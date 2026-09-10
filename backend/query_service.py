@@ -1,0 +1,218 @@
+"""
+Select verified weather values from the existing Open-Meteo fetch.
+
+Does not call Open-Meteo itself — uses weather.open_meteo.fetch_weather.
+Temporal windows are computed here; the LLM must not invent dates.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from models.chat import ChatIntent, DateReference, WeatherFacts, WeatherParameter
+from models.weather import CurrentWeather, HourlyWeather, WeatherResponse
+from weather.open_meteo import fetch_weather
+
+WMO_DESCRIPTIONS: dict[int, str] = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Drizzle",
+    55: "Dense drizzle",
+    61: "Light rain",
+    63: "Rain",
+    65: "Heavy rain",
+    71: "Light snow",
+    73: "Snow",
+    75: "Heavy snow",
+    80: "Light rain showers",
+    81: "Rain showers",
+    82: "Heavy rain showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with slight hail",
+    99: "Thunderstorm with heavy hail",
+}
+
+
+def weather_code_description(code: Optional[int]) -> Optional[str]:
+    if code is None:
+        return None
+    return WMO_DESCRIPTIONS.get(code, f"Weather code {code}")
+
+
+def _zone(tz_name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("UTC")
+
+
+def _parse_local(ts: str, tz: ZoneInfo) -> datetime:
+    # Open-Meteo hourly times are local wall times when timezone=auto.
+    if ts.endswith("Z"):
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(tz)
+    dt = datetime.fromisoformat(ts)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=tz)
+    return dt.astimezone(tz)
+
+
+def _label(date_ref: DateReference) -> str:
+    return {
+        "now": "now",
+        "today": "today",
+        "tomorrow": "tomorrow",
+        "tonight": "tonight",
+        "this_afternoon": "this afternoon",
+    }[date_ref]
+
+
+def _hour_in_window(dt: datetime, now: datetime, date_ref: DateReference) -> bool:
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+    if date_ref == "now":
+        return False
+    if date_ref == "today":
+        return dt.date() == today
+    if date_ref == "tomorrow":
+        return dt.date() == tomorrow
+    if date_ref == "tonight":
+        return dt.date() == today and dt.hour >= 20
+    if date_ref == "this_afternoon":
+        return dt.date() == today and 12 <= dt.hour <= 17
+    return False
+
+
+def _use_current(intent: ChatIntent) -> bool:
+    return intent.intent == "current_weather" and intent.date_reference in {"now", "today"}
+
+
+async def fetch_validated_weather(latitude: float, longitude: float) -> WeatherResponse:
+    raw = await fetch_weather(latitude, longitude)
+    current = CurrentWeather(**raw["current"])
+    hourly = HourlyWeather(**raw["hourly"])
+    return WeatherResponse(
+        latitude=raw["latitude"],
+        longitude=raw["longitude"],
+        timezone=raw["timezone"],
+        retrieved_at=datetime.now(tz=_zone(raw["timezone"])),
+        current=current,
+        hourly=hourly,
+    )
+
+
+def select_weather_facts(
+    weather: WeatherResponse,
+    intent: ChatIntent,
+    location_name: str,
+) -> WeatherFacts:
+    tz = _zone(weather.timezone)
+    now = datetime.now(tz)
+    requested = _label(intent.date_reference)
+
+    if _use_current(intent) or intent.date_reference == "now":
+        current = weather.current
+        facts = WeatherFacts(
+            source="open-meteo",
+            location=location_name,
+            requested_time=f"{requested} ({current.time})",
+            timezone=weather.timezone,
+            temperature_2m=current.temperature_2m,
+            precipitation=current.precipitation,
+            wind_speed_10m=current.wind_speed_10m,
+            relative_humidity_2m=current.relative_humidity_2m,
+            weather_code=current.weather_code,
+            weather_description=weather_code_description(current.weather_code),
+            period_available=True,
+        )
+    else:
+        times = weather.hourly.time
+        temps = weather.hourly.temperature_2m
+        probs = weather.hourly.precipitation_probability
+        precs = weather.hourly.precipitation
+        winds = weather.hourly.wind_speed_10m
+
+        indexes = [
+            i
+            for i, ts in enumerate(times)
+            if _hour_in_window(_parse_local(ts, tz), now, intent.date_reference)
+        ]
+        if not indexes:
+            return WeatherFacts(
+                source="open-meteo",
+                location=location_name,
+                requested_time=requested,
+                timezone=weather.timezone,
+                period_available=False,
+            )
+
+        sel_temps = [temps[i] for i in indexes if temps[i] is not None]
+        sel_probs = [probs[i] for i in indexes if probs[i] is not None]
+        sel_precs = [precs[i] for i in indexes if precs[i] is not None]
+        sel_winds = [winds[i] for i in indexes if winds[i] is not None]
+
+        start = times[indexes[0]]
+        end = times[indexes[-1]]
+        # Representative temperature: midday hour if present, else mean.
+        midday = None
+        for i in indexes:
+            if _parse_local(times[i], tz).hour == 15:
+                midday = temps[i]
+                break
+        representative = midday if midday is not None else (sum(sel_temps) / len(sel_temps) if sel_temps else None)
+
+        max_prob_idx = None
+        if sel_probs:
+            max_prob = max(int(p) for p in sel_probs if p is not None)
+            for i in indexes:
+                if probs[i] == max_prob:
+                    max_prob_idx = i
+                    break
+        else:
+            max_prob = None
+
+        facts = WeatherFacts(
+            source="open-meteo",
+            location=location_name,
+            requested_time=f"{requested} ({start} to {end})",
+            timezone=weather.timezone,
+            temperature_2m=round(representative, 1) if representative is not None else None,
+            temperature_min=round(min(sel_temps), 1) if sel_temps else None,
+            temperature_max=round(max(sel_temps), 1) if sel_temps else None,
+            precipitation=round(sum(sel_precs), 1) if sel_precs else None,
+            precipitation_probability=int(max_prob) if max_prob is not None else None,
+            wind_speed_10m=round(max(sel_winds), 1) if sel_winds else None,
+            weather_code=weather.current.weather_code if intent.date_reference == "today" else None,
+            weather_description=None,
+            period_available=True,
+        )
+
+        if max_prob_idx is not None and intent.weather_parameter in {"precipitation", "general"}:
+            # No hourly weather_code in the existing fetch; leave description unset
+            # rather than inventing one.
+            pass
+
+    if intent.weather_parameter == "temperature":
+        facts.precipitation = None
+        facts.precipitation_probability = None
+        facts.wind_speed_10m = None
+    elif intent.weather_parameter == "precipitation":
+        facts.wind_speed_10m = None
+        facts.relative_humidity_2m = None
+    elif intent.weather_parameter == "wind":
+        facts.precipitation = None
+        facts.precipitation_probability = None
+        facts.relative_humidity_2m = None
+    elif intent.weather_parameter == "humidity":
+        # Hourly humidity is not requested from Open-Meteo; only current is available.
+        facts.relative_humidity_2m = weather.current.relative_humidity_2m
+        facts.precipitation = None
+        facts.wind_speed_10m = None
+
+    return facts

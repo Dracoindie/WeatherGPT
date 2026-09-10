@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+httpx
+pydantic
+geopandas
+shapely
+pyproj
+xarray
+cfgrib
+langgraph
+# dev / test
+pytest
+pytest-asyncio
