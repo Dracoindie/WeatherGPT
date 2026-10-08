@@ -46,50 +46,58 @@ async def chat(
     has_request_coords = body.latitude is not None and body.longitude is not None
     location: Optional[ResolvedLocation] = None
 
-    if intent.location_name:
-        try:
-            geo = await geocode_place(intent.location_name)
-        except RuntimeError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        if geo is None:
-            return ChatResponse(
-                message=unknown_location(intent, intent.location_name),
-                intent=intent,
-                location=None,
-                weather=None,
-                source="open-meteo",
-            )
-        location = ResolvedLocation(
-            name=geo.name,
-            latitude=geo.latitude,
-            longitude=geo.longitude,
-            source="explicit_query",
-        )
-        logger.info("Chat location from query name %s", intent.location_name)
-
-    elif has_request_coords:
-        assert body.latitude is not None and body.longitude is not None
-        label = await reverse_geocode(body.latitude, body.longitude)
-        location = ResolvedLocation(
-            name=label or "selected location",
-            latitude=body.latitude,
-            longitude=body.longitude,
-            source="request_coordinates",
-        )
-        logger.info("Chat location from request coordinates")
-
-    else:
-        trusted = await get_trusted_default_location(authorization)
-        if trusted is not None:
+    try:
+        if intent.location_name:
+            try:
+                geo = await geocode_place(intent.location_name)
+            except RuntimeError as exc:
+                logger.error("Geocode failed for location: %s", intent.location_name, exc_info=exc)
+                raise HTTPException(status_code=502, detail=f"Failed to geocode location: {intent.location_name}") from exc
+            if geo is None:
+                logger.warning("No location found for: %s", intent.location_name)
+                return ChatResponse(
+                    message=unknown_location(intent, intent.location_name),
+                    intent=intent,
+                    location=None,
+                    weather=None,
+                    source="open-meteo",
+                )
             location = ResolvedLocation(
-                name=trusted.name or "saved location",
-                latitude=trusted.latitude,
-                longitude=trusted.longitude,
-                source="trusted_user_default",
+                name=geo.name,
+                latitude=geo.latitude,
+                longitude=geo.longitude,
+                source="explicit_query",
             )
-            logger.info("Chat location from trusted session default")
+            logger.info("Chat location from query name %s", intent.location_name)
 
-    if location is None:
+        elif has_request_coords:
+            assert body.latitude is not None and body.longitude is not None
+            try:
+                label = await reverse_geocode(body.latitude, body.longitude)
+            except RuntimeError as exc:
+                logger.error("Reverse geocode failed for coordinates: %.4f, %.4f", body.latitude, body.longitude, exc_info=exc)
+                raise HTTPException(status_code=502, detail="Failed to reverse geocode coordinates") from exc
+            location = ResolvedLocation(
+                name=label or "selected location",
+                latitude=body.latitude,
+                longitude=body.longitude,
+                source="request_coordinates",
+            )
+            logger.info("Chat location from request coordinates")
+
+        else:
+            trusted = await get_trusted_default_location(authorization)
+            if trusted is not None:
+                location = ResolvedLocation(
+                    name=trusted.name or "saved location",
+                    latitude=trusted.latitude,
+                    longitude=trusted.longitude,
+                    source="trusted_user_default",
+                )
+                logger.info("Chat location from trusted session default")
+
+    except Exception as exc:
+        logger.error("Failed to resolve location: %s", exc, exc_info=exc)
         return ChatResponse(
             message=ask_for_location(intent),
             intent=intent,
@@ -101,17 +109,30 @@ async def chat(
     try:
         weather = await fetch_validated_weather(location.latitude, location.longitude)
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.error("Failed to fetch weather for location: %.4f, %.4f", location.latitude, location.longitude, exc_info=exc)
+        raise HTTPException(status_code=502, detail="Failed to fetch weather data") from exc
     except Exception as exc:
-        logger.error("Failed to build weather facts: %s", exc)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to process weather data. Please try again.",
-        ) from exc
+        logger.error("Unexpected error fetching weather: %s", exc, exc_info=exc)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
-    facts = select_weather_facts(weather, intent, location.name)
-    advisory = evaluate_advisory(facts, intent.weather_parameter)
-    message = await generate_response(intent, facts, advisory)
+    try:
+        facts = select_weather_facts(weather, intent, location.name)
+    except Exception as exc:
+        logger.error("Failed to select weather facts: %s", exc, exc_info=exc)
+        raise HTTPException(status_code=500, detail="Failed to process weather data") from exc
+
+    try:
+        advisory = evaluate_advisory(facts, intent.weather_parameter)
+    except Exception as exc:
+        logger.error("Failed to evaluate advisory: %s", exc, exc_info=exc)
+        raise HTTPException(status_code=500, detail="Failed to generate advisory") from exc
+
+    try:
+        message = await generate_response(intent, facts, advisory)
+    except Exception as exc:
+        logger.error("Failed to generate response: %s", exc, exc_info=exc)
+        raise HTTPException(status_code=500, detail="Failed to generate response") from exc
+
     return ChatResponse(
         message=message,
         intent=intent,
