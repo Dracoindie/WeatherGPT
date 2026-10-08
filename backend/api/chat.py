@@ -106,11 +106,21 @@ async def chat(
             source="open-meteo",
         )
 
+    # Check if location is None before proceeding to fetch weather
+    if location is None:
+        return ChatResponse(
+            message=ask_for_location(intent),
+            intent=intent,
+            location=None,
+            weather=None,
+            source="open-meteo",
+        )
+
     try:
         weather = await fetch_validated_weather(location.latitude, location.longitude)
     except RuntimeError as exc:
         logger.error("Failed to fetch weather for location: %.4f, %.4f", location.latitude, location.longitude, exc_info=exc)
-        raise HTTPException(status_code=502, detail="Failed to fetch weather data") from exc
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         logger.error("Unexpected error fetching weather: %s", exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="Internal server error") from exc
