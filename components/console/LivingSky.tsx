@@ -8,9 +8,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ShieldCheck } from 'lucide-react'
 import { postChat, ChatApiError } from '@/lib/api/chat'
+import { getWeather, type WeatherResponse } from '@/lib/api/weather'
 import { useAuthContext } from '@/context/AuthContext'
 import { useDemoContext } from '@/context/DemoContext'
 import { useI18n } from '@/context/I18nContext'
@@ -33,7 +35,20 @@ import {
   WindPanel,
 } from '@/components/panels/WeatherPanels'
 import { RainGlass } from '@/components/panels/RainGlass'
+import { GlassPanel } from '@/components/panels/GlassPanel'
+import { ForecastTimeline } from '@/components/panels/ForecastTimeline'
 import type { ThreadEntry } from './types'
+
+const SkyMap = dynamic(() => import('@/components/panels/SkyMap'), {
+  ssr: false,
+  loading: () => <div className="h-full min-h-[280px] animate-pulse rounded-xl bg-white/[0.03]" />,
+})
+
+interface ForecastState {
+  key: string
+  data?: WeatherResponse
+  error?: string
+}
 
 const HERE_QUERY = { en: "What's the weather here right now?", hi: 'अभी यहाँ मौसम कैसा है?' } as const
 
@@ -84,6 +99,25 @@ export default function LivingSky() {
       sky.setPreview(null)
     }
   }, [res])
+
+  // Hourly forecast for the timeline whenever the answered location changes.
+  const loc = res?.location ?? null
+  const locKey = loc ? `${loc.latitude.toFixed(4)},${loc.longitude.toFixed(4)}` : null
+  const [forecast, setForecast] = useState<ForecastState | null>(null)
+  useEffect(() => {
+    if (!loc || !locKey) return
+    const ctrl = new AbortController()
+    getWeather(loc.latitude, loc.longitude, ctrl.signal)
+      .then((data) => setForecast({ key: locKey, data }))
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setForecast({ key: locKey, error: err instanceof Error ? err.message : 'Forecast unavailable' })
+      })
+    return () => ctrl.abort()
+    // loc is identified by locKey
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locKey])
+  const forecastForLoc = forecast && forecast.key === locKey ? forecast : null
 
   // "Use my location": ask once the browser resolves coordinates.
   const { coords, status: geoStatus, requestLocation } = geo
@@ -182,6 +216,29 @@ export default function LivingSky() {
               </motion.section>
             )}
           </AnimatePresence>
+
+          {loc && typedId === active?.id && (
+            <section className="mt-4 grid gap-4 xl:grid-cols-5">
+              <div className="min-w-0 xl:col-span-3">
+                {forecastForLoc?.data ? (
+                  <ForecastTimeline weather={forecastForLoc.data} resetKey={activeId} />
+                ) : (
+                  <GlassPanel label={t('panel.timeline')} className="h-full">
+                    {forecastForLoc?.error ? (
+                      <p className="text-sm text-rose-300">{forecastForLoc.error}</p>
+                    ) : (
+                      <div className="h-[230px] animate-pulse rounded-xl bg-white/[0.03]" />
+                    )}
+                  </GlassPanel>
+                )}
+              </div>
+              <GlassPanel label={t('panel.map')} wet={false} className="flex min-h-[340px] flex-col xl:col-span-2">
+                <div className="min-h-0 flex-1">
+                  <SkyMap latitude={loc.latitude} longitude={loc.longitude} label={loc.name} />
+                </div>
+              </GlassPanel>
+            </section>
+          )}
         </div>
 
         <aside className="lg:sticky lg:top-4 lg:self-start lg:pt-6">
