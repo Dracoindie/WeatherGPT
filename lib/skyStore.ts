@@ -101,9 +101,11 @@ export const sky = {
     Object.assign(live, snapshot.target)
     flash.value = 0
   },
-  subscribe(listener: () => void) {
+  subscribe(listener: () => void): () => void {
     listeners.add(listener)
-    return () => listeners.delete(listener)
+    return () => {
+      listeners.delete(listener)
+    }
   },
   getSnapshot: () => snapshot,
 }

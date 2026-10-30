@@ -17,7 +17,8 @@ import { useI18n } from '@/context/I18nContext'
 import { useGeolocation } from '@/lib/location/useGeolocation'
 import { sky } from '@/lib/skyStore'
 import { sceneFromFacts } from '@/lib/weatherScene'
-import { StaticSky } from '@/components/sky/StaticSky'
+import { SkyEngine } from '@/components/sky/SkyEngine'
+import { DemoPanel } from '@/components/sky/DemoPanel'
 import { AskConsole } from './AskConsole'
 import { ConversationThread } from './ConversationThread'
 import { ReplyCard } from './ReplyCard'
@@ -94,7 +95,8 @@ export default function LivingSky() {
 
   return (
     <div className="sky-root" data-severity={severity}>
-      <StaticSky />
+      <SkyEngine />
+      <DemoPanel />
       <SkyNav />
 
       <main className="relative z-10 mx-auto grid max-w-[1500px] gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
