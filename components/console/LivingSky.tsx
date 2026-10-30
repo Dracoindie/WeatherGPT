@@ -24,6 +24,15 @@ import { ConversationThread } from './ConversationThread'
 import { ReplyCard } from './ReplyCard'
 import { ScanningLoader } from './ScanningLoader'
 import { SkyNav } from './SkyNav'
+import { AdvisoryPanel, HighSeverityHud } from '@/components/panels/Advisory'
+import {
+  HumidityPanel,
+  LocationPanel,
+  RainPanel,
+  TemperaturePanel,
+  WindPanel,
+} from '@/components/panels/WeatherPanels'
+import { RainGlass } from '@/components/panels/RainGlass'
 import type { ThreadEntry } from './types'
 
 const HERE_QUERY = { en: "What's the weather here right now?", hi: 'अभी यहाँ मौसम कैसा है?' } as const
@@ -97,6 +106,7 @@ export default function LivingSky() {
     <div className="sky-root" data-severity={severity}>
       <SkyEngine />
       <DemoPanel />
+      <HighSeverityHud advisory={res?.advisory ?? null} />
       <SkyNav />
 
       <main className="relative z-10 mx-auto grid max-w-[1500px] gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -134,6 +144,7 @@ export default function LivingSky() {
                   exit={{ opacity: 0 }}
                   className="sky-glass p-5"
                 >
+                  <RainGlass />
                   <ScanningLoader />
                 </motion.div>
               )}
@@ -148,11 +159,29 @@ export default function LivingSky() {
             </AnimatePresence>
           </section>
 
-          {res && typedId === active?.id && res.weather && (
-            <pre className="mx-auto mt-6 max-w-3xl overflow-x-auto font-readout text-xs text-hud-dim">
-              {JSON.stringify(res.weather, null, 2)}
-            </pre>
-          )}
+          <AnimatePresence>
+            {res?.location && typedId === active?.id && (
+              <motion.section
+                key={active.id}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0 }}
+                variants={{ show: { transition: { staggerChildren: 0.09 } } }}
+                className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              >
+                <LocationPanel location={res.location} facts={res.weather} />
+                {res.weather?.period_available && (
+                  <>
+                    <TemperaturePanel facts={res.weather} />
+                    <RainPanel facts={res.weather} />
+                    <WindPanel facts={res.weather} />
+                    <HumidityPanel facts={res.weather} />
+                  </>
+                )}
+                {res.advisory && <AdvisoryPanel advisory={res.advisory} />}
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
 
         <aside className="lg:sticky lg:top-4 lg:self-start lg:pt-6">

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, Crosshair, LoaderCircle, MapPin } from 'lucide-react'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
+import { RainGlass } from '@/components/panels/RainGlass'
 import type { ThreadEntry } from './types'
 
 interface ConversationThreadProps {
@@ -24,6 +25,7 @@ export function ConversationThread({ entries, activeId, onSelect }: Conversation
 
   return (
     <div className="sky-glass flex max-h-[70vh] flex-col p-4 lg:max-h-[calc(100dvh-7rem)]">
+      <RainGlass />
       <header className="mb-3 flex items-center justify-between">
         <h2 className="sky-label">{t('sky.thread')}</h2>
         <span className="font-readout text-[10px] text-hud-dim">{entries.length.toString().padStart(2, '0')}</span>

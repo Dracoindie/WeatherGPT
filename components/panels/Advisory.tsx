@@ -1,0 +1,104 @@
+'use client'
+
+/**
+ * Advisory alert system. Severity comes from the backend's deterministic
+ * advisory engine; the UI accent follows it (low cyan / moderate amber /
+ * high red). High severity adds a pulsing viewport frame and a HUD banner
+ * whose reasons scroll as a ticker.
+ */
+
+import { AnimatePresence, motion } from 'framer-motion'
+import { OctagonAlert, ShieldAlert, ShieldCheck, X } from 'lucide-react'
+import { useState } from 'react'
+import type { AdvisoryResult } from '@/lib/api/chat'
+import { useI18n } from '@/context/I18nContext'
+import { cn } from '@/lib/utils'
+import { GlassPanel } from './GlassPanel'
+import { panelItem } from './WeatherPanels'
+
+const ICON = { low: ShieldCheck, moderate: ShieldAlert, high: OctagonAlert } as const
+
+export function AdvisoryPanel({ advisory }: { advisory: AdvisoryResult }) {
+  const { t } = useI18n()
+  const Icon = ICON[advisory.severity]
+  return (
+    <motion.div variants={panelItem} className="sm:col-span-2">
+      <GlassPanel
+        label={t('panel.advisory')}
+        className={cn('h-full', advisory.severity !== 'low' && 'border-accent/40 shadow-[0_0_50px_-20px_var(--sky-accent)]')}
+        aside={
+          <span className="rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent">
+            {t(`severity.${advisory.severity}`)}
+          </span>
+        }
+      >
+        <div className="flex items-start gap-3">
+          <Icon className="mt-0.5 size-6 shrink-0 text-accent" />
+          <div className="min-w-0">
+            <p className="font-hud text-lg font-semibold">{advisory.condition}</p>
+            <p className="mt-1 text-sm text-hud-dim">{advisory.advisory}</p>
+            {advisory.reasons.length > 0 && (
+              <ul className="mt-3 space-y-1 font-readout text-[11px] text-hud">
+                {advisory.reasons.map((r) => (
+                  <li key={r} className="flex gap-2">
+                    <span className="text-accent">▸</span>
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </GlassPanel>
+    </motion.div>
+  )
+}
+
+/** Full-viewport treatment for high severity. */
+export function HighSeverityHud({ advisory }: { advisory: AdvisoryResult | null }) {
+  const [dismissedFor, setDismissedFor] = useState<AdvisoryResult | null>(null)
+  const active = advisory?.severity === 'high'
+  const showBanner = active && dismissedFor !== advisory
+  const ticker = advisory ? [advisory.advisory, ...advisory.reasons] : []
+
+  return (
+    <>
+      {active && <div className="sky-alarm-frame" aria-hidden="true" />}
+      <AnimatePresence>
+        {showBanner && advisory && (
+          <motion.div
+            role="alert"
+            initial={{ y: -80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -80, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 180, damping: 22 }}
+            className="fixed inset-x-3 top-3 z-[65] mx-auto max-w-4xl overflow-hidden rounded-2xl border border-rose-500/60 bg-[#1a0309]/85 shadow-[0_0_60px_-10px_rgba(244,63,94,0.8)] backdrop-blur-xl"
+          >
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <OctagonAlert className="size-5 shrink-0 animate-pulse text-rose-400" />
+              <div className="min-w-0 flex-1">
+                <p className="font-readout text-[10px] uppercase tracking-[0.3em] text-rose-300">
+                  Severity high · {advisory.condition}
+                </p>
+              </div>
+              <button type="button" onClick={() => setDismissedFor(advisory)} aria-label="Dismiss" className="text-rose-200/70 hover:text-rose-100">
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="overflow-hidden border-t border-rose-500/30 bg-rose-500/10 py-1.5">
+              <div className="sky-ticker gap-10 whitespace-nowrap font-readout text-xs text-rose-100">
+                {[0, 1].map((copy) => (
+                  <span key={copy} className="flex gap-10 pr-10" aria-hidden={copy === 1}>
+                    {ticker.map((item) => (
+                      <span key={item}>⚠ {item}</span>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}

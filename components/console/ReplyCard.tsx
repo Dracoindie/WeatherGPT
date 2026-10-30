@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { AlertTriangle, Crosshair, MapPinOff, RadioTower } from 'lucide-react'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
+import { RainGlass } from '@/components/panels/RainGlass'
 import { Typewriter } from './Typewriter'
 import type { ThreadEntry } from './types'
 
@@ -47,6 +48,7 @@ export function ReplyCard({ entry, onTyped, onUseLocation }: ReplyCardProps) {
       animate={{ opacity: 1, y: 0 }}
       className={cn('sky-glass p-4 sm:p-5', needsLocation && 'border-amber-400/30')}
     >
+      <RainGlass />
       <div className="mb-2 flex items-center gap-2">
         {needsLocation ? (
           <MapPinOff className="size-4 text-amber-300" />
