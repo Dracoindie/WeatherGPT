@@ -13,7 +13,13 @@ import { ForecastPanel } from '@/components/weather/ForecastPanel';
 import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { TrustStrip } from '@/components/common/TrustStrip';
-import { InteractiveMap } from '@/components/map/InteractiveMap';
+import dynamic from 'next/dynamic';
+
+// Leaflet touches `window` at import time, so the map must not render on the server.
+const InteractiveMap = dynamic(
+  () => import('@/components/map/InteractiveMap').then((m) => m.InteractiveMap),
+  { ssr: false }
+);
 import { AlertBanner } from '@/components/alerts/AlertBanner';
 import type { AdvisoryResult } from '@/components/weather/WeatherIntelligence';
 import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes';
