@@ -1,9 +1,10 @@
-import { redirect } from 'next/navigation'
+import { LivingSkyLoader } from '@/components/console/LivingSkyLoader'
 
 /**
- * Root route — redirect to /dashboard.
- * Middleware will further redirect unauthenticated users to /login.
+ * Living Sky home. Public (no AuthGuard): anonymous users can ask about any
+ * named place; signed-in users also get their saved default location.
+ * The former home (redirect to /dashboard) lives at /classic.
  */
 export default function Home() {
-  redirect('/dashboard')
+  return <LivingSkyLoader />
 }

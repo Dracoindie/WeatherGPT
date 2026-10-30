@@ -68,3 +68,193 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ==========================================================================
+   Living Sky (home route) — everything below is scoped to .sky-root so the
+   existing light-theme pages keep their tokens untouched.
+   ========================================================================== */
+
+@theme inline {
+  --font-hud: var(--font-sky-display), var(--font-sky-deva), ui-sans-serif, sans-serif;
+  --font-skybody: var(--font-sky-body), var(--font-sky-deva), ui-sans-serif, sans-serif;
+  --font-readout: var(--font-geist-mono), ui-monospace, monospace;
+  --color-accent: var(--sky-accent);
+  --color-hud: var(--sky-text);
+  --color-hud-dim: var(--sky-text-dim);
+}
+
+@property --sky-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.sky-root {
+  --sky-accent: #22d3ee;
+  --sky-accent-2: #818cf8;
+  --sky-text: #e7f0ff;
+  --sky-text-dim: rgba(205, 220, 245, 0.62);
+  --sky-flash: 0;
+  position: relative;
+  min-height: 100dvh;
+  color: var(--sky-text);
+  font-family: var(--font-skybody);
+  background: #02040a;
+  isolation: isolate;
+  overflow-x: hidden;
+}
+.sky-root[data-severity="moderate"] { --sky-accent: #fbbf24; --sky-accent-2: #fb923c; }
+.sky-root[data-severity="high"]     { --sky-accent: #f43f5e; --sky-accent-2: #fb7185; }
+.sky-root :lang(hi), .sky-root .deva { font-family: var(--font-sky-deva), var(--font-sky-body), sans-serif; }
+
+/* --- Glass panels: dark frosted glass with HUD corner brackets ------------ */
+.sky-glass {
+  position: relative;
+  border-radius: 18px;
+  background:
+    linear-gradient(165deg, rgba(14, 22, 38, 0.66), rgba(5, 9, 18, 0.78));
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(160, 200, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25),
+    0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  transition: border-color 0.6s ease, box-shadow 0.6s ease;
+}
+.sky-glass::before {
+  /* corner brackets in the severity accent */
+  --c: color-mix(in srgb, var(--sky-accent) 70%, transparent);
+  content: "";
+  position: absolute;
+  inset: 7px;
+  pointer-events: none;
+  z-index: 3;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 12px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 1px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 12px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 1px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 12px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 12px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 12px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 12px no-repeat;
+  transition: --c 0.6s ease;
+}
+.sky-glass::after {
+  /* lightning flash wash + faint scanlines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background:
+    linear-gradient(180deg, rgba(220, 235, 255, calc(var(--sky-flash) * 0.35)), rgba(220, 235, 255, calc(var(--sky-flash) * 0.12))),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px);
+}
+.sky-glass > * { position: relative; z-index: 2; }
+.sky-glass > canvas.rain-glass { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+.sky-label {
+  font-family: var(--font-readout);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sky-text-dim);
+}
+
+/* --- Console: rotating conic glow border ---------------------------------- */
+.sky-console {
+  position: relative;
+  border-radius: 20px;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--sky-angle),
+    transparent 0deg,
+    var(--sky-accent) 60deg,
+    transparent 120deg,
+    var(--sky-accent-2) 220deg,
+    transparent 300deg
+  );
+  animation: sky-spin 6s linear infinite;
+  box-shadow: 0 0 40px -12px var(--sky-accent);
+}
+.sky-console:focus-within { box-shadow: 0 0 70px -10px var(--sky-accent); }
+@keyframes sky-spin { to { --sky-angle: 360deg; } }
+
+.sky-caret {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1.15em;
+  margin-left: 2px;
+  vertical-align: -0.2em;
+  background: var(--sky-accent);
+  box-shadow: 0 0 10px var(--sky-accent);
+  animation: sky-blink 1.05s steps(1) infinite;
+}
+@keyframes sky-blink { 50% { opacity: 0; } }
+
+/* --- Radar loader ---------------------------------------------------------- */
+.sky-radar {
+  position: relative;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle, transparent 0 32%, color-mix(in srgb, var(--sky-accent) 25%, transparent) 33% 33.6%, transparent 34.2% 65%, color-mix(in srgb, var(--sky-accent) 25%, transparent) 66% 66.6%, transparent 67.2%),
+    radial-gradient(circle, rgba(10, 30, 50, 0.6), rgba(2, 6, 14, 0.9));
+  border: 1px solid color-mix(in srgb, var(--sky-accent) 45%, transparent);
+  overflow: hidden;
+}
+.sky-radar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(from 0deg, color-mix(in srgb, var(--sky-accent) 65%, transparent), transparent 70deg);
+  animation: sky-radar 1.6s linear infinite;
+}
+@keyframes sky-radar { to { transform: rotate(360deg); } }
+
+/* --- Advisory: viewport alarm frame + ticker ------------------------------ */
+.sky-alarm-frame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  box-shadow: inset 0 0 0 2px rgba(244, 63, 94, 0.85), inset 0 0 90px rgba(244, 63, 94, 0.35);
+  animation: sky-alarm 1.8s ease-in-out infinite;
+}
+@keyframes sky-alarm { 50% { box-shadow: inset 0 0 0 2px rgba(244, 63, 94, 0.35), inset 0 0 40px rgba(244, 63, 94, 0.12); } }
+
+.sky-ticker { display: flex; width: max-content; animation: sky-ticker 26s linear infinite; }
+@keyframes sky-ticker { to { transform: translateX(-50%); } }
+
+.sky-pulse-ring { animation: sky-pulse 2.4s ease-in-out infinite; transform-origin: center; }
+@keyframes sky-pulse { 50% { opacity: 0.45; transform: scale(1.04); } }
+
+/* --- Map marker ------------------------------------------------------------ */
+.sky-marker { position: relative; width: 18px; height: 18px; }
+.sky-marker span {
+  position: absolute; inset: 0; border-radius: 9999px;
+  background: var(--sky-accent); box-shadow: 0 0 16px 4px var(--sky-accent);
+}
+.sky-marker span + span { background: transparent; border: 2px solid var(--sky-accent); box-shadow: none; animation: sky-ping 1.8s ease-out infinite; }
+@keyframes sky-ping { from { transform: scale(1); opacity: 0.9; } to { transform: scale(4.2); opacity: 0; } }
+.sky-map .leaflet-container { background: #05080f; font-family: var(--font-readout); }
+.sky-map .leaflet-control-attribution { background: rgba(2, 6, 14, 0.7) !important; color: rgba(205, 220, 245, 0.5) !important; font-size: 9px; }
+.sky-map .leaflet-control-attribution a { color: rgba(205, 220, 245, 0.75) !important; }
+.sky-map .leaflet-div-icon { background: transparent; border: 0; }
+
+.sky-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.sky-scroll::-webkit-scrollbar-thumb { background: rgba(160, 200, 255, 0.18); border-radius: 9999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-root *, .sky-root *::before, .sky-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .sky-root { --sky-flash: 0 !important; }
+  .sky-ticker { animation: none; flex-wrap: wrap; width: auto; }
+  .sky-alarm-frame { animation: none; }
+}
