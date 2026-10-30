@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { ShieldCheck } from 'lucide-react'
 import { postChat, ChatApiError } from '@/lib/api/chat'
 import { getWeather, type WeatherResponse } from '@/lib/api/weather'
@@ -137,6 +137,7 @@ export default function LivingSky() {
   }, [requestLocation])
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="sky-root" data-severity={severity}>
       <SkyEngine />
       <DemoPanel />
@@ -221,7 +222,7 @@ export default function LivingSky() {
             <section className="mt-4 grid gap-4 xl:grid-cols-5">
               <div className="min-w-0 xl:col-span-3">
                 {forecastForLoc?.data ? (
-                  <ForecastTimeline weather={forecastForLoc.data} resetKey={activeId} />
+                  <ForecastTimeline key={`${activeId}-${locKey}`} weather={forecastForLoc.data} />
                 ) : (
                   <GlassPanel label={t('panel.timeline')} className="h-full">
                     {forecastForLoc?.error ? (
@@ -246,5 +247,6 @@ export default function LivingSky() {
         </aside>
       </main>
     </div>
+    </MotionConfig>
   )
 }

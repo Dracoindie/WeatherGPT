@@ -46,11 +46,10 @@ function dayLabel(ts: string, lang: string) {
 
 interface Props {
   weather: WeatherResponse
-  /** changes when a new chat answer arrives — resets the scrubber */
-  resetKey: number | null
 }
 
-export function ForecastTimeline({ weather, resetKey }: Props) {
+/** Remount (change `key`) for a new answer or location to reset the scrubber. */
+export function ForecastTimeline({ weather }: Props) {
   const { t, language } = useI18n()
   const { time, temperature_2m: temps, precipitation_probability: probs, precipitation: precs, wind_speed_10m: winds } = weather.hourly
   const n = time.length
@@ -76,17 +75,12 @@ export function ForecastTimeline({ weather, resetKey }: Props) {
   )
   const areaPath = `${linePath} L ${x(n - 1)} ${PAD_TOP + TEMP_H + 8} L ${x(0)} ${PAD_TOP + TEMP_H + 8} Z`
 
-  // New answer / new location: back to live
+  // Start scrolled to the current hour; clear any preview on unmount.
   useEffect(() => {
-    setSelected(live)
-    setPreviewing(false)
     const el = scroller.current
-    if (el) el.scrollTo({ left: Math.max(0, x(live) - el.clientWidth / 3), behavior: 'smooth' })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey, live])
-
-  // Leaving the page section clears the preview
-  useEffect(() => () => sky.setPreview(null), [])
+    if (el) el.scrollTo({ left: Math.max(0, live * HOUR_W - el.clientWidth / 3), behavior: 'smooth' })
+    return () => sky.setPreview(null)
+  }, [live])
 
   function select(i: number) {
     const idx = Math.max(0, Math.min(n - 1, i))

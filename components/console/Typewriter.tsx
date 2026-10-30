@@ -13,6 +13,7 @@ function graphemes(text: string): string[] {
 }
 
 interface TypewriterProps {
+  /** remount (change `key`) to restart with new text */
   text: string
   /** ms per grapheme */
   speed?: number
@@ -31,11 +32,9 @@ export function Typewriter({ text, speed = 16, onDone, className }: TypewriterPr
 
   useEffect(() => {
     if (reduced) {
-      setCount(parts.length)
       doneRef.current?.()
       return
     }
-    setCount(0)
     let i = 0
     const id = window.setInterval(() => {
       i += 1
@@ -48,12 +47,13 @@ export function Typewriter({ text, speed = 16, onDone, className }: TypewriterPr
     return () => window.clearInterval(id)
   }, [parts, speed, reduced])
 
-  const typing = count < parts.length
+  const visible = reduced ? parts.length : count
+  const typing = visible < parts.length
   return (
     <p className={className} aria-live="polite">
       <span className="sr-only">{text}</span>
       <span aria-hidden="true">
-        {parts.slice(0, count).join('')}
+        {parts.slice(0, visible).join('')}
         {typing && <span className="sky-caret" />}
       </span>
     </p>

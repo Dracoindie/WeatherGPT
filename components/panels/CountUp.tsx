@@ -27,14 +27,11 @@ interface CountUpProps {
 export function CountUp({ value, className, duration = 1.1 }: CountUpProps) {
   const reduced = useReducedMotion()
   const decimals = decimalsOf(value)
-  const [shown, setShown] = useState(reduced ? value : 0)
+  const [shown, setShown] = useState(0)
   const from = useRef(0)
 
   useEffect(() => {
-    if (reduced) {
-      setShown(value)
-      return
-    }
+    if (reduced) return
     const controls = animate(from.current, value, {
       duration,
       ease: [0.16, 1, 0.3, 1],
@@ -45,10 +42,11 @@ export function CountUp({ value, className, duration = 1.1 }: CountUpProps) {
     return () => controls.stop()
   }, [value, duration, reduced])
 
+  const display = reduced || shown === value ? formatValue(value) : shown.toFixed(decimals)
   return (
     <span className={className}>
       <span className="sr-only">{formatValue(value)}</span>
-      <span aria-hidden="true">{shown === value ? formatValue(value) : shown.toFixed(decimals)}</span>
+      <span aria-hidden="true">{display}</span>
     </span>
   )
 }
