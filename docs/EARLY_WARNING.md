@@ -143,6 +143,42 @@ Register-ScheduledTask -TaskName "WeatherGPT alert job" -Action $action -Trigger
 
 **Env var names.** The backend reads `SUPABASE_URL` and `SUPABASE_ANON_KEY`, not the frontend's `NEXT_PUBLIC_` names. If `backend\.env` only has the prefixed names, the backend and the job log a warning telling you to rename them; they are never used as a fallback. Every variable is listed in the root `.env.example`.
 
+## Thresholds: one source of truth
+
+Every hazard rule is in **`backend/thresholds.py`**: hazard, level, comparator, value, unit and window. Everything reads it:
+
+| Surface | How it uses the rules |
+|---------|-----------------------|
+| Alert engine (`alerts/engine.py`) | Thresholds **and** levels for `/api/alerts` |
+| Dashboard and map status | `/api/alerts` (the alert banner is the only location status; the old chat-driven "Weather Intelligence" card is gone) |
+| District risk board (`roles/risk.py`) | `evaluate_alerts` |
+| Web Push job (`dissemination/job.py`) | `evaluate_alerts` |
+| CAP export | Each alert's `threshold_value` |
+| Chat advisories (`advisory.py`) | Same values. Severity comes from the rule level through `ADVISORY_SEVERITY`: warning is high; watch and advisory are moderate. |
+| `/alerts` threshold table | `GET /api/alerts/thresholds` (never hard-coded in the UI) |
+
+| Rule | Level | Threshold | Window |
+|------|-------|-----------|--------|
+| Heavy rain | watch | ≥ 15 mm | 24 h total |
+| Extreme rain | warning | ≥ 50 mm | 24 h total |
+| High heat | advisory | ≥ 35 °C | 24 h maximum |
+| Extreme heat | warning | ≥ 40 °C | 24 h maximum |
+| Cold | advisory | ≤ 5 °C | 24 h minimum |
+| Strong wind | watch | ≥ 40 km/h | 24 h maximum |
+| Gale | warning | ≥ 65 km/h | 24 h maximum |
+| Thunderstorm | watch | WMO 95 | current |
+| Thunderstorm with hail | warning | WMO 96, 99 | current |
+
+These are WeatherGPT's conservative fallbacks, not IMD criteria.
+
+**Alerts vs chat advisories:**
+- An alert covers the location's current conditions plus the next 24 h.
+- A chat advisory covers the period the question asked about, and its panel is labelled with that period (for example "Advisory · Mon 2 Nov, 00:00–23:00").
+
+**When changing a rule:**
+- Edit `thresholds.py` and run `tests/test_thresholds.py`.
+- Regenerate the Playwright fixture `weathergpt-web/e2e/support/thresholds.json`; the test prints the command.
+
 ## CAP mapping
 
 | WeatherGPT | CAP `severity` | `urgency` | `responseType` |

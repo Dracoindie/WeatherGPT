@@ -42,3 +42,24 @@ export async function fetchAlerts(params: {
   const data: AlertsResponse = await resp.json();
   return data;
 }
+
+export interface ThresholdRule {
+  id: string
+  hazard: 'rain' | 'heat' | 'cold' | 'wind' | 'storm'
+  level: 'advisory' | 'watch' | 'warning'
+  label: string
+  parameter: string
+  comparator: '>=' | '<=' | 'in'
+  value: number
+  unit: string
+  window: string
+  codes: number[]
+}
+
+/** The single hazard rule table (backend/thresholds.py). */
+export async function fetchThresholds(): Promise<ThresholdRule[]> {
+  const resp = await fetch(`${API_BASE}/api/alerts/thresholds`)
+  if (!resp.ok) throw new Error('Thresholds unavailable')
+  const body = (await resp.json()) as { rules: ThresholdRule[] }
+  return body.rules
+}

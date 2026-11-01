@@ -14,14 +14,12 @@ import AuthGuard from '@/components/auth/AuthGuard'
 import { API_BASE } from '@/lib/api/base'
 import { AppShell } from '@/components/ui/AppShell'
 import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero'
-import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { TrustStrip } from '@/components/common/TrustStrip'
 import LocationPicker, { type LocationData } from '@/components/location/LocationPicker'
 import { useAuthContext } from '@/context/AuthContext'
 import { useDemoContext } from '@/context/DemoContext'
 import { upsertProfile } from '@/lib/profile/profileService'
-import type { AdvisoryResult } from '@/components/weather/WeatherIntelligence'
 import { fetchForecast } from '@/lib/api/forecast'
 import { ALERTS_UNAVAILABLE_MESSAGE, fetchAlerts } from '@/lib/api/alerts'
 import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes'
@@ -57,7 +55,6 @@ export default function DashboardPage() {
   const [weatherData, setWeatherData] = useState<WeatherApiResponse | null>(null)
   const [weatherStatus, setWeatherStatus] = useState<WeatherStatus>('idle')
   const [weatherError, setWeatherError] = useState('')
-  const [advisory, setAdvisory] = useState<AdvisoryResult | null>(null)
   const [forecastState, setForecastState] = useState<DataState<WeatherResponse>>({status: 'idle'})
   const [alerts, setAlerts] = useState<WeatherAlert[]>([])
   const [alertsLoading, setAlertsLoading] = useState(false)
@@ -170,7 +167,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+          <div className="grid grid-cols-1 gap-5">
             <div className="space-y-5">
               <CurrentWeatherHero
                 status={weatherStatus}
@@ -182,7 +179,6 @@ export default function DashboardPage() {
               />
 
             </div>
-            <WeatherIntelligence advisory={advisory} />
           </div>
 
           <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -190,7 +186,6 @@ export default function DashboardPage() {
               latitude={location?.latitude}
               longitude={location?.longitude}
               accessToken={isDemo ? undefined : session?.access_token}
-              onAdvisoryChange={setAdvisory}
             />
             <aside className="min-w-0 space-y-5">
               <ForecastPanel state={forecastState} />

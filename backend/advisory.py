@@ -6,17 +6,25 @@ Provides transparent, threshold-based interpretations of weather facts.
 from typing import List, NamedTuple
 from models.chat import AdvisoryResult, ResponseLanguage, WeatherFacts, WeatherParameter
 
-# Conservative Fallback Thresholds
-# These thresholds are used as reasonable fallbacks for generating advisories
-# since there are no scientifically validated models in the current project scope.
-
-HEAVY_RAIN_MM = 15.0      # 15 mm in a period is considered moderate-to-heavy
-EXTREME_RAIN_MM = 50.0    # 50+ mm is extreme
-HIGH_WIND_KMH = 40.0      # 40 km/h is strong
-STORM_WIND_KMH = 65.0     # 65+ km/h is gale/storm
-HOT_TEMP_C = 35.0         # 35C is hot
-EXTREME_HEAT_C = 40.0     # 40C+ is extreme heat
-COLD_TEMP_C = 5.0         # 5C is cold
+# Thresholds and levels live in thresholds.py (the one source for chat,
+# alerts, dashboard, risk board, push and CAP). Re-exported for older imports.
+from thresholds import (  # noqa: E402
+    ADVISORY_SEVERITY,
+    COLD,
+    COLD_TEMP_C,
+    EXTREME_HEAT,
+    EXTREME_HEAT_C,
+    EXTREME_RAIN,
+    EXTREME_RAIN_MM,
+    GALE,
+    HEAVY_RAIN,
+    HEAVY_RAIN_MM,
+    HIGH_HEAT,
+    HIGH_WIND_KMH,
+    HOT_TEMP_C,
+    STORM_WIND_KMH,
+    STRONG_WIND,
+)
 
 _SEVERITY_RANK = {"low": 0, "moderate": 1, "high": 2}
 
@@ -123,7 +131,7 @@ def evaluate_advisory(facts: WeatherFacts, parameter: WeatherParameter) -> Advis
     # Check Rain
     if rain is not None and rain >= EXTREME_RAIN_MM:
         triggers.append(_Trigger(
-            "high",
+            ADVISORY_SEVERITY[EXTREME_RAIN.level],
             "Extreme Rain / Flood Risk",
             "Severe precipitation expected. Avoid unnecessary travel and stay clear of waterlogged areas.",
         ))
@@ -131,7 +139,7 @@ def evaluate_advisory(facts: WeatherFacts, parameter: WeatherParameter) -> Advis
         is_rain = True
     elif rain is not None and rain >= HEAVY_RAIN_MM:
         triggers.append(_Trigger(
-            "moderate",
+            ADVISORY_SEVERITY[HEAVY_RAIN.level],
             "Heavy Rain",
             "Heavy rain expected. Carry an umbrella and expect minor travel delays.",
         ))
@@ -152,14 +160,14 @@ def evaluate_advisory(facts: WeatherFacts, parameter: WeatherParameter) -> Advis
     # Check Heat
     if temp_high is not None and temp_high >= EXTREME_HEAT_C:
         triggers.append(_Trigger(
-            "high",
+            ADVISORY_SEVERITY[EXTREME_HEAT.level],
             "Extreme Heat",
             "Dangerous heat levels. Stay indoors, stay hydrated, and avoid direct sun exposure.",
         ))
         reasons.append(f"Temperatures reaching {temp_high}°C.")
     elif temp_high is not None and temp_high >= HOT_TEMP_C:
         triggers.append(_Trigger(
-            "moderate",
+            ADVISORY_SEVERITY[HIGH_HEAT.level],
             "High Heat",
             "Hot conditions expected. Keep hydrated if spending time outdoors.",
         ))
@@ -168,7 +176,7 @@ def evaluate_advisory(facts: WeatherFacts, parameter: WeatherParameter) -> Advis
     # Check Cold
     if temp_low is not None and temp_low <= COLD_TEMP_C:
         triggers.append(_Trigger(
-            "moderate",
+            ADVISORY_SEVERITY[COLD.level],
             "Cold / Chilly",
             "Cold temperatures expected. Dress warmly.",
         ))
@@ -177,14 +185,14 @@ def evaluate_advisory(facts: WeatherFacts, parameter: WeatherParameter) -> Advis
     # Check Wind
     if wind is not None and wind >= STORM_WIND_KMH:
         triggers.append(_Trigger(
-            "high",
+            ADVISORY_SEVERITY[GALE.level],
             "Storm / Gale Winds",
             "Dangerous wind speeds. Secure loose objects and avoid outdoor activities.",
         ))
         reasons.append(f"Wind speeds reaching {wind} km/h.")
     elif wind is not None and wind >= HIGH_WIND_KMH:
         triggers.append(_Trigger(
-            "moderate",
+            ADVISORY_SEVERITY[STRONG_WIND.level],
             "Strong Winds",
             "Breezy to strong winds expected. Exercise caution if driving high-profile vehicles.",
         ))

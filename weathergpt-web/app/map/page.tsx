@@ -11,7 +11,6 @@ import { fetchForecast } from '@/lib/api/forecast';
 import { ALERTS_UNAVAILABLE_MESSAGE, fetchAlerts } from '@/lib/api/alerts';
 import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero';
 import { ForecastPanel } from '@/components/weather/ForecastPanel';
-import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { TrustStrip } from '@/components/common/TrustStrip';
 import dynamic from 'next/dynamic';
@@ -22,7 +21,6 @@ const InteractiveMap = dynamic(
   { ssr: false }
 );
 import { AlertBanner } from '@/components/alerts/AlertBanner';
-import type { AdvisoryResult } from '@/components/weather/WeatherIntelligence';
 import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes';
 import type { WeatherAlert } from '@/types/alerts';
 import { useState } from 'react'
@@ -52,7 +50,6 @@ export default function MapPage() {
   const [weatherData, setWeatherData] = useState<WeatherApiResponse | null>(null);
   const [weatherStatus, setWeatherStatus] = useState<WeatherStatus>('idle');
   const [weatherError, setWeatherError] = useState('');
-  const [advisory, setAdvisory] = useState<AdvisoryResult | null>(null);
   const [forecastState, setForecastState] = useState<DataState<WeatherResponse>>({ status: 'idle' });
   const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -184,7 +181,6 @@ export default function MapPage() {
                 source={weatherData?.source}
                 conditionLabel={conditionLabel}
               />
-              <WeatherIntelligence advisory={advisory} />
             </div>
           </div>
 
@@ -193,7 +189,6 @@ export default function MapPage() {
               latitude={location?.latitude}
               longitude={location?.longitude}
               accessToken={isDemo ? undefined : session?.access_token}
-              onAdvisoryChange={setAdvisory}
             />
             <aside className="space-y-5">
               <ForecastPanel state={forecastState} />

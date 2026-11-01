@@ -13,19 +13,26 @@ import uuid
 
 from models.alerts import WeatherAlert, AlertSeverity, AlertCategory
 from models.weather import WeatherResponse
-from advisory import (
-    HEAVY_RAIN_MM,
-    EXTREME_RAIN_MM,
-    HIGH_WIND_KMH,
-    STORM_WIND_KMH,
-    HOT_TEMP_C,
-    EXTREME_HEAT_C,
+# Every threshold and level comes from thresholds.py (single source of truth).
+from thresholds import (
+    COLD,
     COLD_TEMP_C,
+    EXTREME_HEAT,
+    EXTREME_HEAT_C,
+    EXTREME_RAIN,
+    EXTREME_RAIN_MM,
+    GALE,
+    HEAVY_RAIN,
+    HEAVY_RAIN_MM,
+    HIGH_HEAT,
+    HIGH_WIND_KMH,
+    HOT_TEMP_C,
+    STORM_WIND_KMH,
+    STORM_WMO_CODES,
+    STRONG_WIND,
+    THUNDERSTORM,
+    THUNDERSTORM_HAIL,
 )
-
-# Severe storm WMO codes from WMO 4677 standard
-# 95: Thunderstorm, 96: Thunderstorm with hail, 99: Severe thunderstorm with hail
-STORM_WMO_CODES = {95, 96, 99}
 
 def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
     """
@@ -67,7 +74,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-rain-warning-{int(now.timestamp())}",
                 alert_type="rain",
-                severity="warning",
+                severity=EXTREME_RAIN.level,
                 condition="Extreme Rain / Flood Risk",
                 headline=f"Warning: Extreme rainfall ({eval_rain:.1f} mm) recorded/forecasted",
                 description=f"Significant precipitation of {eval_rain:.1f} mm exceeds the extreme safety threshold of {EXTREME_RAIN_MM} mm. High risk of waterlogging, local flooding, and dangerous road conditions.",
@@ -86,7 +93,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-rain-watch-{int(now.timestamp())}",
                 alert_type="rain",
-                severity="watch",
+                severity=HEAVY_RAIN.level,
                 condition="Heavy Rain Watch",
                 headline=f"Watch: Heavy rain ({eval_rain:.1f} mm) anticipated",
                 description=f"Precipitation of {eval_rain:.1f} mm exceeds the heavy rainfall threshold of {HEAVY_RAIN_MM} mm. Expect wet surfaces and reduced visibility.",
@@ -117,7 +124,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-heat-warning-{int(now.timestamp())}",
                 alert_type="heat",
-                severity="warning",
+                severity=EXTREME_HEAT.level,
                 condition="Extreme Heat Warning",
                 headline=f"Warning: Dangerous heat ({eval_temp_max:.1f}°C) detected",
                 description=f"Ambient temperatures reaching {eval_temp_max:.1f}°C surpass the critical heat threshold of {EXTREME_HEAT_C}°C. Elevated risk of heat exhaustion and heatstroke.",
@@ -136,7 +143,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-heat-advisory-{int(now.timestamp())}",
                 alert_type="heat",
-                severity="advisory",
+                severity=HIGH_HEAT.level,
                 condition="High Temperature Advisory",
                 headline=f"Advisory: High temperatures ({eval_temp_max:.1f}°C)",
                 description=f"Temperatures reaching {eval_temp_max:.1f}°C meet or exceed the elevated heat threshold of {HOT_TEMP_C}°C.",
@@ -166,7 +173,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-cold-advisory-{int(now.timestamp())}",
                 alert_type="cold",
-                severity="advisory",
+                severity=COLD.level,
                 condition="Cold Weather Advisory",
                 headline=f"Advisory: Chilly conditions ({eval_temp_min:.1f}°C)",
                 description=f"Temperatures dropping to {eval_temp_min:.1f}°C meet the cold weather advisory threshold ({COLD_TEMP_C}°C).",
@@ -197,7 +204,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-wind-warning-{int(now.timestamp())}",
                 alert_type="wind",
-                severity="warning",
+                severity=GALE.level,
                 condition="Gale / High Wind Warning",
                 headline=f"Warning: Damaging wind gusts ({eval_wind:.1f} km/h)",
                 description=f"Wind speeds reaching {eval_wind:.1f} km/h cross the severe storm wind threshold of {STORM_WIND_KMH} km/h. Risk of falling branches and structural hazards.",
@@ -216,7 +223,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
             WeatherAlert(
                 id=f"alert-wind-watch-{int(now.timestamp())}",
                 alert_type="wind",
-                severity="watch",
+                severity=STRONG_WIND.level,
                 condition="Strong Wind Watch",
                 headline=f"Watch: Strong winds ({eval_wind:.1f} km/h)",
                 description=f"Wind velocities of {eval_wind:.1f} km/h exceed the high wind threshold of {HIGH_WIND_KMH} km/h.",
@@ -235,8 +242,9 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
     # 5. THUNDERSTORM / SEVERE WEATHER (WMO Code Grounded)
     # -------------------------------------------------------------------------
     if current.weather_code in STORM_WMO_CODES:
-        is_severe = current.weather_code in (96, 99)
-        severity_level: AlertSeverity = "warning" if is_severe else "watch"
+        is_severe = current.weather_code in THUNDERSTORM_HAIL.codes
+        rule = THUNDERSTORM_HAIL if is_severe else THUNDERSTORM
+        severity_level: AlertSeverity = rule.level
         alerts.append(
             WeatherAlert(
                 id=f"alert-storm-{int(now.timestamp())}",
@@ -248,7 +256,7 @@ def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
                 recommended_action="Seek immediate sturdy indoor shelter. Avoid open fields, metal fences, and water bodies. Unplug sensitive electrical equipment.",
                 relevant_parameter="weather_code",
                 relevant_value=float(current.weather_code),
-                threshold_value=95.0,
+                threshold_value=rule.value,
                 unit="WMO code",
                 time_window="Current",
                 source="open-meteo",

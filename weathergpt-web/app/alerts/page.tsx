@@ -8,8 +8,9 @@ import { AlertList } from '@/components/alerts/AlertList'
 import { TrustStrip } from '@/components/common/TrustStrip'
 import { fetchAlerts } from '@/lib/api/alerts'
 import type { WeatherAlert } from '@/types/alerts'
-import { BellRing, FileDown, ShieldAlert } from 'lucide-react'
+import { FileDown, ShieldAlert } from 'lucide-react'
 import { SubscribeAlerts } from '@/components/alerts/SubscribeAlerts'
+import { ThresholdTable } from '@/components/alerts/ThresholdTable'
 import { API_BASE } from '@/lib/api/base'
 
 export default function AlertsPage() {
@@ -80,46 +81,7 @@ export default function AlertsPage() {
                 </a>
               )}
 
-              <div className="rounded-[16px] border border-line bg-panel p-5">
-                <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-fog">
-                  <BellRing className="size-3.5 text-teal" />
-                  Alert Thresholds
-                </div>
-                <div className="mt-3 space-y-2.5 text-xs">
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Heavy Rain</span>
-                    <span className="font-mono font-medium text-ink">≥ 15.0 mm</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Extreme Rain</span>
-                    <span className="font-mono font-medium text-coral">≥ 50.0 mm</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">High Heat</span>
-                    <span className="font-mono font-medium text-amber">≥ 35.0 °C</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Extreme Heat</span>
-                    <span className="font-mono font-medium text-coral">≥ 40.0 °C</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Cold Chilly</span>
-                    <span className="font-mono font-medium text-teal">≤ 5.0 °C</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Strong Wind</span>
-                    <span className="font-mono font-medium text-amber">≥ 40.0 km/h</span>
-                  </div>
-                  <div className="flex justify-between border-b border-line/40 pb-1.5">
-                    <span className="text-ink-soft">Storm Gale</span>
-                    <span className="font-mono font-medium text-coral">≥ 65.0 km/h</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-ink-soft">Thunderstorms</span>
-                    <span className="font-mono font-medium text-coral">WMO 95, 96, 99</span>
-                  </div>
-                </div>
-              </div>
+              <ThresholdTable />
 
               <TrustStrip />
             </aside>

@@ -63,7 +63,8 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `query_service.py` | Open-Meteo to `WeatherFacts`: period windows in the location's local time, `focus_facts` per parameter, English `WMO_DESCRIPTIONS` |
 | `weather/open_meteo.py` | Forecast client (current + 7-day hourly) |
 | `geocoding.py` | Nominatim search and reverse, TTL cache and rate limit. Raises `RuntimeError` when the service is down; returns `None` for an unknown place. |
-| `advisory.py` | Deterministic thresholds and localised advisory text |
+| `thresholds.py` | **The one table of hazard thresholds and levels.** Engine, chat advisories, risk board, push, CAP and `GET /api/alerts/thresholds` all read it. Never hard-code a threshold elsewhere (UI included). |
+| `advisory.py` | Chat advisory from `thresholds.py`, plus localised advisory text |
 | `alerts/engine.py` | Alert engine (advisory / watch / warning). `api/alerts.py` retries, serves stale data, then returns a clean 503. |
 | `climate/` | Open-Meteo archive: a period compared with the same dates over the previous 10 years |
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
@@ -75,7 +76,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `env_check.py` | Startup warning when only `NEXT_PUBLIC_` Supabase names are set (never used as a fallback) |
 
 **Endpoints:**
-- `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
+- `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/thresholds`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
 - `/api/air-quality`, `/api/farm`, `/api/aviation`, `/api/risk`, `/api/compare`
 - `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header), `POST /api/push/test` (signed-in demo push to the caller's own subscriptions, 1/min)
 

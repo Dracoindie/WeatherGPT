@@ -8,6 +8,12 @@ code (listed below with their file) and are returned in each response's
 `thresholds` object, so the UI and users can see exactly why a window was
 chosen. Tests: `tests/test_roles.py`.
 
+These role windows (spray, irrigation, harvest, sowing, aviation flags) are
+role guidance, separate from the **hazard** thresholds (heavy rain, heat, wind,
+thunderstorm). The hazard thresholds live only in `backend/thresholds.py` and
+drive alerts, chat advisories, the district risk board, push and CAP; see
+`docs/EARLY_WARNING.md`.
+
 ## Farmer — `GET /api/farm` (`backend/roles/farm.py`)
 
 The rules look at the next 72 forecast hours, in the location's local time.

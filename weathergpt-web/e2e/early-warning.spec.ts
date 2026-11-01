@@ -34,6 +34,32 @@ test('alerts page labels alerts as unofficial and offers CAP + WhatsApp', async 
   await expect(page.getByRole('button', { name: /send test alert/i })).toHaveCount(0)
 })
 
+test('alert cards and the threshold table show the same numbers (one source: backend/thresholds.py)', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  const log = await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/alerts"]').first().dispatchEvent('click')
+  await page.waitForURL('**/alerts')
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect(page.getByTestId('threshold-heavy_rain')).toHaveText('≥ 15 mm')
+  await expect(page.getByTestId('threshold-extreme_rain')).toHaveText('≥ 50 mm')
+  await expect(page.getByTestId('threshold-thunderstorm_hail')).toHaveText('WMO 96, 99')
+  const card = page.getByRole('article').filter({ hasText: 'Heavy rain expected' })
+  await expect(card.getByText(/threshold: 15 mm/)).toBeVisible()
+  expect(log.paths).toContain('/api/alerts/thresholds')
+})
+
+test('dashboard never shows "no advisory" next to an active alert', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect(page.getByText('Heavy rain expected').first()).toBeVisible()
+  await expect(page.getByText(/No active advisory/i)).toHaveCount(0)
+})
+
 test('a chat answer can be shared on WhatsApp', async ({ page }) => {
   await mockBackend(page)
   await page.goto('/')

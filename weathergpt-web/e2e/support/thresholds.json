@@ -1,0 +1,115 @@
+[
+  {
+    "id": "heavy_rain",
+    "hazard": "rain",
+    "level": "watch",
+    "label": "Heavy rain",
+    "parameter": "precipitation",
+    "comparator": ">=",
+    "value": 15.0,
+    "unit": "mm",
+    "window": "24 h total",
+    "codes": []
+  },
+  {
+    "id": "extreme_rain",
+    "hazard": "rain",
+    "level": "warning",
+    "label": "Extreme rain",
+    "parameter": "precipitation",
+    "comparator": ">=",
+    "value": 50.0,
+    "unit": "mm",
+    "window": "24 h total",
+    "codes": []
+  },
+  {
+    "id": "high_heat",
+    "hazard": "heat",
+    "level": "advisory",
+    "label": "High heat",
+    "parameter": "temperature",
+    "comparator": ">=",
+    "value": 35.0,
+    "unit": "°C",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "extreme_heat",
+    "hazard": "heat",
+    "level": "warning",
+    "label": "Extreme heat",
+    "parameter": "temperature",
+    "comparator": ">=",
+    "value": 40.0,
+    "unit": "°C",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "cold",
+    "hazard": "cold",
+    "level": "advisory",
+    "label": "Cold",
+    "parameter": "temperature",
+    "comparator": "<=",
+    "value": 5.0,
+    "unit": "°C",
+    "window": "24 h minimum",
+    "codes": []
+  },
+  {
+    "id": "strong_wind",
+    "hazard": "wind",
+    "level": "watch",
+    "label": "Strong wind",
+    "parameter": "wind_speed",
+    "comparator": ">=",
+    "value": 40.0,
+    "unit": "km/h",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "gale",
+    "hazard": "wind",
+    "level": "warning",
+    "label": "Gale",
+    "parameter": "wind_speed",
+    "comparator": ">=",
+    "value": 65.0,
+    "unit": "km/h",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "thunderstorm",
+    "hazard": "storm",
+    "level": "watch",
+    "label": "Thunderstorm",
+    "parameter": "weather_code",
+    "comparator": "in",
+    "value": 95.0,
+    "unit": "WMO code",
+    "window": "current",
+    "codes": [
+      95
+    ]
+  },
+  {
+    "id": "thunderstorm_hail",
+    "hazard": "storm",
+    "level": "warning",
+    "label": "Thunderstorm with hail",
+    "parameter": "weather_code",
+    "comparator": "in",
+    "value": 96.0,
+    "unit": "WMO code",
+    "window": "current",
+    "codes": [
+      96,
+      99
+    ]
+  }
+]
