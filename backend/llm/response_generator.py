@@ -12,6 +12,7 @@ import logging
 import re
 from typing import Optional
 
+from advisory import localized_advisory, should_mention_advisory
 from models.chat import ChatIntent, ResponseLanguage, WeatherFacts, AdvisoryResult
 
 logger = logging.getLogger(__name__)
@@ -254,13 +255,9 @@ def unknown_location(intent: ChatIntent, place: str) -> str:
 
 async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: Optional[AdvisoryResult] = None) -> str:
     templated = template_response(intent, facts)
-    if advisory:
-        if intent.language == "hi":
-            templated += f" सलाह: {advisory.advisory}"
-        elif intent.language == "hinglish":
-            templated += f" Advisory: {advisory.advisory}"
-        else:
-            templated += f" Advisory: {advisory.advisory}"
+    if advisory and should_mention_advisory(advisory, intent.weather_parameter):
+        label = "सलाह" if intent.language == "hi" else "Advisory"
+        templated += f" {label}: {localized_advisory(advisory, intent.language)}"
 
     try:
         from llm import provider as llm_provider
@@ -270,7 +267,8 @@ async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: O
     if not llm_provider.is_configured():
         return templated
 
-    advisory_json = advisory.model_dump_json() if advisory else "{}"
+    mention = advisory is not None and should_mention_advisory(advisory, intent.weather_parameter)
+    advisory_json = advisory.model_dump_json() if mention else "{}"
 
     user_payload = (
         f"Language: {intent.language}\n"

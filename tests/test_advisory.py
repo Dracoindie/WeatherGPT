@@ -92,3 +92,78 @@ class TestAdvisoryThresholds:
     def test_period_unavailable(self):
         result = evaluate_advisory(_facts(period_available=False), "general")
         assert result.condition == "Unknown"
+
+
+class TestAdvisoryInReply:
+    """Task 2: the reply carries the advisory only when it says something."""
+
+    def _intent(self, language="en", parameter="general"):
+        from models.chat import ChatIntent
+
+        return ChatIntent(
+            intent="forecast",
+            location_name="Pune",
+            date_reference="today",
+            weather_parameter=parameter,
+            language=language,
+        )
+
+    def _reply(self, facts, language="en", parameter="general"):
+        import asyncio
+
+        from llm.response_generator import generate_response
+
+        advisory = evaluate_advisory(facts, parameter)
+        return asyncio.run(generate_response(self._intent(language, parameter), facts, advisory))
+
+    def test_routine_low_advisory_not_appended(self):
+        text = self._reply(_facts(temperature_2m=25.0))
+        assert "Advisory" not in text
+        assert "No specific weather advisories" not in text
+
+    def test_active_conditions_without_trigger_not_appended(self):
+        text = self._reply(_facts(temperature_2m=25.0, precipitation_probability=80))
+        assert "Advisory" not in text
+
+    def test_unavailable_period_not_appended(self):
+        text = self._reply(_facts(period_available=False))
+        assert "Advisory" not in text
+
+    def test_low_severity_trigger_is_appended(self):
+        text = self._reply(_facts(temperature_2m=25.0, precipitation=2.0), parameter="heavy_rain")
+        assert "Advisory: Some rain is expected" in text
+
+    def test_explicit_advisory_request_appends_normal_text(self):
+        text = self._reply(_facts(temperature_2m=25.0), parameter="advisory")
+        assert "Advisory: Weather conditions are currently normal" in text
+
+    def test_moderate_advisory_appended_in_english(self):
+        text = self._reply(_facts(temperature_max=36.0))
+        assert "Advisory: Hot conditions expected." in text
+
+    def test_advisory_localized_hindi(self):
+        text = self._reply(_facts(precipitation=60.0), language="hi")
+        assert "सलाह: भारी वर्षा की संभावना है।" in text
+        assert "Severe precipitation" not in text
+
+    def test_advisory_localized_hinglish(self):
+        text = self._reply(_facts(wind_speed_10m=70.0), language="hinglish")
+        assert "Advisory: Khatarnak tez hawa hai." in text
+        assert "Dangerous wind" not in text
+
+    def test_every_triggered_advisory_has_translations(self):
+        from advisory import _ADVISORY_TRANSLATIONS
+
+        cases = [
+            _facts(precipitation=60.0),
+            _facts(precipitation=20.0),
+            _facts(precipitation=2.0),
+            _facts(temperature_max=41.0),
+            _facts(temperature_max=36.0),
+            _facts(temperature_min=2.0),
+            _facts(wind_speed_10m=70.0),
+            _facts(wind_speed_10m=45.0),
+        ]
+        for facts in cases:
+            result = evaluate_advisory(facts, "heavy_rain")
+            assert set(_ADVISORY_TRANSLATIONS[result.advisory]) == {"hi", "hinglish"}
