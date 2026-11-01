@@ -79,7 +79,7 @@ export default function SkyCanvas() {
   return (
     <Canvas
       aria-hidden="true"
-      style={{ position: 'fixed', inset: 0, zIndex: -10, pointerEvents: 'none' }}
+      style={{ position: 'fixed', inset: 0, zIndex: -10, pointerEvents: 'none', maskImage: 'linear-gradient(180deg, #000 72%, transparent 100%)', WebkitMaskImage: 'linear-gradient(180deg, #000 72%, transparent 100%)' }}
       dpr={dpr}
       frameloop={visible ? 'always' : 'never'}
       camera={{ fov: CAMERA_FOV, position: [0, 0, CAMERA_Z], near: 0.1, far: 100 }}

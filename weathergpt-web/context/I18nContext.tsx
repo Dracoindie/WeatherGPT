@@ -10,6 +10,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -69,7 +70,6 @@ const dict = {
     'voice.denied': 'Microphone permission denied',
     'voice.unsupported': 'Voice not supported in this browser',
     'nav.home': 'Living Sky',
-    'nav.classic': 'Classic',
     'nav.signin': 'Sign in',
     'sky.title': 'Ask the Sky',
     'sky.subtitle': 'Live atmosphere console · English · हिंदी · Hinglish',
@@ -104,6 +104,25 @@ const dict = {
     'sky.live': 'Live',
     'sky.preview': 'Preview',
     'sky.unavailable': 'Not in forecast window',
+    'threshold.thunderstorm_hail': 'Thunderstorm with hail',
+    'threshold.thunderstorm': 'Thunderstorm',
+    'threshold.gale': 'Gale',
+    'threshold.strong_wind': 'Strong wind',
+    'threshold.cold': 'Cold',
+    'threshold.extreme_heat': 'Extreme heat',
+    'threshold.high_heat': 'High heat',
+    'threshold.extreme_rain': 'Extreme rain',
+    'threshold.heavy_rain': 'Heavy rain',
+    'thresholds.note': 'The same rules drive chat advisories, alerts, the risk board, push and CAP. WeatherGPT thresholds, not IMD criteria.',
+    'thresholds.unavailable': 'Thresholds could not be loaded from the backend.',
+    'thresholds.title': 'Alert thresholds',
+    'severity.unknown': 'Unknown',
+    'severity.none': 'None',
+    'nav.demo': 'Demo',
+    'nav.lite': 'Lite mode',
+    'nav.role': 'Role',
+    'nav.language': 'Language',
+    'nav.signout': 'Sign out',
     'push.test': 'Send test alert',
     'push.testSending': 'Sending test…',
     'push.testSent': 'Test alert sent. Check your notifications.',
@@ -166,7 +185,6 @@ const dict = {
     'voice.denied': 'माइक्रोफ़ोन अनुमति अस्वीकृत',
     'voice.unsupported': 'इस ब्राउज़र में आवाज़ समर्थित नहीं है',
     'nav.home': 'जीवंत आकाश',
-    'nav.classic': 'क्लासिक',
     'nav.signin': 'साइन इन',
     'sky.title': 'आकाश से पूछें',
     'sky.subtitle': 'लाइव वायुमंडल कंसोल · English · हिंदी · Hinglish',
@@ -201,6 +219,25 @@ const dict = {
     'sky.live': 'लाइव',
     'sky.preview': 'पूर्वावलोकन',
     'sky.unavailable': 'पूर्वानुमान अवधि में नहीं',
+    'threshold.thunderstorm_hail': 'ओलों के साथ तूफ़ान',
+    'threshold.thunderstorm': 'गरज वाला तूफ़ान',
+    'threshold.gale': 'आँधी',
+    'threshold.strong_wind': 'तेज़ हवा',
+    'threshold.cold': 'ठंड',
+    'threshold.extreme_heat': 'अत्यधिक गर्मी',
+    'threshold.high_heat': 'तेज़ गर्मी',
+    'threshold.extreme_rain': 'अति भारी बारिश',
+    'threshold.heavy_rain': 'भारी बारिश',
+    'thresholds.note': 'यही नियम चैट सलाह, अलर्ट, रिस्क बोर्ड, पुश और CAP में लागू होते हैं। ये WeatherGPT की सीमाएँ हैं, IMD मानदंड नहीं।',
+    'thresholds.unavailable': 'सीमाएँ बैकएंड से लोड नहीं हो सकीं।',
+    'thresholds.title': 'अलर्ट सीमाएँ',
+    'severity.unknown': 'अज्ञात',
+    'severity.none': 'कोई नहीं',
+    'nav.demo': 'डेमो',
+    'nav.lite': 'लाइट मोड',
+    'nav.role': 'भूमिका',
+    'nav.language': 'भाषा',
+    'nav.signout': 'साइन आउट',
     'push.test': 'टेस्ट अलर्ट भेजें',
     'push.testSending': 'टेस्ट भेजा जा रहा है…',
     'push.testSent': 'टेस्ट अलर्ट भेज दिया गया। अपनी सूचनाएँ देखें।',
@@ -235,7 +272,6 @@ const marathi: Partial<Record<TranslationKey, string>> = {
   'nav.climate': 'हवामान इतिहास',
   'nav.settings': 'सेटिंग्ज',
   'nav.home': 'जिवंत आकाश',
-  'nav.classic': 'क्लासिक',
   'nav.signin': 'साइन इन',
   'nav.disaster': 'धोका फलक',
   'current.title': 'सध्याचे हवामान',
@@ -308,6 +344,25 @@ const marathi: Partial<Record<TranslationKey, string>> = {
   'sky.verified': 'स्रोत: Open-Meteo · पडताळलेले',
   'sky.preview': 'पूर्वावलोकन',
   'sky.unavailable': 'अंदाज कालावधीत नाही',
+  'threshold.thunderstorm_hail': 'गारांसह वादळ',
+  'threshold.thunderstorm': 'गडगडाटी वादळ',
+  'threshold.gale': 'वादळी वारा',
+  'threshold.strong_wind': 'जोरदार वारा',
+  'threshold.cold': 'थंडी',
+  'threshold.extreme_heat': 'अति उष्णता',
+  'threshold.high_heat': 'जास्त उष्णता',
+  'threshold.extreme_rain': 'अतिवृष्टी',
+  'threshold.heavy_rain': 'मुसळधार पाऊस',
+  'thresholds.note': 'हेच नियम चॅट सल्ला, सूचना, रिस्क बोर्ड, पुश आणि CAP मध्ये वापरले जातात. या WeatherGPT मर्यादा आहेत, IMD निकष नाहीत.',
+  'thresholds.unavailable': 'मर्यादा बॅकएंडवरून लोड झाल्या नाहीत.',
+  'thresholds.title': 'सूचना मर्यादा',
+  'severity.unknown': 'अज्ञात',
+  'severity.none': 'काही नाही',
+  'nav.demo': 'डेमो',
+  'nav.lite': 'लाइट मोड',
+  'nav.role': 'भूमिका',
+  'nav.language': 'भाषा',
+  'nav.signout': 'साइन आउट',
   'push.test': 'चाचणी सूचना पाठवा',
   'push.testSending': 'चाचणी पाठवत आहोत…',
   'push.testSent': 'चाचणी सूचना पाठवली. तुमच्या सूचना तपासा.',
@@ -387,6 +442,26 @@ const hinglish: Partial<Record<TranslationKey, string>> = {
   'sky.verified': 'Source: Open-Meteo · verified',
   'sky.preview': 'Preview',
   'sky.unavailable': 'Forecast window mein nahi',
+  'threshold.thunderstorm_hail': 'Olon ke saath toofan',
+  'threshold.thunderstorm': 'Toofan (garaj)',
+  'threshold.gale': 'Aandhi',
+  'threshold.strong_wind': 'Tez hawa',
+  'threshold.cold': 'Thand',
+  'threshold.extreme_heat': 'Bahut zyada garmi',
+  'threshold.high_heat': 'Tez garmi',
+  'threshold.extreme_rain': 'Bahut bhaari baarish',
+  'threshold.heavy_rain': 'Bhaari baarish',
+  'thresholds.note': 'Yahi rules chat advisory, alerts, risk board, push aur CAP mein lagte hain. Ye WeatherGPT thresholds hain, IMD criteria nahi.',
+  'thresholds.unavailable': 'Thresholds backend se load nahi hue.',
+  'thresholds.title': 'Alert thresholds',
+  'severity.unknown': 'Pata nahi',
+  'severity.none': 'Koi nahi',
+  'nav.demo': 'Demo',
+  'nav.lite': 'Lite mode',
+  'nav.role': 'Role',
+  'nav.language': 'Bhasha',
+  'nav.settings': 'Settings',
+  'nav.signout': 'Sign out',
   'push.test': 'Test alert bhejo',
   'push.testSending': 'Test bhej rahe hain…',
   'push.testSent': 'Test alert bhej diya. Notifications check karo.',
@@ -396,6 +471,8 @@ const hinglish: Partial<Record<TranslationKey, string>> = {
   'push.testWait': 'Ek minute mein ek hi test. Thodi der baad try karo.',
   'push.testNote': '“TEST: WeatherGPT demo alert, not an official IMD warning” sirf aapke apne devices par jaata hai.',
 }
+
+const LANGUAGE_KEY = 'wgpt:lang'
 
 interface I18nValue {
   language: Language
@@ -407,7 +484,29 @@ const I18nContext = createContext<I18nValue | null>(null)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en')
-  const setLanguage = useCallback((lang: Language) => setLanguageState(lang), [])
+  // Remember the choice per device so a full page load keeps the language.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LANGUAGE_KEY) as Language | null
+      if (saved && (LANGUAGES as readonly string[]).includes(saved) && saved !== 'en') {
+        const id = window.setTimeout(() => setLanguageState(saved), 0)
+        return () => window.clearTimeout(id)
+      }
+    } catch {
+      // storage blocked: stay in English
+    }
+  }, [])
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang)
+    try {
+      localStorage.setItem(LANGUAGE_KEY, lang)
+    } catch {
+      // storage blocked: the choice lasts for this page only
+    }
+  }, [])
+  useEffect(() => {
+    document.documentElement.lang = language === 'hinglish' ? 'en' : language
+  }, [language])
 
   const value = useMemo<I18nValue>(
     () => ({

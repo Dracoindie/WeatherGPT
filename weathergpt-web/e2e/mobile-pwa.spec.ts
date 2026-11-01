@@ -65,7 +65,9 @@ test('lite mode turns on automatically with Save-Data and can be switched off', 
   await mockBackend(page)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
+  // Lite mode lives in Settings (the menu on phones, the gear panel on desktop).
   if (isMobile) await page.getByRole('button', { name: /menu/i }).first().click()
+  else await page.getByRole('button', { name: 'Settings' }).click()
   const toggle = page.getByRole('button', { name: /lite mode/i }).first()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   await expect(toggle).toContainText('auto')

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import AuthGuard from '@/components/auth/AuthGuard'
-import { TopNav } from '@/components/layout/TopNav'
+import { AppShell } from '@/components/ui/AppShell'
 import LocationPicker, { type LocationData } from '@/components/location/LocationPicker'
 import { AlertList } from '@/components/alerts/AlertList'
 import { TrustStrip } from '@/components/common/TrustStrip'
@@ -35,11 +35,8 @@ export default function AlertsPage() {
   }
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-canvas flex flex-col">
-        <TopNav />
-
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 flex-grow w-full">
+    <AppShell>
+      <AuthGuard>
           <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
             <div>
               <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
@@ -127,8 +124,7 @@ export default function AlertsPage() {
               <TrustStrip />
             </aside>
           </div>
-        </main>
-      </div>
-    </AuthGuard>
+        </AuthGuard>
+    </AppShell>
   )
 }

@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { describeWeather, useDescribeWeather } from '@/lib/i18n/weather'
 import AuthGuard from '@/components/auth/AuthGuard'
 import { API_BASE } from '@/lib/api/base'
-import { TopNav } from '@/components/layout/TopNav'
+import { AppShell } from '@/components/ui/AppShell'
 import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero'
 import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence'
 import { ChatPanel } from '@/components/chat/ChatPanel'
@@ -140,11 +140,8 @@ export default function DashboardPage() {
       : undefined
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-canvas">
-        <TopNav />
-
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8">
+    <AppShell>
+      <AuthGuard>
           <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">Live meteorological context</p>
@@ -221,8 +218,7 @@ export default function DashboardPage() {
               </Link>
             ))}
           </section>
-        </main>
-      </div>
-    </AuthGuard>
+        </AuthGuard>
+    </AppShell>
   )
 }

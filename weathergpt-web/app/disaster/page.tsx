@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import dynamic from 'next/dynamic'
 import { LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldAlert, X } from 'lucide-react'
-import { TopNav } from '@/components/layout/TopNav'
+import { AppShell } from '@/components/ui/AppShell'
 import { getRiskBoard, type District, type RiskBoard, type RiskLevel } from '@/lib/api/roles'
 import { cn } from '@/lib/utils'
 
@@ -137,9 +137,7 @@ export default function DisasterPage() {
   const counts = rows.reduce<Record<string, number>>((acc, r) => ({ ...acc, [r.severity]: (acc[r.severity] ?? 0) + 1 }), {})
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <TopNav />
-      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8">
+    <AppShell>
         <div className="mb-5 flex flex-col justify-between gap-3 border-b border-line pb-5 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
@@ -244,7 +242,5 @@ export default function DisasterPage() {
             {board && <p className="mt-4 text-[11px] text-ink-soft">{board.note}</p>}
           </section>
         </div>
-      </main>
-    </div>
-  )
+      </AppShell>)
 }

@@ -2,7 +2,7 @@
 
 import AuthGuard from '@/components/auth/AuthGuard';
 import { API_BASE } from '@/lib/api/base';
-import { TopNav } from '@/components/layout/TopNav';
+import { AppShell } from '@/components/ui/AppShell'
 import LocationPicker, { type LocationData } from '@/components/location/LocationPicker';
 import { useAuthContext } from '@/context/AuthContext';
 import { useDemoContext } from '@/context/DemoContext';
@@ -129,10 +129,8 @@ export default function MapPage() {
       : undefined;
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen bg-canvas flex flex-col">
-        <TopNav />
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 flex-grow">
+    <AppShell>
+      <AuthGuard>
           <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">Live meteorological context</p>
@@ -202,8 +200,7 @@ export default function MapPage() {
               <TrustStrip />
             </aside>
           </section>
-        </main>
-      </div>
-    </AuthGuard>
+        </AuthGuard>
+    </AppShell>
   );
 }

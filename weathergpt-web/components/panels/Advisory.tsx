@@ -13,18 +13,25 @@ import { useState } from 'react'
 import type { AdvisoryResult } from '@/lib/api/chat'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
+import { formatWindow } from '@/lib/format'
 import { GlassPanel } from './GlassPanel'
 import { panelItem } from './WeatherPanels'
 
 const ICON = { low: ShieldCheck, moderate: ShieldAlert, high: OctagonAlert } as const
 
-export function AdvisoryPanel({ advisory }: { advisory: AdvisoryResult }) {
-  const { t } = useI18n()
+/**
+ * The advisory for the period the question asked about (chat facts), not the
+ * location's 24 h alert status (that is /api/alerts). The label names the
+ * period so the two are never confused.
+ */
+export function AdvisoryPanel({ advisory, window }: { advisory: AdvisoryResult; window?: string | null }) {
+  const { t, language } = useI18n()
+  const period = formatWindow(window, language)
   const Icon = ICON[advisory.severity]
   return (
     <motion.div variants={panelItem} className="sm:col-span-2">
       <GlassPanel
-        label={t('panel.advisory')}
+        label={period ? `${t('panel.advisory')} · ${period}` : t('panel.advisory')}
         className={cn('h-full', advisory.severity !== 'low' && 'border-accent/40 shadow-[0_0_50px_-20px_var(--sky-accent)]')}
         aside={
           <span className="rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent">

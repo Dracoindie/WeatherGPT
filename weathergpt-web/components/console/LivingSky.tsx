@@ -30,7 +30,7 @@ import { AskConsole } from './AskConsole'
 import { ConversationThread } from './ConversationThread'
 import { ReplyCard } from './ReplyCard'
 import { ScanningLoader } from './ScanningLoader'
-import { SkyNav } from './SkyNav'
+import { AppShell } from '@/components/ui/AppShell'
 import { AdvisoryPanel, HighSeverityHud } from '@/components/panels/Advisory'
 import {
   HumidityPanel,
@@ -225,20 +225,21 @@ export default function LivingSky() {
 
   return (
     <MotionConfig reducedMotion="user">
-    <div className="sky-root" data-severity={severity}>
-      <SkyEngine />
-      <DemoPanel />
-      <HighSeverityHud advisory={res?.advisory ?? null} />
-      <SkyNav />
-
-      <main
-        className={cn(
-          'relative z-10 mx-auto grid max-w-[1500px] gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]',
-          // clear the bottom nav (and the docked console on phones)
-          'max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))]',
-          docked && 'max-sm:pb-[calc(10rem+env(safe-area-inset-bottom))]'
-        )}
-      >
+    <AppShell
+      severity={severity}
+      background={<SkyEngine />}
+      overlay={
+        <>
+          <DemoPanel />
+          <HighSeverityHud advisory={res?.advisory ?? null} />
+        </>
+      }
+      mainClassName={cn(
+        'grid max-w-[1500px] gap-6 pt-0 lg:pt-0 lg:grid-cols-[minmax(0,1fr)_340px]',
+        // clear the docked console on phones
+        docked && 'max-sm:pb-[calc(10rem+env(safe-area-inset-bottom))]'
+      )}
+    >
         <div className="min-w-0">
           <section className="mx-auto max-w-3xl pt-6 text-center sm:pt-12">
             <p className="sky-label">{t('sky.subtitle')}</p>
@@ -325,7 +326,7 @@ export default function LivingSky() {
                 )}
                 {res.climate && <ClimateComparePanel facts={res.climate} />}
                 {res.nwp && <GfsPanel facts={res.nwp} />}
-                {res.advisory && <AdvisoryPanel advisory={res.advisory} />}
+                {res.advisory && <AdvisoryPanel advisory={res.advisory} window={res.weather?.requested_time} />}
                 <AirPanels latitude={res.location.latitude} longitude={res.location.longitude} />
               </motion.section>
             )}
@@ -362,8 +363,7 @@ export default function LivingSky() {
         <aside className="lg:sticky lg:top-4 lg:self-start lg:pt-6">
           <ConversationThread entries={entries} activeId={activeId} onSelect={setActiveId} />
         </aside>
-      </main>
-    </div>
+    </AppShell>
     </MotionConfig>
   )
 }

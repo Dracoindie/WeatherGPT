@@ -15,7 +15,7 @@ const DIR = process.env.AUDIT_DIR
 test.skip(!DIR, 'set AUDIT_DIR to run the design audit')
 test.describe.configure({ mode: 'serial', timeout: 300_000 })
 
-const ROUTES = ['/', '/dashboard', '/alerts', '/climate', '/map', '/disaster', '/classic', '/login', '/signup', '/offline']
+const ROUTES = ['/', '/dashboard', '/alerts', '/climate', '/map', '/disaster', '/login', '/signup', '/offline']
 
 const name = (route: string) => (route === '/' ? 'home' : route.slice(1))
 
@@ -70,7 +70,7 @@ test('@audit signed out: home with an answer', async ({ page }, info) => {
 test('@audit demo session: every route', async ({ page }, info) => {
   await mockBackend(page, { routes: { '/api/risk': BOARD } })
   await enterDemo(page)
-  for (const route of ROUTES.filter((r) => !['/login', '/signup', '/offline', '/classic'].includes(r))) {
+  for (const route of ROUTES.filter((r) => !['/login', '/signup', '/offline'].includes(r))) {
     if (page.url().endsWith(route) === false) {
       const link = page.locator(`a[href="${route}"]`).first()
       if (await link.count()) {

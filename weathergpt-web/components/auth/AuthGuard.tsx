@@ -34,8 +34,8 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   if (!isDemo && loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <span className="text-zinc-400 text-sm animate-pulse">Loading…</span>
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <span className="sky-label animate-pulse">Loading…</span>
       </div>
     )
   }

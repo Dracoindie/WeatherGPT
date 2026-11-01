@@ -1,33 +1,54 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ==========================================================================
+     ONE design: Living Sky. Every page renders inside <AppShell> (.sky-root).
+     The old light "Lovable" token names are kept as aliases of the Living Sky
+     palette so nothing can render in a second style. New code should use the
+     sky tokens (text-hud, text-hud-dim, text-accent, sev-*) and components/ui.
+     ========================================================================== */
+  --sky-accent: #22d3ee;
+  --sky-accent-2: #818cf8;
+  --sky-text: #e7f0ff;
+  --sky-text-dim: rgba(205, 220, 245, 0.66);
+  --sky-floor: #02040a;      /* page colour under the sky; StaticSky updates it */
+  --sky-line: rgba(160, 200, 255, 0.12);
+  --sky-surface: rgba(8, 14, 26, 0.72);
 
-  /* Lovable design tokens */
-  --color-canvas: #f8f8f7;
-  --color-panel: #ffffff;
-  --color-ink: #0f0f0e;
-  --color-ink-soft: #6b6b6b;
-  --color-fog: #9c9c9c;
-  --color-line: #e4e4e1;
-  --color-teal: #0d9488;
-  --color-teal-soft: #e0f2ef;
-  --color-amber: #d97706;
-  --color-amber-soft: #fef3c7;
-  --color-coral: #e11d48;
-  --color-coral-soft: #ffe4e6;
+  /* Severity: the same five colours on every surface (badges, banners, map dots) */
+  --sev-none: #34d399;
+  --sev-advisory: #38bdf8;
+  --sev-watch: #fbbf24;
+  --sev-warning: #f43f5e;
+  --sev-unknown: #94a3b8;
+
+  --background: var(--sky-floor);
+  --foreground: var(--sky-text);
+
+  /* Legacy token names -> Living Sky values */
+  --color-canvas: transparent;
+  --color-panel: var(--sky-surface);
+  --color-ink: var(--sky-text);
+  --color-ink-soft: var(--sky-text-dim);
+  --color-fog: rgba(205, 220, 245, 0.5);
+  --color-line: var(--sky-line);
+  --color-teal: var(--sky-accent);
+  --color-teal-soft: color-mix(in srgb, var(--sky-accent) 14%, transparent);
+  --color-amber: var(--sev-watch);
+  --color-amber-soft: color-mix(in srgb, var(--sev-watch) 14%, transparent);
+  --color-coral: var(--sev-warning);
+  --color-coral-soft: color-mix(in srgb, var(--sev-warning) 14%, transparent);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-sky-body), var(--font-sky-deva), ui-sans-serif, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-geist-sans);
-  --font-body: var(--font-geist-sans);
+  --font-display: var(--font-sky-display), var(--font-sky-deva), ui-sans-serif, sans-serif;
+  --font-body: var(--font-sky-body), var(--font-sky-deva), ui-sans-serif, sans-serif;
 
-  /* Expose Lovable tokens to Tailwind */
   --color-canvas: var(--color-canvas);
   --color-panel: var(--color-panel);
   --color-ink: var(--color-ink);
@@ -40,38 +61,26 @@
   --color-amber-soft: var(--color-amber-soft);
   --color-coral: var(--color-coral);
   --color-coral-soft: var(--color-coral-soft);
+
+  --color-sev-none: var(--sev-none);
+  --color-sev-advisory: var(--sev-advisory);
+  --color-sev-watch: var(--sev-watch);
+  --color-sev-warning: var(--sev-warning);
+  --color-sev-unknown: var(--sev-unknown);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-
-    /* Dark mode Lovable tokens */
-    --color-canvas: #111110;
-    --color-panel: #1c1c1a;
-    --color-ink: #f0f0ee;
-    --color-ink-soft: #a0a09e;
-    --color-fog: #6a6a68;
-    --color-line: #2a2a28;
-    --color-teal: #2dd4bf;
-    --color-teal-soft: #0d2e2a;
-    --color-amber: #fbbf24;
-    --color-amber-soft: #2a1e00;
-    --color-coral: #fb7185;
-    --color-coral-soft: #2a0011;
-  }
+html {
+  background: var(--sky-floor);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--sky-floor);
+  color: var(--sky-text);
+  font-family: var(--font-sky-body), var(--font-sky-deva), ui-sans-serif, sans-serif;
 }
 
 /* ==========================================================================
-   Living Sky (home route) — everything below is scoped to .sky-root so the
-   existing light-theme pages keep their tokens untouched.
+   Living Sky components. Every route renders inside .sky-root (AppShell).
    ========================================================================== */
 
 @theme inline {
@@ -90,16 +99,13 @@ body {
 }
 
 .sky-root {
-  --sky-accent: #22d3ee;
-  --sky-accent-2: #818cf8;
-  --sky-text: #e7f0ff;
-  --sky-text-dim: rgba(205, 220, 245, 0.62);
   --sky-flash: 0;
   position: relative;
   min-height: 100dvh;
   color: var(--sky-text);
   font-family: var(--font-skybody);
-  background: #02040a;
+  /* the page colour continues the sky's horizon, so long pages have no seam */
+  background: var(--sky-floor);
   isolation: isolate;
   overflow-x: hidden;
 }
@@ -266,3 +272,70 @@ body {
   .sky-ticker { animation: none; flex-wrap: wrap; width: auto; }
   .sky-alarm-frame { animation: none; }
 }
+
+/* --- Shared controls (components/ui) --------------------------------------- */
+@layer components {
+  .sky-btn {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    padding: 0 1.1rem;
+    font-family: var(--font-readout);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+  }
+  .sky-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .sky-btn:focus-visible, .sky-input:focus-visible { outline: 2px solid var(--sky-accent); outline-offset: 2px; }
+  .sky-btn-primary {
+    background: var(--sky-accent);
+    color: #031018;
+    font-weight: 600;
+    box-shadow: 0 0 28px -8px var(--sky-accent);
+  }
+  .sky-btn-primary:hover:not(:disabled) { box-shadow: 0 0 40px -6px var(--sky-accent); }
+  .sky-btn-ghost {
+    border: 1px solid color-mix(in srgb, var(--sky-accent) 45%, transparent);
+    color: var(--sky-accent);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .sky-btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--sky-accent) 12%, transparent); }
+  .sky-btn-subtle {
+    border: 1px solid var(--sky-line);
+    color: var(--sky-text-dim);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  .sky-btn-subtle:hover:not(:disabled) { color: var(--sky-text); border-color: rgba(160, 200, 255, 0.25); }
+
+  .sky-input {
+    width: 100%;
+    min-height: 2.75rem;
+    border-radius: 12px;
+    border: 1px solid var(--sky-line);
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0 0.9rem;
+    color: var(--sky-text);
+    font-size: 0.9rem;
+  }
+  .sky-input::placeholder { color: var(--sky-text-dim); }
+  .sky-input:focus { border-color: color-mix(in srgb, var(--sky-accent) 60%, transparent); }
+}
+
+/* Leaflet popups in the Living Sky palette */
+.leaflet-container { background: #0a1220; font-family: inherit; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: rgba(8, 14, 26, 0.94);
+  color: var(--sky-text);
+  border: 1px solid var(--sky-line);
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
+}
+.leaflet-popup-content-wrapper { border-radius: 14px; }
+.leaflet-container a.leaflet-popup-close-button { color: var(--sky-text-dim); }
+.leaflet-control-attribution { background: rgba(2, 4, 10, 0.7) !important; color: var(--sky-text-dim) !important; }
+.leaflet-control-attribution a { color: var(--sky-accent) !important; }
+.leaflet-bar a { background: rgba(8, 14, 26, 0.92); color: var(--sky-text); border-color: var(--sky-line); }

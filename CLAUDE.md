@@ -84,7 +84,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 - **This Next.js has breaking changes compared with training data.** Read `weathergpt-web/AGENTS.md` and `node_modules/next/dist/docs/` before writing Next code. It uses `proxy.ts`, not `middleware.ts`.
 - **Pages** (`app/`):
   - `/`: the Living Sky chat console, with a 3D sky scene driven by real codes and wind
-  - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/classic`, `/login`, `/signup`, `/offline`
+  - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/login`, `/signup`, `/offline`
 - **Shared code:**
   - `context/`: `I18nContext` (UI dictionary: EN / हि / Hinglish / मरा), `AuthContext`, `DemoContext`
   - `lib/api/`: backend clients
