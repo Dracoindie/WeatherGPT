@@ -4,3 +4,6 @@ geopandas==1.1.4
 shapely==2.1.2
 pyproj==3.7.2
 langgraph==1.2.11
+# External tools; local clones of their source are not tracked in this repo
+herbie-data==2026.10.0
+livekit-agents==1.8.10

@@ -31,3 +31,9 @@ Thumbs.db
 # Logs
 *.log
 .aider*
+
+# Third-party clones (external dependencies, installed separately; see README)
+/Herbie/
+/WeatherGPT-Resources/Herbie/
+/agents/
+/IndicTrans2/

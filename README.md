@@ -320,3 +320,14 @@ WeatherGPT/
 > **Note:** `weathergpt-web/` is a separate nested git repository. This repo only records a
 > pointer to it (a gitlink without `.gitmodules`), so its code is **not yet in this GitHub repo**.
 > Setup steps are in `weathergpt-web/README.md`.
+
+### External dependencies
+
+These are third-party projects, not part of this repo. The local clones in `Herbie/`,
+`WeatherGPT-Resources/Herbie/`, `agents/` and `IndicTrans2/` are git-ignored; install them separately:
+
+| Project | Install | Used for |
+|---------|---------|----------|
+| [Herbie](https://github.com/blaylockbk/Herbie) | `pip install herbie-data` (in `requirements-future.txt`) | Downloading NWP GRIB files |
+| [LiveKit Agents](https://github.com/livekit/agents) | `pip install livekit-agents` (in `requirements-future.txt`) | Planned voice agent |
+| [IndicTrans2](https://github.com/AI4Bharat/IndicTrans2) | `git clone https://github.com/AI4Bharat/IndicTrans2` and follow its README | Indic-language translation |
