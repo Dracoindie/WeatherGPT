@@ -4,6 +4,7 @@ Early-warning dissemination endpoints.
 GET  /api/alerts/cap    – current alerts for a point as CAP 1.2 XML
 GET  /api/push/config   – whether Web Push is configured, and the VAPID public key
 POST /api/alerts/check  – run the subscription job (needs X-Job-Token = ALERT_JOB_TOKEN)
+POST /api/push/test     – signed-in demo: one TEST notification to the caller's own subscriptions
 """
 
 from __future__ import annotations
@@ -15,11 +16,12 @@ from dataclasses import asdict
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from alerts.engine import evaluate_alerts
 from dissemination.cap import build_cap
-from dissemination.push import VapidConfig, pywebpush_installed
+from dissemination import demo_push
+from dissemination.push import VapidConfig, WebPushSender, pywebpush_installed
 from query_service import fetch_validated_weather
 
 logger = logging.getLogger(__name__)
@@ -81,3 +83,46 @@ async def run_alert_check(x_job_token: Optional[str] = Header(default=None)) -> 
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return asdict(report)
+
+
+@router.post("/api/push/test")
+async def send_test_alert(authorization: Optional[str] = Header(default=None)):
+    """
+    Send "TEST: WeatherGPT demo alert, not an official IMD warning" to the
+    caller's own subscriptions. Needs ``Authorization: Bearer <Supabase access
+    token>``. Rate-limited to one per minute per user. Never touches
+    ``last_severity``, so the real job is unaffected.
+    """
+    try:
+        token = demo_push.bearer(authorization)
+        user_id = await demo_push.verify_user(token)
+    except demo_push.AuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except demo_push.NotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    wait = demo_push.limiter.retry_after(user_id)
+    if wait > 0:
+        seconds = int(wait) + 1
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(seconds)},
+            content={
+                "status": "rate_limited",
+                "retry_after": seconds,
+                "detail": f"One test alert per minute. Try again in {seconds} s.",
+            },
+        )
+
+    try:
+        subs = await demo_push.own_subscriptions(token, user_id)
+    except Exception as exc:  # Supabase down or table missing
+        logger.warning("Test push: listing subscriptions failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Your subscriptions could not be read right now.") from exc
+
+    if subs:
+        demo_push.limiter.hit(user_id)  # only real send attempts count
+    result = await demo_push.send_test(subs, WebPushSender(VapidConfig.from_env()).send)
+    return asdict(result)

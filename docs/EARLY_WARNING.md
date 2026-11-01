@@ -12,6 +12,20 @@ WeatherGPT alerts come from the deterministic alert engine (`backend/alerts/engi
 | Web Push when severity **becomes high** | `backend/dissemination/job.py`, `backend/dissemination/push.py`, `public/sw.js` | Works once VAPID keys are set (sent with `pywebpush`, pinned in `backend/requirements.txt`) |
 | WhatsApp share | Alert cards on `/alerts`, chat answers | Works (a `wa.me` link, no API key) |
 | CAP 1.2 XML | `GET /api/alerts/cap?latitude=&longitude=&name=` | Works |
+| Test push for demos | **Send test alert** on `/alerts` → `POST /api/push/test` | Works for signed-in users with a subscription |
+
+### Test push for demos
+
+On a calm day the job never sends anything, so `/alerts` has a **Send test alert** button for signed-in users who have at least one subscription. It calls `POST /api/push/test` with the user's Supabase access token (`Authorization: Bearer …`).
+
+- **Auth:** the backend verifies the token with Supabase Auth (`GET /auth/v1/user`, which checks the signature) and takes the user id from that response.
+- **Own subscriptions only:** rows are read with the user's own JWT and the anon key (RLS applies), filtered by `user_id=eq.<id>`, and any row for another user is dropped. The service-role key is not used.
+- **Text:** title "WeatherGPT test alert", body "TEST: WeatherGPT demo alert, not an official IMD warning".
+- **Rate limit:** one test per user per minute (HTTP 429 with `Retry-After`). An attempt with no subscriptions does not use up the minute. The limit is in memory, per backend process.
+- **No effect on the real job:** nothing is written back. `last_severity` and `last_notified_at` stay as they were, so a real warning is still sent when it starts.
+- **Result:** `status` is `sent`, `failed`, `disabled` (push not configured) or `no_subscription`, with `sent` / `total` counts. The UI shows it under the button.
+
+Needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the backend (503 otherwise) plus the VAPID keys. Tests: `tests/test_demo_push.py`.
 
 ### Web Push: how it works
 

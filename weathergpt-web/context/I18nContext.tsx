@@ -104,6 +104,14 @@ const dict = {
     'sky.live': 'Live',
     'sky.preview': 'Preview',
     'sky.unavailable': 'Not in forecast window',
+    'push.test': 'Send test alert',
+    'push.testSending': 'Sending test…',
+    'push.testSent': 'Test alert sent. Check your notifications.',
+    'push.testFailed': 'Test alert could not be delivered.',
+    'push.testNoSub': 'No subscription yet. Tap Alert me first.',
+    'push.testDisabled': 'Push sending is not configured on the server.',
+    'push.testWait': 'One test per minute. Try again shortly.',
+    'push.testNote': 'Sends “TEST: WeatherGPT demo alert, not an official IMD warning” to your own devices only.',
   },
   hi: {
     'brand.tag': 'मौसम बुद्धिमत्ता',
@@ -193,6 +201,14 @@ const dict = {
     'sky.live': 'लाइव',
     'sky.preview': 'पूर्वावलोकन',
     'sky.unavailable': 'पूर्वानुमान अवधि में नहीं',
+    'push.test': 'टेस्ट अलर्ट भेजें',
+    'push.testSending': 'टेस्ट भेजा जा रहा है…',
+    'push.testSent': 'टेस्ट अलर्ट भेज दिया गया। अपनी सूचनाएँ देखें।',
+    'push.testFailed': 'टेस्ट अलर्ट नहीं पहुँच सका।',
+    'push.testNoSub': 'अभी कोई सदस्यता नहीं। पहले "Alert me" दबाएँ।',
+    'push.testDisabled': 'सर्वर पर पुश भेजना कॉन्फ़िगर नहीं है।',
+    'push.testWait': 'हर मिनट एक ही टेस्ट। थोड़ी देर में फिर कोशिश करें।',
+    'push.testNote': '“TEST: WeatherGPT demo alert, not an official IMD warning” केवल आपके अपने डिवाइस पर भेजा जाता है।',
   },
 } as const
 
@@ -292,6 +308,14 @@ const marathi: Partial<Record<TranslationKey, string>> = {
   'sky.verified': 'स्रोत: Open-Meteo · पडताळलेले',
   'sky.preview': 'पूर्वावलोकन',
   'sky.unavailable': 'अंदाज कालावधीत नाही',
+  'push.test': 'चाचणी सूचना पाठवा',
+  'push.testSending': 'चाचणी पाठवत आहोत…',
+  'push.testSent': 'चाचणी सूचना पाठवली. तुमच्या सूचना तपासा.',
+  'push.testFailed': 'चाचणी सूचना पोहोचू शकली नाही.',
+  'push.testNoSub': 'अजून सदस्यता नाही. आधी "Alert me" दाबा.',
+  'push.testDisabled': 'सर्व्हरवर पुश पाठवणे कॉन्फिगर केलेले नाही.',
+  'push.testWait': 'दर मिनिटाला एकच चाचणी. थोड्या वेळाने पुन्हा प्रयत्न करा.',
+  'push.testNote': '“TEST: WeatherGPT demo alert, not an official IMD warning” फक्त तुमच्या स्वतःच्या डिव्हाइसवर पाठवले जाते.',
 }
 
 const hinglish: Partial<Record<TranslationKey, string>> = {
@@ -363,6 +387,14 @@ const hinglish: Partial<Record<TranslationKey, string>> = {
   'sky.verified': 'Source: Open-Meteo · verified',
   'sky.preview': 'Preview',
   'sky.unavailable': 'Forecast window mein nahi',
+  'push.test': 'Test alert bhejo',
+  'push.testSending': 'Test bhej rahe hain…',
+  'push.testSent': 'Test alert bhej diya. Notifications check karo.',
+  'push.testFailed': 'Test alert deliver nahi hua.',
+  'push.testNoSub': 'Abhi koi subscription nahi. Pehle Alert me dabao.',
+  'push.testDisabled': 'Server par push sending configure nahi hai.',
+  'push.testWait': 'Ek minute mein ek hi test. Thodi der baad try karo.',
+  'push.testNote': '“TEST: WeatherGPT demo alert, not an official IMD warning” sirf aapke apne devices par jaata hai.',
 }
 
 interface I18nValue {

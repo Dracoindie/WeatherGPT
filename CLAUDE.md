@@ -69,14 +69,15 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
-| `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML) |
+| `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML), `demo_push.py` (signed-in test push; never writes `last_severity`) |
 | `auth/trusted_location.py` | Verifies the Supabase JWT, then reads `profiles` (`id=eq.<sub>`, RLS) |
 | `http_tls.py` | Shared TLS context for all HTTP clients |
+| `env_check.py` | Startup warning when only `NEXT_PUBLIC_` Supabase names are set (never used as a fallback) |
 
 **Endpoints:**
 - `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
 - `/api/air-quality`, `/api/farm`, `/api/aviation`, `/api/risk`, `/api/compare`
-- `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header)
+- `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header), `POST /api/push/test` (signed-in demo push to the caller's own subscriptions, 1/min)
 
 ### Frontend (`weathergpt-web/`, Next.js 16, TypeScript, Tailwind, react-three-fiber, Leaflet)
 

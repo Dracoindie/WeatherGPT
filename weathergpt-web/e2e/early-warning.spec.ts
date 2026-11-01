@@ -30,6 +30,8 @@ test('alerts page labels alerts as unofficial and offers CAP + WhatsApp', async 
 
   // Push opt-in needs an account; demo mode has none.
   await expect(page.getByRole('link', { name: 'Sign in' }).last()).toBeVisible()
+  // The demo test push is for signed-in users with a subscription only.
+  await expect(page.getByRole('button', { name: /send test alert/i })).toHaveCount(0)
 })
 
 test('a chat answer can be shared on WhatsApp', async ({ page }) => {

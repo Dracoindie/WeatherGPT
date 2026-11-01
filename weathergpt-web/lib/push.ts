@@ -94,3 +94,42 @@ export async function deleteAlertSubscription(id: string): Promise<void> {
   const { error } = await createClient().from('alert_subscriptions').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }
+
+export type TestAlertStatus = 'sent' | 'failed' | 'no_subscription' | 'disabled' | 'rate_limited' | 'unauthorized' | 'error'
+
+export interface TestAlertResult {
+  status: TestAlertStatus
+  sent?: number
+  total?: number
+  retry_after?: number
+  message: string
+}
+
+/**
+ * Ask the backend to send "TEST: WeatherGPT demo alert, not an official IMD
+ * warning" to this user's own subscriptions (POST /api/push/test). It does not
+ * change the stored alert level, so the real job is unaffected.
+ */
+export async function sendTestAlert(accessToken: string): Promise<TestAlertResult> {
+  let resp: Response
+  try {
+    resp = await fetch(`${API_BASE}/api/push/test`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch {
+    return { status: 'error', message: 'Backend unreachable.' }
+  }
+  const body = (await resp.json().catch(() => ({}))) as Record<string, unknown>
+  if (resp.status === 401) return { status: 'unauthorized', message: String(body.detail ?? 'Sign in again.') }
+  if (resp.status === 429) {
+    return { status: 'rate_limited', retry_after: Number(body.retry_after ?? 60), message: String(body.detail ?? 'Try again in a minute.') }
+  }
+  if (!resp.ok) return { status: 'error', message: String(body.detail ?? 'Test alert unavailable.') }
+  return {
+    status: body.status as TestAlertStatus,
+    sent: Number(body.sent ?? 0),
+    total: Number(body.total ?? 0),
+    message: String(body.message ?? ''),
+  }
+}

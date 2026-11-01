@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { BellPlus, LoaderCircle, Trash2 } from 'lucide-react'
+import { BellPlus, BellRing, LoaderCircle, Trash2 } from 'lucide-react'
 import { useAuthContext } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
 import {
@@ -15,9 +15,11 @@ import {
   deleteAlertSubscription,
   getPushConfig,
   listAlertSubscriptions,
+  sendTestAlert,
   subscribeToAlerts,
   type AlertSubscription,
   type PushConfig,
+  type TestAlertResult,
 } from '@/lib/push'
 
 interface Props {
@@ -25,8 +27,10 @@ interface Props {
 }
 
 export function SubscribeAlerts({ location }: Props) {
-  const { user } = useAuthContext()
-  const { language } = useI18n()
+  const { user, session } = useAuthContext()
+  const { language, t } = useI18n()
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<TestAlertResult | null>(null)
   const [config, setConfig] = useState<PushConfig | null>(null)
   const [subs, setSubs] = useState<AlertSubscription[]>([])
   const [busy, setBusy] = useState(false)
@@ -65,6 +69,34 @@ export function SubscribeAlerts({ location }: Props) {
       setMessage(err instanceof Error ? err.message : 'Could not subscribe.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function sendTest() {
+    if (!session?.access_token) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      setTestResult(await sendTestAlert(session.access_token))
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  function testMessage(r: TestAlertResult): string {
+    switch (r.status) {
+      case 'sent':
+        return `${t('push.testSent')} (${r.sent}/${r.total})`
+      case 'no_subscription':
+        return t('push.testNoSub')
+      case 'disabled':
+        return t('push.testDisabled')
+      case 'rate_limited':
+        return t('push.testWait')
+      case 'failed':
+        return t('push.testFailed')
+      default:
+        return r.message || t('push.testFailed')
     }
   }
 
@@ -132,6 +164,30 @@ export function SubscribeAlerts({ location }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {user && session?.access_token && subs.length > 0 && (
+        <div className="mt-4 border-t border-line/60 pt-3">
+          <button
+            type="button"
+            onClick={() => void sendTest()}
+            disabled={testing}
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-line px-4 text-sm text-ink hover:bg-canvas disabled:opacity-50"
+          >
+            {testing ? <LoaderCircle className="size-4 animate-spin" /> : <BellRing className="size-4" />}
+            {testing ? t('push.testSending') : t('push.test')}
+          </button>
+          <p className="mt-1.5 text-[11px] text-ink-soft">{t('push.testNote')}</p>
+          {testResult && (
+            <p
+              role="status"
+              data-test-status={testResult.status}
+              className={`mt-1.5 text-xs ${testResult.status === 'sent' ? 'text-teal' : 'text-amber'}`}
+            >
+              {testMessage(testResult)}
+            </p>
+          )}
+        </div>
       )}
     </div>
   )
