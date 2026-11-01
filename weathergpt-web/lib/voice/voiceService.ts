@@ -82,6 +82,34 @@ export interface VoiceServiceCallbacks {
   onSpeechEnd?: () => void;
 }
 
+/** UI / reply languages the voice layer understands. */
+export type VoiceLanguage = 'en' | 'hi' | 'hinglish' | 'mr';
+
+/**
+ * BCP-47 tag for recognition and synthesis. Hinglish is romanised, so it is
+ * recognised and read as Indian English; Marathi uses mr-IN.
+ */
+export function speechLang(language: VoiceLanguage): 'en-IN' | 'hi-IN' | 'mr-IN' {
+  if (language === 'hi') return 'hi-IN';
+  if (language === 'mr') return 'mr-IN';
+  return 'en-IN';
+}
+
+/**
+ * Best installed voice for a language: exact tag, then same language, then
+ * (for Marathi, which few systems ship) a Hindi voice, which reads Devanagari.
+ * Returns null to let the browser pick from utterance.lang.
+ */
+export function pickVoice<T extends { lang: string }>(voices: readonly T[], language: VoiceLanguage): T | null {
+  const tag = speechLang(language).toLowerCase();
+  const norm = (v: T) => v.lang.toLowerCase().replace('_', '-');
+  return (
+    voices.find((v) => norm(v) === tag) ??
+    voices.find((v) => norm(v).startsWith(tag.slice(0, 2))) ??
+    (language === 'mr' ? voices.find((v) => norm(v).startsWith('hi')) ?? null : null)
+  );
+}
+
 export function getBrowserVoiceSupport(): { stt: boolean; tts: boolean } {
   if (typeof window === 'undefined') {
     return { stt: false, tts: false };
@@ -178,7 +206,7 @@ export class VoiceService {
     };
   }
 
-  public startListening(language: 'en' | 'hi' | 'hinglish' = 'en') {
+  public startListening(language: VoiceLanguage = 'en') {
     if (typeof window === 'undefined') return;
 
     // Stop any ongoing speech synthesis first
@@ -191,9 +219,7 @@ export class VoiceService {
     }
 
     try {
-      // Set language: English and romanised Hinglish use Indian English, Hindi uses hi-IN
-      // Chrome supports Hinglish recognition well under either en-IN or hi-IN
-      this.recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+      this.recognition.lang = speechLang(language);
       this.recognition.start();
     } catch (err: unknown) {
       const errorObj = err as { name?: string };
@@ -227,7 +253,7 @@ export class VoiceService {
     }
   }
 
-  public speak(text: string, language: 'en' | 'hi' | 'hinglish' = 'en') {
+  public speak(text: string, language: VoiceLanguage = 'en') {
     if (typeof window === 'undefined') return;
 
     const support = getBrowserVoiceSupport();
@@ -248,16 +274,14 @@ export class VoiceService {
 
     try {
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+      utterance.lang = speechLang(language);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
-      // Select natural voice if available
-      const voices = window.speechSynthesis.getVoices?.() ?? [];
-      const langPrefix = language === 'hi' ? 'hi' : 'en';
-      const matchingVoice = voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix));
-      if (matchingVoice) {
-        utterance.voice = matchingVoice;
+      const voice = pickVoice(window.speechSynthesis.getVoices?.() ?? [], language);
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
       }
 
       utterance.onstart = () => {

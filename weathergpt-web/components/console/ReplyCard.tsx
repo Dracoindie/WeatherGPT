@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { AlertTriangle, Crosshair, MapPinOff, RadioTower } from 'lucide-react'
+import { AlertTriangle, Crosshair, MapPinOff, RadioTower, Volume2 } from 'lucide-react'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 import { RainGlass } from '@/components/panels/RainGlass'
@@ -15,10 +15,12 @@ interface ReplyCardProps {
   entry: ThreadEntry
   onTyped: () => void
   onUseLocation: () => void
+  /** read the answer aloud (shown only when the browser can speak) */
+  onListen?: () => void
 }
 
 /** The grounded reply (typewriter) or a graceful error / need-location state. */
-export function ReplyCard({ entry, onTyped, onUseLocation }: ReplyCardProps) {
+export function ReplyCard({ entry, onTyped, onUseLocation, onListen }: ReplyCardProps) {
   const { t } = useI18n()
 
   if (entry.status === 'error') {
@@ -73,7 +75,16 @@ export function ReplyCard({ entry, onTyped, onUseLocation }: ReplyCardProps) {
         )}
       />
       {!needsLocation && (
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex flex-wrap justify-end gap-2">
+          {onListen && (
+            <button
+              type="button"
+              onClick={onListen}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-white/15 bg-black/30 px-3 text-xs text-hud-dim hover:text-hud"
+            >
+              <Volume2 className="size-3.5" aria-hidden="true" /> Listen
+            </button>
+          )}
           <ShareWhatsApp tone="sky" text={`${entry.query}\n${res.message}`} />
         </div>
       )}

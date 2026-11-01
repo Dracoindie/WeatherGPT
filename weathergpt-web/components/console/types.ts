@@ -11,4 +11,6 @@ export interface ThreadEntry {
   error?: string
   /** restored from this device's last answer while offline */
   saved?: boolean
+  /** asked with the mic: the reply is spoken unless muted */
+  viaVoice?: boolean
 }

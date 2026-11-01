@@ -21,6 +21,8 @@ import { sky } from '@/lib/skyStore'
 import { sceneFromFacts } from '@/lib/weatherScene'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/lib/role'
+import { useVoice } from '@/lib/voice/useVoice'
+import type { VoiceLanguage } from '@/lib/voice/voiceService'
 import { RolePanel } from '@/components/panels/RolePanels'
 import { SkyEngine } from '@/components/sky/SkyEngine'
 import { DemoPanel } from '@/components/sky/DemoPanel'
@@ -107,11 +109,11 @@ export default function LivingSky() {
   const context = contextFrom(lastAnswered?.response)
 
   const ask = useCallback(
-    async (message: string, coords?: { latitude: number; longitude: number }) => {
+    async (message: string, coords?: { latitude: number; longitude: number }, viaVoice = false) => {
       const id = nextId.current++
       setEntries((prev) => [
         ...prev,
-        { id, query: message, usedGps: !!coords, askedAt: new Date(), status: 'pending' },
+        { id, query: message, usedGps: !!coords, askedAt: new Date(), status: 'pending', viaVoice },
       ])
       setActiveId(id)
       try {
@@ -125,6 +127,21 @@ export default function LivingSky() {
     },
     [accessToken, context, role]
   )
+
+  // Voice: mic questions go straight to ask(); their answers are spoken unless muted.
+  const voice = useVoice((text) => void ask(text, undefined, true))
+  const [voiceLangChoice, setVoiceLang] = useState<VoiceLanguage | null>(null)
+  const voiceLang: VoiceLanguage = voiceLangChoice ?? (language === 'hi' ? 'hi' : 'en')
+  const spoken = useRef(new Set<number>())
+  const { muted, speak } = voice
+  useEffect(() => {
+    for (const e of entries) {
+      if (e.viaVoice && e.status === 'done' && e.response && !spoken.current.has(e.id)) {
+        spoken.current.add(e.id)
+        if (!muted) speak(e.response.message, e.response.intent.language)
+      }
+    }
+  }, [entries, muted, speak])
 
   // Remember the latest grounded answer for offline viewing.
   useEffect(() => {
@@ -239,6 +256,9 @@ export default function LivingSky() {
               <AskConsole
                 busy={busy}
                 docked={docked}
+                voice={voice}
+                voiceLang={voiceLang}
+                onVoiceLang={setVoiceLang}
                 locating={geoStatus === 'requesting'}
                 onAsk={(m) => void ask(m)}
                 onUseLocation={useLocation}
@@ -272,6 +292,11 @@ export default function LivingSky() {
                   entry={active}
                   onTyped={() => setTypedId(active.id)}
                   onUseLocation={useLocation}
+                  onListen={
+                    voice.supported.tts && active.response
+                      ? () => voice.speak(active.response!.message, active.response!.intent.language)
+                      : undefined
+                  }
                 />
               )}
             </AnimatePresence>

@@ -6,7 +6,9 @@
  */
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ArrowUpRight, Crosshair, LoaderCircle } from 'lucide-react'
+import { ArrowUpRight, Crosshair, LoaderCircle, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
+import type { UseVoice } from '@/lib/voice/useVoice'
+import type { VoiceLanguage } from '@/lib/voice/voiceService'
 import { useReducedMotion } from 'framer-motion'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
@@ -35,7 +37,17 @@ interface AskConsoleProps {
   locating: boolean
   onAsk: (message: string) => void
   onUseLocation: () => void
+  /** mic input + spoken replies; omitted = no voice controls */
+  voice?: UseVoice
+  voiceLang?: VoiceLanguage
+  onVoiceLang?: (lang: VoiceLanguage) => void
 }
+
+const VOICE_LANGS: { value: VoiceLanguage; label: string }[] = [
+  { value: 'en', label: 'EN-IN' },
+  { value: 'hi', label: 'हिंदी' },
+  { value: 'mr', label: 'मराठी' },
+]
 
 /** Types out each example, pauses, erases, moves to the next. */
 function useCyclingPlaceholder(active: boolean): string {
@@ -79,12 +91,22 @@ function useCyclingPlaceholder(active: boolean): string {
   return text
 }
 
-export function AskConsole({ busy, docked = false, locating, onAsk, onUseLocation }: AskConsoleProps) {
+export function AskConsole({
+  busy,
+  docked = false,
+  locating,
+  onAsk,
+  onUseLocation,
+  voice,
+  voiceLang = 'en',
+  onVoiceLang,
+}: AskConsoleProps) {
   const { t } = useI18n()
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const placeholder = useCyclingPlaceholder(value === '')
+  const listening = voice?.status === 'listening'
+  const placeholder = useCyclingPlaceholder(value === '' && !listening)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -118,7 +140,12 @@ export function AskConsole({ busy, docked = false, locating, onAsk, onUseLocatio
               autoComplete="off"
               spellCheck={false}
             />
-            {value === '' && (
+            {value === '' && listening && (
+              <span aria-live="polite" className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap text-base text-accent sm:text-lg">
+                {voice?.interim || t('voice.listening')}
+              </span>
+            )}
+            {value === '' && !listening && (
               <span
                 aria-hidden="true"
                 className={cn(
@@ -131,6 +158,50 @@ export function AskConsole({ busy, docked = false, locating, onAsk, onUseLocatio
               </span>
             )}
           </div>
+          {voice && (
+            <>
+              <select
+                value={voiceLang}
+                onChange={(e) => onVoiceLang?.(e.target.value as VoiceLanguage)}
+                aria-label="Speech language"
+                disabled={!voice.supported.stt}
+                className="hidden shrink-0 cursor-pointer rounded-lg bg-transparent font-readout text-[11px] text-hud-dim outline-none disabled:opacity-40 sm:block [&>option]:bg-[#0b1220]"
+              >
+                {VOICE_LANGS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => (listening ? voice.stopListening() : voice.listen(voiceLang))}
+                disabled={busy || !voice.supported.stt}
+                aria-pressed={listening}
+                aria-label={
+                  !voice.supported.stt ? 'Voice input is not supported in this browser' : listening ? t('voice.stop') : t('voice.start')
+                }
+                title={!voice.supported.stt ? 'Voice input is not supported in this browser. Type your question instead.' : undefined}
+                className={cn(
+                  'grid size-11 shrink-0 place-items-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-40',
+                  listening ? 'animate-pulse border-rose-400/70 bg-rose-500/20 text-rose-200' : 'border-white/10 bg-black/30 text-hud-dim hover:text-hud'
+                )}
+              >
+                {voice.supported.stt ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+              </button>
+              {voice.supported.tts && (
+                <button
+                  type="button"
+                  onClick={() => voice.setMuted(!voice.muted)}
+                  aria-pressed={voice.muted}
+                  aria-label={voice.muted ? 'Unmute spoken replies' : 'Mute spoken replies'}
+                  className="hidden size-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/30 text-hud-dim hover:text-hud sm:grid"
+                >
+                  {voice.muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
+                </button>
+              )}
+            </>
+          )}
           <button
             type="submit"
             disabled={busy || value.trim() === ''}
@@ -141,6 +212,12 @@ export function AskConsole({ busy, docked = false, locating, onAsk, onUseLocatio
           </button>
         </div>
       </form>
+
+      {voice?.error && (
+        <p role="status" className="mt-2 text-center text-xs text-amber-200">
+          {voice.error}
+        </p>
+      )}
 
       {/* one swipeable row on phones, wrapped and centred from sm up */}
       <div
