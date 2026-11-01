@@ -21,3 +21,13 @@ def disable_live_integrations(monkeypatch):
         "SUPABASE_ANON_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def reset_geocoding_cache():
+    """Each test starts with an empty Nominatim cache and rate-limit clock."""
+    import geocoding
+
+    geocoding.clear_cache()
+    yield
+    geocoding.clear_cache()

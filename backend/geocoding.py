@@ -5,12 +5,17 @@ Forward search resolves a place name to coordinates.
 Reverse search labels request-time GPS coordinates.
 
 City coordinates are NEVER hardcoded — Nominatim is the resolver.
+
+Usage policy (https://operations.osmfoundation.org/policies/nominatim/):
+at most 1 request per second, and results are cached in memory.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Optional
+import time
+from typing import Any, Optional
 
 import httpx
 
@@ -20,6 +25,55 @@ NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 USER_AGENT = "WeatherGPT-SIH2026/0.1 (prototype)"
 TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
+
+CACHE_TTL_S = 24 * 60 * 60
+CACHE_MAX_ENTRIES = 1024
+MIN_REQUEST_INTERVAL_S = 1.0
+
+_cache: dict[tuple, tuple[float, Any]] = {}
+_rate_lock = asyncio.Lock()
+_last_request_at: Optional[float] = None
+
+
+def clear_cache() -> None:
+    """Drop cached results and the rate-limit state (used by tests)."""
+    global _last_request_at, _rate_lock
+    _cache.clear()
+    _last_request_at = None
+    _rate_lock = asyncio.Lock()
+
+
+def _cache_get(key: tuple) -> tuple[bool, Any]:
+    entry = _cache.get(key)
+    if entry is None:
+        return False, None
+    expires_at, value = entry
+    if expires_at < time.monotonic():
+        del _cache[key]
+        return False, None
+    return True, value
+
+
+def _cache_put(key: tuple, value: Any) -> None:
+    if len(_cache) >= CACHE_MAX_ENTRIES:
+        # Evict the oldest insertion (dicts keep insertion order).
+        _cache.pop(next(iter(_cache)))
+    _cache[key] = (time.monotonic() + CACHE_TTL_S, value)
+
+
+async def _nominatim_get(url: str, params: dict[str, str]) -> httpx.Response:
+    """GET Nominatim, spacing requests at least MIN_REQUEST_INTERVAL_S apart."""
+    global _last_request_at
+    async with _rate_lock:
+        if _last_request_at is not None:
+            wait = MIN_REQUEST_INTERVAL_S - (time.monotonic() - _last_request_at)
+            if wait > 0:
+                await asyncio.sleep(wait)
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+                return await client.get(url, params=params, headers={"User-Agent": USER_AGENT})
+        finally:
+            _last_request_at = time.monotonic()
 
 
 class GeoResult:
@@ -42,14 +96,19 @@ async def geocode_place(place_name: str) -> Optional[GeoResult]:
     if not query:
         return None
 
+    key = ("search", query.casefold())
+    hit, cached = _cache_get(key)
+    if hit:
+        return cached
+    result = await _geocode_uncached(query)
+    _cache_put(key, result)
+    return result
+
+
+async def _geocode_uncached(query: str) -> Optional[GeoResult]:
     params = {"q": query, "format": "json", "limit": "1"}
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.get(
-                NOMINATIM_SEARCH_URL,
-                params=params,
-                headers={"User-Agent": USER_AGENT},
-            )
+        response = await _nominatim_get(NOMINATIM_SEARCH_URL, params)
     except httpx.RequestError as exc:
         logger.error("Nominatim search request failed: %s", exc)
         raise RuntimeError("Location service is temporarily unavailable.") from exc
@@ -80,6 +139,18 @@ async def geocode_place(place_name: str) -> Optional[GeoResult]:
 
 async def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
     """Turn coordinates into a short display name. None on failure."""
+    # ~110 m grid: nearby GPS fixes share a label.
+    key = ("reverse", round(latitude, 3), round(longitude, 3))
+    hit, cached = _cache_get(key)
+    if hit:
+        return cached
+    label = await _reverse_uncached(latitude, longitude)
+    if label is not None:
+        _cache_put(key, label)
+    return label
+
+
+async def _reverse_uncached(latitude: float, longitude: float) -> Optional[str]:
     params = {
         "lat": str(latitude),
         "lon": str(longitude),
@@ -88,12 +159,7 @@ async def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
         "addressdetails": "1",
     }
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.get(
-                NOMINATIM_REVERSE_URL,
-                params=params,
-                headers={"User-Agent": USER_AGENT},
-            )
+        response = await _nominatim_get(NOMINATIM_REVERSE_URL, params)
     except httpx.RequestError as exc:
         logger.error("Nominatim reverse request failed: %s", exc)
         return None
