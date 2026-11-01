@@ -1,19 +1,24 @@
-import Link from 'next/link'
+'use client'
+
 import { WifiOff } from 'lucide-react'
+import { AppShell } from '@/components/ui/AppShell'
+import { GlassPanel } from '@/components/panels/GlassPanel'
+import { SkyLinkButton } from '@/components/ui/SkyButton'
+import { useI18n } from '@/context/I18nContext'
 
 /** Fallback page the service worker serves when a page was never cached. */
 export default function OfflinePage() {
+  const { t } = useI18n()
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#02040a] px-6 text-center text-[#e7f0ff]">
-      <WifiOff className="size-10 text-amber-300" aria-hidden="true" />
-      <h1 className="text-2xl font-semibold">You are offline</h1>
-      <p className="max-w-sm text-sm text-white/70">
-        This page has not been saved on this device yet. The home screen shows your last
-        forecast while you are offline; live data returns when you reconnect.
-      </p>
-      <Link href="/" className="rounded-full border border-cyan-300/50 px-4 py-2 text-sm text-cyan-200">
-        Open the last forecast
-      </Link>
-    </main>
+    <AppShell mainClassName="flex items-center justify-center py-10">
+      <GlassPanel wet={false} className="w-full max-w-md p-8 text-center">
+        <WifiOff className="mx-auto size-10 text-sev-watch" aria-hidden="true" />
+        <h1 className="mt-4 font-hud text-2xl font-bold text-hud">{t('offline.title')}</h1>
+        <p className="mt-2 text-sm text-hud-dim">{t('offline.body')}</p>
+        <SkyLinkButton href="/" variant="ghost" className="mt-6">
+          {t('offline.open')}
+        </SkyLinkButton>
+      </GlassPanel>
+    </AppShell>
   )
 }

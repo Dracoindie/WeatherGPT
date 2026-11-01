@@ -1,145 +1,110 @@
 /**
- * SignUpForm — email/password registration form.
- *
- * Validates client-side before calling Supabase Auth signUp.
- * Shows inline errors.  On success, shows a confirmation message
- * asking the user to verify their email.
+ * SignUpForm: email/password registration. Validates client-side before
+ * calling Supabase Auth signUp; on success asks the user to confirm their email.
  */
 
 'use client'
 
 import { useState } from 'react'
+import { CircleCheck, LoaderCircle, UserPlus } from 'lucide-react'
 import { useAuthContext } from '@/context/AuthContext'
+import { useI18n, type TranslationKey } from '@/context/I18nContext'
+import { SkyButton } from '@/components/ui/SkyButton'
+import { SkyField, SkyInput } from '@/components/ui/SkyInput'
+import { FieldError, FormError } from './AuthCard'
 
 const MIN_PASSWORD_LENGTH = 8
 
-function validateEmail(email: string): string {
-  if (!email) return 'Email is required.'
-  // RFC 5322–like basic check
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address.'
+function validateEmail(email: string): TranslationKey | '' {
+  if (!email) return 'auth.emailRequired'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'auth.emailInvalid'
   return ''
 }
 
-function validatePassword(password: string): string {
-  if (!password) return 'Password is required.'
-  if (password.length < MIN_PASSWORD_LENGTH)
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+function validatePassword(password: string): TranslationKey | '' {
+  if (!password) return 'auth.passwordRequired'
+  if (password.length < MIN_PASSWORD_LENGTH) return 'auth.passwordShort'
   return ''
 }
 
-interface SignUpFormProps {
-  onSuccess?: () => void
-}
-
-export default function SignUpForm({ onSuccess }: SignUpFormProps) {
+export default function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
   const { signUp } = useAuthContext()
+  const { t } = useI18n()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, TranslationKey>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [successMsg, setSuccessMsg] = useState('')
+  const [done, setDone] = useState(false)
   const [serverError, setServerError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const newErrors: Record<string, string> = {}
-
-    const emailErr = validateEmail(email)
-    if (emailErr) newErrors.email = emailErr
-
+    const next: Record<string, TranslationKey> = {}
+    const emailErr = validateEmail(email.trim())
+    if (emailErr) next.email = emailErr
     const pwErr = validatePassword(password)
-    if (pwErr) newErrors.password = pwErr
+    if (pwErr) next.password = pwErr
+    setErrors(next)
+    if (Object.keys(next).length) return
 
-    if (Object.keys(newErrors).length) {
-      setErrors(newErrors)
-      return
-    }
-
-    setErrors({})
     setServerError('')
     setSubmitting(true)
-
     const { error } = await signUp(email.trim(), password, fullName.trim())
     setSubmitting(false)
-
     if (error) {
       setServerError(error.message)
       return
     }
-
-    setSuccessMsg(
-      'Account created! Check your email to confirm your address before logging in.'
-    )
+    setDone(true)
     onSuccess?.()
   }
 
-  if (successMsg) {
+  if (done) {
     return (
-      <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300">
-        <p className="text-lg font-semibold">✅ {successMsg}</p>
+      <div role="status" className="flex items-start gap-3 rounded-xl border border-sev-none/40 bg-sev-none/10 p-4 text-sm text-hud">
+        <CircleCheck className="mt-0.5 size-5 shrink-0 text-sev-none" />
+        {t('auth.created')}
       </div>
     )
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      {serverError && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-300">
-          {serverError}
-        </div>
-      )}
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Full name (optional)
-        </label>
-        <input
-          type="text"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          placeholder="Priya Sharma"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Email
-        </label>
-        <input
+      {serverError && <FormError>{serverError}</FormError>}
+      <SkyField label={t('auth.fullName')} htmlFor="signup-name">
+        <SkyInput id="signup-name" type="text" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+      </SkyField>
+      <SkyField label={t('auth.email')} htmlFor="signup-email">
+        <SkyInput
+          id="signup-email"
           type="email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? 'signup-email-error' : undefined}
         />
-        {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Password
-        </label>
-        <input
+        <FieldError id="signup-email-error">{errors.email && t(errors.email)}</FieldError>
+      </SkyField>
+      <SkyField label={t('auth.password')} htmlFor="signup-password">
+        <SkyInput
+          id="signup-password"
           type="password"
+          autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Min. 8 characters"
-          className="w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+          placeholder={t('auth.passwordHint')}
+          aria-invalid={!!errors.password}
+          aria-describedby={errors.password ? 'signup-password-error' : undefined}
         />
-        {errors.password && (
-          <p className="mt-1 text-xs text-red-500">{errors.password}</p>
-        )}
-      </div>
-
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-      >
-        {submitting ? 'Creating account…' : 'Create account'}
-      </button>
+        <FieldError id="signup-password-error">{errors.password && t(errors.password)}</FieldError>
+      </SkyField>
+      <SkyButton type="submit" variant="primary" disabled={submitting} className="mt-1 w-full">
+        {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+        {submitting ? t('auth.creating') : t('auth.create')}
+      </SkyButton>
     </form>
   )
 }
