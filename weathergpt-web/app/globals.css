@@ -341,3 +341,5 @@ body {
 .sky-root .leaflet-container .leaflet-control-attribution { background: rgba(2, 4, 10, 0.7); color: var(--sky-text-dim); }
 .sky-root .leaflet-container .leaflet-control-attribution a { color: var(--sky-accent); }
 .sky-root .leaflet-bar a { background: rgba(8, 14, 26, 0.92); color: var(--sky-text); border-color: var(--sky-line); }
+.sky-root .leaflet-container .leaflet-tooltip { background: rgba(8, 14, 26, 0.94); color: var(--sky-text); border: 1px solid var(--sky-line); box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.9); }
+.sky-root .leaflet-container .leaflet-tooltip-top::before { border-top-color: rgba(8, 14, 26, 0.94); }
