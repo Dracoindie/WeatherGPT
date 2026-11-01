@@ -8,7 +8,7 @@ import { useAuthContext } from '@/context/AuthContext';
 import { useDemoContext } from '@/context/DemoContext';
 import { upsertProfile } from '@/lib/profile/profileService';
 import { fetchForecast } from '@/lib/api/forecast';
-import { fetchAlerts } from '@/lib/api/alerts';
+import { ALERTS_UNAVAILABLE_MESSAGE, fetchAlerts } from '@/lib/api/alerts';
 import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero';
 import { ForecastPanel } from '@/components/weather/ForecastPanel';
 import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence';
@@ -64,6 +64,8 @@ export default function MapPage() {
   const [forecastState, setForecastState] = useState<DataState<WeatherResponse>>({ status: 'idle' });
   const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [alertsStaleSince, setAlertsStaleSince] = useState<string | null>(null);
 
   async function handleLocationSelected(loc: LocationData) {
     setLocation(loc);
@@ -105,18 +107,26 @@ export default function MapPage() {
       }
 
       // Fetch alerts
-      try {
-        setAlertsLoading(true);
-        const alertData = await fetchAlerts({ latitude: loc.latitude, longitude: loc.longitude });
-        setAlerts(alertData.alerts);
-      } catch {
-        setAlerts([]);
-      } finally {
-        setAlertsLoading(false);
-      }
+      await loadAlerts(loc);
     } catch (err) {
       setWeatherStatus('error');
       setWeatherError(err instanceof Error ? err.message : 'Could not fetch weather. Is the backend running?');
+    }
+  }
+
+  async function loadAlerts(loc: LocationData) {
+    setAlertsLoading(true);
+    setAlertsError(null);
+    try {
+      const alertData = await fetchAlerts({ latitude: loc.latitude, longitude: loc.longitude });
+      setAlerts(alertData.alerts);
+      setAlertsStaleSince(alertData.stale ? alertData.data_retrieved_at ?? null : null);
+    } catch (err) {
+      setAlerts([]);
+      setAlertsStaleSince(null);
+      setAlertsError(err instanceof Error ? err.message : ALERTS_UNAVAILABLE_MESSAGE);
+    } finally {
+      setAlertsLoading(false);
     }
   }
 
@@ -143,6 +153,9 @@ export default function MapPage() {
               alerts={alerts}
               locationName={location?.name}
               loading={alertsLoading}
+              error={alertsError}
+              staleSince={alertsStaleSince}
+              onRetry={location ? () => void loadAlerts(location) : undefined}
             />
           </div>
 

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
@@ -72,3 +72,46 @@ def test_nwp_endpoint_502_on_upstream_failure(monkeypatch):
 def test_nwp_endpoint_invalid_hours():
     resp = client.get("/api/nwp?latitude=18.5204&longitude=73.8567&hours=0")
     assert resp.status_code == 422  # FastAPI validation rejects hours<1
+
+
+# The autouse patch_nwp fixture replaces _fetch_hour_grib; keep the real one.
+from nwp import service as _nwp_service  # noqa: E402
+
+_REAL_FETCH_HOUR_GRIB = _nwp_service._fetch_hour_grib
+
+
+@pytest.mark.asyncio
+async def test_grib_decoding_does_not_block_the_event_loop(monkeypatch):
+    """Root cause of intermittent /api/alerts 502s: blocking cfgrib decodes froze the loop."""
+    import asyncio
+    import time
+
+    from nwp import service
+
+    def slow_decode(content):
+        time.sleep(0.4)  # stands in for cfgrib work
+        return {"TMP": 300.0}
+
+    monkeypatch.setattr(service, "_decode_grib", slow_decode)
+
+    resp = MagicMock()
+    resp.content = b"grib"
+    resp.raise_for_status = MagicMock()
+    http = MagicMock()
+    http.get = AsyncMock(return_value=resp)
+
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.02)
+            ticks += 1
+
+    task = asyncio.create_task(ticker())
+    try:
+        await _REAL_FETCH_HOUR_GRIB(http, service._latest_run_timestamp(), 0, 19.4, 72.8)
+    finally:
+        task.cancel()
+    # 0.8 s of decoding; a blocked loop would tick ~0 times.
+    assert ticks >= 15

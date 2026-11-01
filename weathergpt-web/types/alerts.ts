@@ -25,4 +25,8 @@ export interface AlertsResponse {
   retrieved_at: string;
   active_alerts_count: number;
   alerts: WeatherAlert[];
+  /** true when the weather service was down and the last good data was used */
+  stale?: boolean;
+  /** UTC time the evaluated weather data was fetched */
+  data_retrieved_at?: string | null;
 }

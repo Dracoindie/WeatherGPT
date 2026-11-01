@@ -7,6 +7,7 @@ import httpx
 from pydantic import ValidationError
 
 from models.climate import ClimateResponse, HistoricalDaily
+from http_tls import SSL_CONTEXT
 
 BASE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
@@ -42,7 +43,7 @@ async def fetch_historical_weather(
         "timezone": timezone,
     }
     start = time.time()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=SSL_CONTEXT) as client:
         resp = await client.get(BASE_URL, params=params, timeout=20.0)
         resp.raise_for_status()
         data = resp.json()

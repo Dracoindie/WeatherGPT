@@ -28,6 +28,7 @@ import os
 from typing import Optional
 
 import httpx
+from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ async def _gemini_complete(
         "generationConfig": generation_config,
     }
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
             response = await client.post(url, params={"key": key}, json=payload)
     except httpx.RequestError as exc:
         logger.error("Gemini request failed: %s", exc)
@@ -168,7 +169,7 @@ async def _openai_compatible_complete(
         body["response_format"] = {"type": "json_object"}
 
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
             response = await client.post(
                 url,
                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},

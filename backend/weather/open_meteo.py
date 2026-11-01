@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 import httpx
+from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ async def fetch_weather(latitude: float, longitude: float) -> dict[str, Any]:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
             response = await client.get(OPEN_METEO_URL, params=params)
     except httpx.TimeoutException as exc:
         logger.error("Open-Meteo request timed out: %s", exc)

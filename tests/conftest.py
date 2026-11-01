@@ -31,3 +31,13 @@ def reset_geocoding_cache():
     geocoding.clear_cache()
     yield
     geocoding.clear_cache()
+
+
+@pytest.fixture(autouse=True)
+def reset_alerts_cache():
+    """Each test starts without last-known-good alert data."""
+    from api import alerts
+
+    alerts.clear_cache()
+    yield
+    alerts.clear_cache()

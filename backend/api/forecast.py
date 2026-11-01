@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import httpx
 import logging
 from models.forecast import ForecastResponse, DailyForecast
+from http_tls import SSL_CONTEXT
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ async def _fetch_daily(latitude: float, longitude: float, days: int) -> dict:
         "timezone": "auto",
     }
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
             response = await client.get(OPEN_METEO_URL, params=params)
     except httpx.RequestError as exc:
         logger.error("Open-Meteo request error: %s", exc)

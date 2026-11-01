@@ -29,6 +29,7 @@ from typing import Optional
 
 import httpx
 from pydantic import BaseModel, Field
+from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,7 @@ async def get_trusted_default_location(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
             response = await client.get(url, params=params, headers=headers)
     except httpx.RequestError as exc:
         logger.error("Trusted location lookup failed: %s", exc)

@@ -36,3 +36,11 @@ class AlertsResponse(BaseModel):
     retrieved_at: datetime = Field(..., description="UTC timestamp when alerts were evaluated")
     active_alerts_count: int = Field(..., description="Number of active alerts")
     alerts: List[WeatherAlert] = Field(default_factory=list, description="List of active weather alerts")
+    stale: bool = Field(
+        default=False,
+        description="True when the weather service was unreachable and alerts were evaluated "
+        "from the last successful fetch for this location",
+    )
+    data_retrieved_at: Optional[datetime] = Field(
+        default=None, description="UTC time the evaluated weather data was fetched"
+    )

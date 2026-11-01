@@ -144,3 +144,56 @@ def test_get_alerts_endpoint_validation():
     # Missing parameters
     resp = client.get("/api/alerts")
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Upstream failure: retry, stale fallback, clear 503 (never a bare 502)
+# ---------------------------------------------------------------------------
+
+URL = "/api/alerts?latitude=19.442336&longitude=72.814052"
+TIMEOUT_ERR = RuntimeError("Weather service did not respond in time. Please try again.")
+
+
+def test_alerts_503_when_weather_service_down_and_no_recent_data():
+    fetch = AsyncMock(side_effect=TIMEOUT_ERR)
+    with patch("api.alerts.fetch_validated_weather", new=fetch):
+        resp = client.get(URL)
+    assert resp.status_code == 503
+    assert "temporarily unavailable" in resp.json()["detail"]
+    assert fetch.await_count == 2  # retried once
+
+
+def test_alerts_retry_recovers_from_one_failure():
+    fetch = AsyncMock(side_effect=[TIMEOUT_ERR, _mock_weather_response(hourly_precip_max=10.0)])
+    with patch("api.alerts.fetch_validated_weather", new=fetch):
+        resp = client.get(URL)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["stale"] is False
+    assert body["active_alerts_count"] >= 1
+
+
+def test_alerts_fall_back_to_last_good_data_marked_stale():
+    good = _mock_weather_response(hourly_precip_max=10.0)
+    with patch("api.alerts.fetch_validated_weather", new=AsyncMock(return_value=good)):
+        first = client.get(URL).json()
+    with patch("api.alerts.fetch_validated_weather", new=AsyncMock(side_effect=TIMEOUT_ERR)):
+        resp = client.get(URL)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["stale"] is True
+    assert body["data_retrieved_at"] == first["data_retrieved_at"]
+    # Same verified values -> same alerts as the live evaluation.
+    assert [a["alert_type"] for a in body["alerts"]] == [a["alert_type"] for a in first["alerts"]]
+
+
+def test_alerts_stale_data_expires(monkeypatch):
+    from api import alerts as alerts_api
+
+    with patch("api.alerts.fetch_validated_weather", new=AsyncMock(return_value=_mock_weather_response())):
+        client.get(URL)
+    real = alerts_api.time.monotonic
+    monkeypatch.setattr(alerts_api.time, "monotonic", lambda: real() + alerts_api.STALE_MAX_AGE_S + 1)
+    with patch("api.alerts.fetch_validated_weather", new=AsyncMock(side_effect=TIMEOUT_ERR)):
+        resp = client.get(URL)
+    assert resp.status_code == 503

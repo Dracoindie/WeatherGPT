@@ -18,6 +18,7 @@ import time
 from typing import Any, Optional
 
 import httpx
+from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ async def _nominatim_get(url: str, params: dict[str, str]) -> httpx.Response:
             if wait > 0:
                 await asyncio.sleep(wait)
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
                 return await client.get(url, params=params, headers={"User-Agent": USER_AGENT})
         finally:
             _last_request_at = time.monotonic()

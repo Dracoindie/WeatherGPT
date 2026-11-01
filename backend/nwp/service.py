@@ -3,10 +3,12 @@ import asyncio
 import logging
 import os
 import tempfile
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import List
 import xarray as xr
 from .models import NwpMetadata, NwpForecast, NwpResponse
+from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,30 @@ def _build_wind_url(run: datetime, forecast_hour: int, latitude: float, longitud
 
 
 
+# eccodes is not documented as thread-safe; decode one file at a time.
+_DECODE_LOCK = threading.Lock()
+
+
+def _decode_grib(content: bytes) -> dict:
+    """Mean of each variable in a GRIB2 subset. Blocking; call via asyncio.to_thread."""
+    result: dict = {}
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".grib2")
+    try:
+        with os.fdopen(tmp_fd, "wb") as f:
+            f.write(content)
+        with _DECODE_LOCK:
+            ds = xr.open_dataset(tmp_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
+            try:
+                for var_name in ds.data_vars:
+                    result[var_name] = float(ds[var_name].values.mean())
+            finally:
+                ds.close()
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    return result
+
+
 async def _fetch_hour_grib(
     client: httpx.AsyncClient,
     run: datetime,
@@ -89,33 +115,11 @@ async def _fetch_hour_grib(
     wind_resp.raise_for_status()
 
     result: dict = {}
-
-    # Decode surface variables (TMP at 2m, APCP at surface)
-    if surf_resp.content:
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".grib2")
-        try:
-            with os.fdopen(tmp_fd, "wb") as f:
-                f.write(surf_resp.content)
-            ds = xr.open_dataset(tmp_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
-            for var_name in ds.data_vars:
-                result[var_name] = float(ds[var_name].values.mean())
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
-    # Decode wind variables (UGRD/VGRD at 10m) — homogeneous, no conflict
-    if wind_resp.content:
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".grib2")
-        try:
-            with os.fdopen(tmp_fd, "wb") as f:
-                f.write(wind_resp.content)
-            ds = xr.open_dataset(tmp_path, engine="cfgrib", backend_kwargs={"indexpath": ""})
-            for var_name in ds.data_vars:
-                result[var_name] = float(ds[var_name].values.mean())
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
+    # cfgrib decoding is CPU-bound and blocking: run it in a worker thread so the
+    # event loop (and every other request, e.g. /api/alerts) keeps moving.
+    for content in (surf_resp.content, wind_resp.content):
+        if content:
+            result.update(await asyncio.to_thread(_decode_grib, content))
     return result
 
 
@@ -141,7 +145,7 @@ async def get_nwp_forecast(latitude: float, longitude: float, hours: int = 24) -
     run = None
     results = None
 
-    async with httpx.AsyncClient(timeout=45.0) as client:
+    async with httpx.AsyncClient(timeout=45.0, verify=SSL_CONTEXT) as client:
         # Try up to 4 recent cycles (last 24 hours)
         for _ in range(4):
             if candidate_run > now:
