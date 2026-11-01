@@ -9,20 +9,44 @@ GET /api/weather – real-time weather from Open-Meteo
 """
 
 import logging
+import os
+from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
-from models.weather import WeatherResponse
-from query_service import fetch_validated_weather
-from api.chat import router as chat_router
-from api.forecast import router as forecast_router
-from api.nwp import router as nwp_router
-from api.alerts import router as alerts_router
-from api.climate import router as climate_router
+# backend/.env, if present. Real environment variables take precedence.
+load_dotenv(Path(__file__).with_name(".env"))
+
+from fastapi import FastAPI, HTTPException, Query  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+from models.weather import WeatherResponse  # noqa: E402
+from query_service import fetch_validated_weather  # noqa: E402
+from api.chat import router as chat_router  # noqa: E402
+from api.forecast import router as forecast_router  # noqa: E402
+from api.alerts import router as alerts_router  # noqa: E402
+from api.climate import router as climate_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# /api/nwp needs xarray + cfgrib (and the eccodes library); the API starts without them.
+try:
+    import cfgrib  # noqa: F401  (raises RuntimeError if the eccodes library is missing)
+
+    from api.nwp import router as nwp_router
+except (ImportError, RuntimeError, OSError) as exc:
+    nwp_router = None
+    logger.warning("NWP endpoint disabled: %s", exc)
+
+DEFAULT_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def allowed_origins() -> list[str]:
+    """CORS origins from ALLOWED_ORIGINS (comma-separated), else the local dev defaults."""
+    raw = os.getenv("ALLOWED_ORIGINS", "")
+    origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    return origins or DEFAULT_ALLOWED_ORIGINS
 
 # ---------------------------------------------------------------------------
 # App
@@ -36,10 +60,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -48,7 +69,8 @@ app.add_middleware(
 # Register routers
 app.include_router(chat_router)
 app.include_router(forecast_router)
-app.include_router(nwp_router)
+if nwp_router is not None:
+    app.include_router(nwp_router)
 app.include_router(alerts_router)
 app.include_router(climate_router)
 

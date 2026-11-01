@@ -1,0 +1,6 @@
+# Not imported by the backend yet; kept for planned GIS and agent work.
+# Install with: pip install -r backend/requirements-future.txt
+geopandas==1.1.4
+shapely==2.1.2
+pyproj==3.7.2
+langgraph==1.2.11

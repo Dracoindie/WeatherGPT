@@ -1,13 +1,11 @@
-fastapi
-uvicorn[standard]
-httpx
-pydantic
-geopandas
-shapely
-pyproj
-xarray
-cfgrib
-langgraph
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+httpx==0.28.1
+pydantic==2.13.5
+python-dotenv==1.2.3
+# NWP (GRIB via cfgrib/eccodes). Optional at runtime: /api/nwp is skipped if missing.
+xarray==2026.7.0
+cfgrib==0.9.15.1
 # dev / test
-pytest
-pytest-asyncio
+pytest==9.1.1
+pytest-asyncio==1.4.0
