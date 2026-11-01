@@ -9,6 +9,9 @@ SECURITY
   and ``SUPABASE_URL`` + ``SUPABASE_ANON_KEY`` are configured.
 - The request is made to PostgREST with the user's own JWT so RLS still applies.
   Another user's profile cannot be read this way.
+- Defense in depth: the query is also filtered by ``id=eq.<sub>``, with ``sub``
+  read from the JWT payload. The signature is not checked here (Supabase
+  checks it and RLS enforces access); ``sub`` only narrows the filter.
 
 If those env vars are missing, authenticated-default support is disabled
 (anonymous queries with an explicit location still work).
@@ -16,8 +19,12 @@ If those env vars are missing, authenticated-default support is disabled
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 import os
+import uuid
 from typing import Optional
 
 import httpx
@@ -44,6 +51,26 @@ def _bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token or None
 
 
+def _jwt_subject(token: str) -> Optional[str]:
+    """``sub`` claim from an unverified JWT payload, if it is a UUID."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    payload = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(payload))
+    except (binascii.Error, ValueError):
+        return None
+    sub = claims.get("sub") if isinstance(claims, dict) else None
+    if not isinstance(sub, str):
+        return None
+    # Supabase user ids are UUIDs; anything else must not reach the filter.
+    try:
+        return str(uuid.UUID(sub))
+    except ValueError:
+        return None
+
+
 async def get_trusted_default_location(
     authorization: Optional[str],
 ) -> Optional[TrustedDefaultLocation]:
@@ -54,6 +81,11 @@ async def get_trusted_default_location(
     """
     token = _bearer_token(authorization)
     if token is None:
+        return None
+
+    subject = _jwt_subject(token)
+    if subject is None:
+        logger.info("Trusted default location skipped: token has no usable sub claim")
         return None
 
     supabase_url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
@@ -67,6 +99,7 @@ async def get_trusted_default_location(
     url = f"{supabase_url}/rest/v1/profiles"
     params = {
         "select": "default_latitude,default_longitude,default_location_name",
+        "id": f"eq.{subject}",
         "limit": "1",
     }
     headers = {
