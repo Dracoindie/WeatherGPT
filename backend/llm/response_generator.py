@@ -67,11 +67,17 @@ def allowed_numbers(facts: WeatherFacts) -> set[str]:
     return tokens
 
 
-def is_grounded(text: str, facts: WeatherFacts) -> bool:
-    """Reject replies that introduce numbers not present in WeatherFacts."""
+def is_grounded(
+    text: str, facts: WeatherFacts, advisory: Optional[AdvisoryResult] = None
+) -> bool:
+    """Reject replies that introduce numbers not present in WeatherFacts or the advisory."""
     if not facts.period_available:
         return True
     allowed = allowed_numbers(facts)
+    if advisory is not None:
+        # Reasons quote verified period values (e.g. rain on a temperature question).
+        for reason in advisory.reasons:
+            allowed.update(re.findall(r"\d+(?:\.\d+)?", reason))
     if not allowed:
         return not re.search(r"\d", text)
     for match in re.finditer(r"\d+(?:\.\d+)?", text):
@@ -153,6 +159,30 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
                 )
             if precip is not None:
                 return f"{loc} में {when_phrase} वर्षा {precip} मिमी दर्ज/अनुमानित है (Open-Meteo)।"
+        if param == "heavy_rain" and precip is not None:
+            chance = f", अधिकतम संभावना {prob}%" if prob is not None else ""
+            return (
+                f"{loc} में {when_phrase} भारी बारिश की जाँच: कुल वर्षा {precip} मिमी{chance} "
+                "(Open-Meteo)।"
+            )
+        if param == "rain_likelihood" and prob is not None:
+            amount = f", अनुमानित वर्षा {precip} मिमी" if precip is not None else ""
+            return f"{loc} में {when_phrase} बारिश की संभावना अधिकतम {prob}% है{amount} (Open-Meteo)।"
+        if param in ("heavy_rain", "rain_likelihood") and precip is not None:
+            return f"{loc} में {when_phrase} वर्षा {precip} मिमी दर्ज/अनुमानित है (Open-Meteo)।"
+        if param == "storm" and (wind or precip is not None or desc):
+            parts = []
+            if desc:
+                parts.append(desc)
+            if wind:
+                parts.append(f"हवा {wind} किमी/घंटा तक")
+            if precip is not None:
+                parts.append(f"वर्षा {precip} मिमी")
+            return f"{loc} में {when_phrase} तूफान की जाँच: {', '.join(parts)} (Open-Meteo)।"
+        if param == "high_temperature" and tmax:
+            return f"{loc} में {when_phrase} अधिकतम तापमान {tmax}°C रहेगा (Open-Meteo)।"
+        if param == "high_temperature" and temp:
+            return f"{loc} में {when_phrase} तापमान {temp}°C है (Open-Meteo)।"
         if param == "temperature" and tmin and tmax:
             return (
                 f"{loc} में {when_phrase} तापमान लगभग {tmin}°C से {tmax}°C रहेगा (Open-Meteo)।"
@@ -161,6 +191,8 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
             return f"{loc} में {when_phrase} तापमान {temp}°C है (Open-Meteo)।"
         if param == "wind" and wind:
             return f"{loc} में {when_phrase} हवा की गति {wind} किमी/घंटा है (Open-Meteo)।"
+        if param == "strong_wind" and wind:
+            return f"{loc} में {when_phrase} हवा की गति {wind} किमी/घंटा तक है (Open-Meteo)।"
         if param == "humidity" and humidity:
             return f"{loc} में वर्तमान आर्द्रता {humidity}% है (Open-Meteo)।"
         parts = []
@@ -183,6 +215,30 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
                 )
             if precip is not None:
                 return f"{loc} mein {when_phrase} precipitation {precip} mm hai (Open-Meteo)."
+        if param == "heavy_rain" and precip is not None:
+            chance = f", peak chance {prob}%" if prob is not None else ""
+            return (
+                f"{loc} mein {when_phrase} heavy rain check: total rain {precip} mm{chance} "
+                "(Open-Meteo)."
+            )
+        if param == "rain_likelihood" and prob is not None:
+            amount = f", expected rain {precip} mm" if precip is not None else ""
+            return f"{loc} mein {when_phrase} baarish ka chance {prob}% tak hai{amount} (Open-Meteo)."
+        if param in ("heavy_rain", "rain_likelihood") and precip is not None:
+            return f"{loc} mein {when_phrase} precipitation {precip} mm hai (Open-Meteo)."
+        if param == "storm" and (wind or precip is not None or desc):
+            bits = []
+            if desc:
+                bits.append(desc.lower())
+            if wind:
+                bits.append(f"wind {wind} km/h tak")
+            if precip is not None:
+                bits.append(f"rain {precip} mm")
+            return f"{loc} mein {when_phrase} storm check: {', '.join(bits)} (Open-Meteo)."
+        if param == "high_temperature" and tmax:
+            return f"{loc} mein {when_phrase} maximum temperature {tmax}°C rahega (Open-Meteo)."
+        if param == "high_temperature" and temp:
+            return f"{loc} mein {when_phrase} temperature {temp}°C hai (Open-Meteo)."
         if param == "temperature" and tmin and tmax:
             return (
                 f"{loc} mein {when_phrase} temperature {tmin}°C se {tmax}°C rahega (Open-Meteo)."
@@ -191,6 +247,8 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
             return f"{loc} mein {when_phrase} temperature {temp}°C hai (Open-Meteo)."
         if param == "wind" and wind:
             return f"{loc} mein {when_phrase} wind {wind} km/h hai (Open-Meteo)."
+        if param == "strong_wind" and wind:
+            return f"{loc} mein {when_phrase} hawa {wind} km/h tak hai (Open-Meteo)."
         if param == "humidity" and humidity:
             return f"{loc} mein humidity {humidity}% hai (Open-Meteo)."
         bits = []
@@ -213,6 +271,30 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
             )
         if precip is not None:
             return f"In {loc} {when_phrase}, precipitation is {precip} mm (Open-Meteo)."
+    if param == "heavy_rain" and precip is not None:
+        chance = f", peak probability {prob}%" if prob is not None else ""
+        return (
+            f"Heavy rain check for {loc} {when_phrase}: total precipitation {precip} mm{chance} "
+            "(Open-Meteo)."
+        )
+    if param == "rain_likelihood" and prob is not None:
+        amount = f", with {precip} mm expected" if precip is not None else ""
+        return f"The chance of rain in {loc} {when_phrase} peaks at {prob}%{amount} (Open-Meteo)."
+    if param in ("heavy_rain", "rain_likelihood") and precip is not None:
+        return f"In {loc} {when_phrase}, precipitation is {precip} mm (Open-Meteo)."
+    if param == "storm" and (wind or precip is not None or desc):
+        pieces = []
+        if desc:
+            pieces.append(desc.lower())
+        if wind:
+            pieces.append(f"wind up to {wind} km/h")
+        if precip is not None:
+            pieces.append(f"{precip} mm precipitation")
+        return f"Storm check for {loc} {when_phrase}: {', '.join(pieces)} (Open-Meteo)."
+    if param == "high_temperature" and tmax:
+        return f"In {loc} {when_phrase}, the maximum temperature is {tmax}°C (Open-Meteo)."
+    if param == "high_temperature" and temp:
+        return f"The temperature in {loc} {when_phrase} is {temp}°C (Open-Meteo)."
     if param == "temperature" and tmin and tmax:
         extra = f", around {temp}°C mid-period" if temp else ""
         return (
@@ -223,6 +305,8 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
         return f"The temperature in {loc} {when_phrase} is {temp}°C (Open-Meteo)."
     if param == "wind" and wind:
         return f"Wind speed in {loc} {when_phrase} is {wind} km/h (Open-Meteo)."
+    if param == "strong_wind" and wind:
+        return f"Wind speed in {loc} {when_phrase} reaches up to {wind} km/h (Open-Meteo)."
     if param == "humidity" and humidity:
         return f"Relative humidity in {loc} is {humidity}% (Open-Meteo)."
     chunks = []
@@ -285,7 +369,7 @@ async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: O
         logger.info("LLM response generation failed; using template (%s)", type(exc).__name__)
         return templated
 
-    if not text or not is_grounded(text, facts):
+    if not text or not is_grounded(text, facts, advisory if mention else None):
         logger.info("LLM reply failed grounding check; using template")
         return templated
     return text

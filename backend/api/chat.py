@@ -29,7 +29,7 @@ from geocoding import geocode_place, reverse_geocode
 from llm.query_parser import parse_query
 from llm.response_generator import ask_for_location, generate_response, unknown_location
 from models.chat import ChatIntent, ChatRequest, ChatResponse, ResolvedLocation
-from query_service import fetch_validated_weather, select_weather_facts
+from query_service import fetch_validated_weather, focus_facts, select_period_facts
 
 logger = logging.getLogger(__name__)
 
@@ -126,13 +126,16 @@ async def chat(
         raise HTTPException(status_code=500, detail="Internal server error") from exc
 
     try:
-        facts = select_weather_facts(weather, intent, location.name)
+        period_facts = select_period_facts(weather, intent, location.name)
+        facts = focus_facts(period_facts, intent.weather_parameter)
     except Exception as exc:
         logger.error("Failed to select weather facts: %s", exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="Failed to process weather data") from exc
 
     try:
-        advisory = evaluate_advisory(facts, intent.weather_parameter)
+        # The advisory sees every value for the period, so heavy rain is still
+        # flagged when the question was about temperature.
+        advisory = evaluate_advisory(period_facts, intent.weather_parameter)
     except Exception as exc:
         logger.error("Failed to evaluate advisory: %s", exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="Failed to generate advisory") from exc

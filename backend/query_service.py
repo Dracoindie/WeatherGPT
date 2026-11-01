@@ -107,11 +107,12 @@ async def fetch_validated_weather(latitude: float, longitude: float) -> WeatherR
     )
 
 
-def select_weather_facts(
+def select_period_facts(
     weather: WeatherResponse,
     intent: ChatIntent,
     location_name: str,
 ) -> WeatherFacts:
+    """All verified values for the requested period, before focusing on a parameter."""
     tz = _zone(weather.timezone)
     now = datetime.now(tz)
     requested = _label(intent.date_reference)
@@ -167,15 +168,7 @@ def select_weather_facts(
                 break
         representative = midday if midday is not None else (sum(sel_temps) / len(sel_temps) if sel_temps else None)
 
-        max_prob_idx = None
-        if sel_probs:
-            max_prob = max(int(p) for p in sel_probs if p is not None)
-            for i in indexes:
-                if probs[i] == max_prob:
-                    max_prob_idx = i
-                    break
-        else:
-            max_prob = None
+        max_prob = max(int(p) for p in sel_probs) if sel_probs else None
 
         facts = WeatherFacts(
             source="open-meteo",
@@ -193,26 +186,39 @@ def select_weather_facts(
             period_available=True,
         )
 
-        if max_prob_idx is not None and intent.weather_parameter in {"precipitation", "general"}:
-            # No hourly weather_code in the existing fetch; leave description unset
-            # rather than inventing one.
-            pass
-
-    if intent.weather_parameter == "temperature":
-        facts.precipitation = None
-        facts.precipitation_probability = None
-        facts.wind_speed_10m = None
-    elif intent.weather_parameter == "precipitation":
-        facts.wind_speed_10m = None
-        facts.relative_humidity_2m = None
-    elif intent.weather_parameter == "wind":
-        facts.precipitation = None
-        facts.precipitation_probability = None
-        facts.relative_humidity_2m = None
-    elif intent.weather_parameter == "humidity":
-        # Hourly humidity is not requested from Open-Meteo; only current is available.
-        facts.relative_humidity_2m = weather.current.relative_humidity_2m
-        facts.precipitation = None
-        facts.wind_speed_10m = None
+        if intent.weather_parameter == "humidity":
+            # Hourly humidity is not requested from Open-Meteo; only current is available.
+            facts.relative_humidity_2m = weather.current.relative_humidity_2m
 
     return facts
+
+
+# Facts each parameter hides so the reply stays on topic.
+_FOCUS_DROPS: dict[WeatherParameter, tuple[str, ...]] = {
+    "temperature": ("precipitation", "precipitation_probability", "wind_speed_10m"),
+    "high_temperature": ("precipitation", "precipitation_probability", "wind_speed_10m"),
+    "precipitation": ("wind_speed_10m", "relative_humidity_2m"),
+    "heavy_rain": ("wind_speed_10m", "relative_humidity_2m"),
+    "rain_likelihood": ("wind_speed_10m", "relative_humidity_2m"),
+    "wind": ("precipitation", "precipitation_probability", "relative_humidity_2m"),
+    "strong_wind": ("precipitation", "precipitation_probability", "relative_humidity_2m"),
+    "storm": ("relative_humidity_2m",),
+    "humidity": ("precipitation", "wind_speed_10m"),
+    "advisory": (),
+    "general": (),
+}
+
+
+def focus_facts(facts: WeatherFacts, parameter: WeatherParameter) -> WeatherFacts:
+    """Copy of *facts* limited to the values relevant to *parameter*."""
+    return facts.model_copy(update={field: None for field in _FOCUS_DROPS[parameter]})
+
+
+def select_weather_facts(
+    weather: WeatherResponse,
+    intent: ChatIntent,
+    location_name: str,
+) -> WeatherFacts:
+    return focus_facts(
+        select_period_facts(weather, intent, location_name), intent.weather_parameter
+    )
