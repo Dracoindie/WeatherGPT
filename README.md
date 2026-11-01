@@ -317,9 +317,8 @@ WeatherGPT/
 └── weathergpt-web/           # Next.js "Living Sky" frontend (see note below)
 ```
 
-> **Note:** `weathergpt-web/` is a separate nested git repository. This repo only records a
-> pointer to it (a gitlink without `.gitmodules`), so its code is **not yet in this GitHub repo**.
-> Setup steps are in `weathergpt-web/README.md`.
+> **Note:** `weathergpt-web/` was imported with its full history via `git subtree`, so it is a
+> normal folder in this repo. Setup steps are in `weathergpt-web/README.md`.
 
 ### External dependencies
 
