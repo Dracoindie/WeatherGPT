@@ -102,6 +102,18 @@ _CITY_NAMES = (
     "हैदराबाद",
     "चेन्नई",
     "कोलकाता",
+    "जयपुर",
+    "लखनऊ",
+    "पटना",
+    "अहमदाबाद",
+    "भोपाल",
+    "इंदौर",
+    "सूरत",
+    "चंडीगढ़",
+    "गुवाहाटी",
+    "श्रीनगर",
+    "शिमला",
+    "गोवा",
     # Marathi spellings and locative forms
     "पुण्यात",
     "पुण्याला",
@@ -120,6 +132,7 @@ _CITY_NAMES = (
     "रत्नागिरीत",
     "औरंगाबाद",
     "छत्रपती संभाजीनगर",
+    "bhubaneswar",
     "punyat",
     "mumbait",
     "nagpurat",
@@ -136,6 +149,18 @@ _CITY_DEVANAGARI = {
     "हैदराबाद": "Hyderabad",
     "चेन्नई": "Chennai",
     "कोलकाता": "Kolkata",
+    "जयपुर": "Jaipur",
+    "लखनऊ": "Lucknow",
+    "पटना": "Patna",
+    "अहमदाबाद": "Ahmedabad",
+    "भोपाल": "Bhopal",
+    "इंदौर": "Indore",
+    "सूरत": "Surat",
+    "चंडीगढ़": "Chandigarh",
+    "गुवाहाटी": "Guwahati",
+    "श्रीनगर": "Srinagar",
+    "शिमला": "Shimla",
+    "गोवा": "Goa",
     "पुण्यात": "Pune",
     "पुण्याला": "Pune",
     "मुंबईत": "Mumbai",
@@ -187,7 +212,10 @@ _CLIMATE = re.compile(
     r"climate|trend|trends|anomal\w*|record|last year|this year|past years|previous years|compared to|"
     r"pichle saal|pichhle saal|is saal|har saal|normal se|aam taur)\b"
 )
-_CLIMATE_DEVANAGARI = ("सामान्य", "पिछले साल", "पिछले वर्ष", "इस साल", "इस वर्ष", "जलवायु", "औसत")
+_CLIMATE_DEVANAGARI = (
+    "सामान्य", "पिछले साल", "पिछले वर्ष", "इस साल", "इस वर्ष", "जलवायु", "औसत",
+    "नेहमीपेक्षा", "मागील वर्ष", "गेल्या वर्षी", "या वर्षी", "यंदा", "सरासरी",
+)
 
 _PARSE_SYSTEM = """You extract weather-query slots. Reply with JSON only:
 {
@@ -218,7 +246,7 @@ Rules:
 _MARATHI_WORDS = (
     "आहे", "आहेत", "होईल", "पडेल", "पाऊस", "पावसा", "उद्या", "परवा", "मध्ये", "काय", "किती",
     "हवामान", "आत्ता", "सध्या", "रात्री", "दुपारी", "वारा", "वाऱ्या", "थंडी", "उकाडा", "उष्णता",
-    "गुणवत्ता", "हवेची", "पुण्यात", "मुंबईत", "नागपुरात", "ळ",
+    "हवेची", "नेहमी", "पेक्षा", "साठी", "पुण्यात", "मुंबईत", "नागपुरात", "ळ",
 )
 _MARATHI_ROMAN = re.compile(
     r"\b(aahe|ahe|hoil|padel|paus|pavus|pavsachi|udya|parva|madhye|kiti|havaman|aatta|sadhya|"
@@ -274,14 +302,45 @@ def _title_place(name: str) -> str:
     return " ".join(part.capitalize() for part in name.split())
 
 
+# Marathi case endings attach to an oblique stem (पुणे -> पुण्यात, पुण्याला,
+# पुण्यासाठी); a word starting with the stem names the city.
+_MARATHI_STEMS = {
+    "पुण्या": "Pune",
+    "मुंबई": "Mumbai",
+    "नागपुर": "Nagpur",
+    "नाशिक": "Nashik",
+    "कोल्हापुर": "Kolhapur",
+    "सोलापुर": "Solapur",
+    "ठाण्या": "Thane",
+    "साताऱ्या": "Satara",
+    "रत्नागिरी": "Ratnagiri",
+    "औरंगाबाद": "Chhatrapati Sambhajinagar",
+    "अमरावती": "Amravati",
+    "लातूर": "Latur",
+    "नांदेड": "Nanded",
+}
+
+
+def _marathi_stem_city(message: str) -> Optional[str]:
+    for word in re.findall(r"[\u0900-\u097F]+", message):
+        for stem, city in _MARATHI_STEMS.items():
+            if word.startswith(stem):
+                return city
+    return None
+
+
 def _extract_location(message: str) -> Optional[str]:
     lower = _normalize(message)
     for city in sorted(_CITY_NAMES, key=len, reverse=True):
         if city in lower:
             return _title_place(city)
 
+    stem_city = _marathi_stem_city(message)
+    if stem_city:
+        return stem_city
+
     patterns = [
-        rf"\bin\s+([A-Za-z][A-Za-z ]{{1,40}}?)\s+(?:on\s+)?(?:{_DAY_AFTER_TOMORROW}|tomorrow|today|tonight|afternoon|{_WEEKDAY_WORDS})\b",
+        rf"\b(?:in|for|at|near)\s+([A-Za-z][A-Za-z ]{{1,40}}?)\s+(?:on\s+)?(?:{_DAY_AFTER_TOMORROW}|tomorrow|today|tonight|afternoon|{_WEEKDAY_WORDS})\b",
         r"\bin\s+([A-Za-z][A-Za-z ]{1,40})\??$",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+(?:mein|me|ka|ki|ke)\b",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+weather\b",
@@ -312,6 +371,9 @@ def _extract_location(message: str) -> Optional[str]:
         "your",
         "my",
         "the",
+        "current",
+        "todays",
+        "local",
         "aaj",
         "kal",
         "baarish",
@@ -349,7 +411,7 @@ def _extract_date(message: str) -> DateReference:
         r"\b(kal|tomorrow|udya)\b", lower
     ) or "उद्या" in message:
         return "tomorrow"
-    if re.search(r"\b(tonight|raat|raat ko|ratri)\b", lower) or "रात" in message:
+    if re.search(r"\b(tonight|raat|raat ko|ratri)\b", lower) or re.search(r"(?:^|[\s,?])(रात|रात्री)", message):
         return "tonight"
     if re.search(r"\b(this afternoon|afternoon|dopahar|dopahar ko|dupari)\b", lower) or "दोपहर" in message or "दुपारी" in message:
         return "this_afternoon"
@@ -364,7 +426,7 @@ def _extract_parameter(message: str) -> WeatherParameter:
         w in message for w in ("वायु गुणवत्ता", "प्रदूषण", "हवेची गुणवत्ता", "हवा की गुणवत्ता", "वायू गुणवत्ता")
     ):
         return "air_quality"
-    if re.search(r"\b(uv|uv index|ultraviolet|sunburn)\b", lower) or "यूवी" in message or "यूव्ही" in message or "पराबैंगनी" in message:
+    if re.search(r"\b(uv|uv index|ultraviolet|sunburn|sunscreen|sun protection)\b", lower) or "यूवी" in message or "यूव्ही" in message or "पराबैंगनी" in message:
         return "uv"
     # Marathi "हवामान" (weather) contains Hindi "हवा" (wind); it names no parameter.
     message = message.replace("हवामान", " ")
@@ -375,7 +437,8 @@ def _extract_parameter(message: str) -> WeatherParameter:
         return "strong_wind"
     if "मुसळधार" in message or "अतिवृष्टी" in message or re.search(r"\bmusaldhar\b", lower):
         return "heavy_rain"
-    if "पाऊस" in message or "पावसा" in message or re.search(r"\b(paus|pavus|pavsachi)\b", lower):
+    # "पावसाची शक्यता" (chance of rain) falls through to the rain-likelihood rule
+    if ("पाऊस" in message or "पावसा" in message or re.search(r"\b(paus|pavus|pavsachi)\b", lower)) and "शक्यता" not in message:
         return "precipitation"
     if "उष्णता" in message or "उकाडा" in message or "गरम" in message or re.search(r"\bukada\b", lower):
         return "high_temperature"
@@ -387,14 +450,32 @@ def _extract_parameter(message: str) -> WeatherParameter:
         return "humidity"
     if "इशारा" in message:
         return "advisory"
+    rain_word = bool(
+        re.search(r"\b(rain|raining|baarish|barish|precipitation|drizzle|shower|paus)\b", lower)
+        or any(w in message for w in ("बारिश", "वर्षा", "पाऊस", "पावसा"))
+    )
+    chance_word = bool(
+        re.search(r"\b(chance|chances|probability|likelihood|likely)\b", lower)
+        or any(w in message for w in ("संभावना", "शक्यता"))
+    )
+    if rain_word and chance_word:
+        return "rain_likelihood"
+    wind_word = bool(
+        re.search(r"\b(wind|winds|windy|hawa|breeze|gust|gusts|gusty|crosswind|vara)\b", lower)
+        or any(w in message for w in ("हवा", "वारा", "वाऱ्या"))
+    )
+    if wind_word and (
+        re.search(r"\b(strong|tez|high|gale|severe)\b", lower) or any(w in message for w in ("तेज", "तेज़", "जोरदार", "वादळी"))
+    ):
+        return "strong_wind"
     # comparative words (climate questions): "hotter than usual", "a wetter year"
     if re.search(r"\b(hotter|warmer|garam)\b", lower) or "गर्म" in message:
         return "high_temperature"
-    if re.search(r"\b(colder|cooler|thanda)\b", lower) or "ठंड" in message:
+    if re.search(r"\b(colder|cooler|thanda|cold|chilly|freezing)\b", lower) or "ठंड" in message:
         return "temperature"
     if re.search(r"\b(wetter|drier|dryer|rainier|rainfall)\b", lower):
         return "precipitation"
-    if re.search(r"\b(storm|toofan|cyclone|hurricane)\b", lower) or "तूफान" in message:
+    if re.search(r"\b(storm|storms|thunderstorm|thunderstorms|thunder|lightning|toofan|cyclone|hurricane)\b", lower) or "तूफान" in message:
         return "storm"
     if re.search(r"\b(strong wind|tej hawa|high wind|gale)\b", lower) or "तेज हवा" in message:
         return "strong_wind"
@@ -404,7 +485,7 @@ def _extract_parameter(message: str) -> WeatherParameter:
         return "rain_likelihood"
     if (
         re.search(
-            r"\b(rain|raining|baarish|barish|precipitation|drizzle|shower)\b",
+            r"\b(rain|raining|baarish|barish|precipitation|drizzle|shower|irrigate|irrigation)\b",
             lower,
         )
         or "बारिश" in message
@@ -413,13 +494,15 @@ def _extract_parameter(message: str) -> WeatherParameter:
         return "precipitation"
     if re.search(r"\b(heat|heatwave|high temp|hot|garmi)\b", lower) or "गर्मी" in message:
         return "high_temperature"
-    if re.search(r"\b(temp|temperature|thand|tapman|tapmaan)\b", lower) or "तापमान" in message:
+    if re.search(r"\b(temp|temps|temperature|temperatures|thand|tapman|tapmaan)\b", lower) or "तापमान" in message:
         return "temperature"
-    if re.search(r"\b(wind|hawa|breeze)\b", lower) or "हवा" in message:
+    if wind_word:
         return "wind"
-    if re.search(r"\b(humidity|nami|moist)\b", lower) or "नमी" in message:
+    if re.search(r"\b(humidity|humid|nami|moist|muggy)\b", lower) or "नमी" in message:
         return "humidity"
-    if re.search(r"\b(advisory|travel|safe|danger|warning|alert|advisories)\b", lower) or "चेतावनी" in message or "यात्रा" in message:
+    if re.search(r"\b(advisory|advisories|travel|safe|danger|warning|warnings|alert|alerts)\b", lower) or any(
+        w in message for w in ("चेतावनी", "यात्रा", "सुरक्षित", "प्रवास")
+    ):
         return "advisory"
     return "general"
 
@@ -434,9 +517,13 @@ def is_climate_query(message: str) -> bool:
 
 def _extract_climate_period(message: str) -> ClimatePeriod:
     lower = _normalize(message)
-    if re.search(r"\b(this year|is saal|is varsh)\b", lower) or "इस साल" in message or "इस वर्ष" in message:
+    if re.search(r"\b(this year|is saal|is varsh)\b", lower) or any(
+        w in message for w in ("इस साल", "इस वर्ष", "या वर्षी", "यंदा")
+    ):
         return "this_year"
-    if re.search(r"\b(this month|is mahine|is mahina)\b", lower) or "इस महीने" in message:
+    if re.search(r"\b(this month|is mahine|is mahina)\b", lower) or any(
+        w in message for w in ("इस महीने", "या महिन्यात")
+    ):
         return "this_month"
     return "last_30_days"
 

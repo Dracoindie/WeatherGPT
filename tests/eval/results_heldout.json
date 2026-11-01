@@ -1,0 +1,78 @@
+{
+  "queries": 24,
+  "exact_match": 91.7,
+  "fields": {
+    "intent": 100.0,
+    "location_name": 100.0,
+    "date_reference": 100.0,
+    "weather_parameter": 91.7,
+    "language": 100.0,
+    "climate_period": 100.0
+  },
+  "by_language": {
+    "en": {
+      "queries": 6,
+      "exact_match": 83.3,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 83.3,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hi": {
+      "queries": 6,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hinglish": {
+      "queries": 6,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "mr": {
+      "queries": 6,
+      "exact_match": 83.3,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 83.3,
+      "language": 100.0,
+      "climate_period": 100.0
+    }
+  },
+  "failures": [
+    {
+      "id": 2,
+      "lang": "en",
+      "query": "What will the maximum temperature be in Surat on Saturday?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "high_temperature",
+          "got": "temperature"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "lang": "mr",
+      "query": "रत्नागिरीत उद्या पुराचा धोका आहे का?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "heavy_rain",
+          "got": "general"
+        }
+      }
+    }
+  ]
+}

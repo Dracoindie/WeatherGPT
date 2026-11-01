@@ -1,0 +1,339 @@
+{
+  "queries": 120,
+  "exact_match": 79.2,
+  "fields": {
+    "intent": 99.2,
+    "location_name": 95.0,
+    "date_reference": 99.2,
+    "weather_parameter": 86.7,
+    "language": 99.2,
+    "climate_period": 84.6
+  },
+  "by_language": {
+    "en": {
+      "queries": 40,
+      "exact_match": 70.0,
+      "intent": 100.0,
+      "location_name": 95.0,
+      "date_reference": 100.0,
+      "weather_parameter": 75.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hi": {
+      "queries": 28,
+      "exact_match": 85.7,
+      "intent": 100.0,
+      "location_name": 89.3,
+      "date_reference": 100.0,
+      "weather_parameter": 96.4,
+      "language": 96.4,
+      "climate_period": 100.0
+    },
+    "hinglish": {
+      "queries": 28,
+      "exact_match": 89.3,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 89.3,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "mr": {
+      "queries": 24,
+      "exact_match": 75.0,
+      "intent": 95.8,
+      "location_name": 95.8,
+      "date_reference": 95.8,
+      "weather_parameter": 91.7,
+      "language": 100.0,
+      "climate_period": 0.0
+    }
+  },
+  "failures": [
+    {
+      "id": 4,
+      "lang": "en",
+      "query": "How windy will it be in Chennai tonight?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "wind",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "lang": "en",
+      "query": "How humid is it in Kolkata right now?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "humidity",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "lang": "en",
+      "query": "Will there be a thunderstorm in Nagpur on Friday?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "storm",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "lang": "en",
+      "query": "Strong winds in Visakhapatnam on Sunday?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "strong_wind",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "lang": "en",
+      "query": "Are there any weather warnings for Guwahati today?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "advisory",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "lang": "en",
+      "query": "Will it be cold in Srinagar on Monday?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "temperature",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "lang": "en",
+      "query": "Should I irrigate my farm in Latur tomorrow?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "precipitation",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "lang": "en",
+      "query": "Crosswind and gusts at Pune tonight?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "wind",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "lang": "en",
+      "query": "What does the weather model predict for Bhubaneswar on Wednesday?",
+      "wrong": {
+        "location_name": {
+          "expected": "Bhubaneswar",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 37,
+      "lang": "en",
+      "query": "Do I need sunscreen in Jaisalmer tomorrow?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "uv",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 38,
+      "lang": "en",
+      "query": "Current weather",
+      "wrong": {
+        "location_name": {
+          "expected": null,
+          "got": "Current"
+        }
+      }
+    },
+    {
+      "id": 40,
+      "lang": "en",
+      "query": "What's the trend in temperatures in Pune this year compared to past years?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "temperature",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 47,
+      "lang": "hi",
+      "query": "जयपुर में परसों भारी बारिश होगी?",
+      "wrong": {
+        "location_name": {
+          "expected": "Jaipur",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 49,
+      "lang": "hi",
+      "query": "लखनऊ में आज वायु गुणवत्ता कैसी है?",
+      "wrong": {
+        "location_name": {
+          "expected": "Lucknow",
+          "got": null
+        },
+        "language": {
+          "expected": "hi",
+          "got": "mr"
+        }
+      }
+    },
+    {
+      "id": 55,
+      "lang": "hi",
+      "query": "बेंगलुरु में आज दोपहर बारिश की संभावना?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "rain_likelihood",
+          "got": "precipitation"
+        }
+      }
+    },
+    {
+      "id": 59,
+      "lang": "hi",
+      "query": "पटना में आज मौसम कैसा रहेगा?",
+      "wrong": {
+        "location_name": {
+          "expected": "Patna",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 72,
+      "lang": "hinglish",
+      "query": "Chennai mein aaj raat tez hawa chalegi kya?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "strong_wind",
+          "got": "wind"
+        }
+      }
+    },
+    {
+      "id": 83,
+      "lang": "hinglish",
+      "query": "Bengaluru mein dopahar ko baarish ka chance kitna hai?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "rain_likelihood",
+          "got": "precipitation"
+        }
+      }
+    },
+    {
+      "id": 85,
+      "lang": "hinglish",
+      "query": "Kolkata mein Sunday ko tez hawa chalegi?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "strong_wind",
+          "got": "wind"
+        }
+      }
+    },
+    {
+      "id": 99,
+      "lang": "mr",
+      "query": "नागपुरात आज तापमान किती आहे?",
+      "wrong": {
+        "date_reference": {
+          "expected": "today",
+          "got": "tonight"
+        }
+      }
+    },
+    {
+      "id": 108,
+      "lang": "mr",
+      "query": "या वर्षी पुण्यात नेहमीपेक्षा जास्त उष्णता आहे का?",
+      "wrong": {
+        "intent": {
+          "expected": "climate",
+          "got": "current_weather"
+        },
+        "climate_period": {
+          "expected": "this_year",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 109,
+      "lang": "mr",
+      "query": "मुंबईत या महिन्यात पाऊस सामान्यपेक्षा कमी झाला का?",
+      "wrong": {
+        "climate_period": {
+          "expected": "this_month",
+          "got": "last_30_days"
+        }
+      }
+    },
+    {
+      "id": 110,
+      "lang": "mr",
+      "query": "पुण्यासाठी उद्या GFS मॉडेल काय सांगते?",
+      "wrong": {
+        "location_name": {
+          "expected": "Pune",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 111,
+      "lang": "mr",
+      "query": "साताऱ्यात आज दुपारी पावसाची शक्यता किती?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "rain_likelihood",
+          "got": "precipitation"
+        }
+      }
+    },
+    {
+      "id": 112,
+      "lang": "mr",
+      "query": "उद्या रत्नागिरीला प्रवास करणे सुरक्षित आहे का?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "advisory",
+          "got": "general"
+        }
+      }
+    }
+  ]
+}

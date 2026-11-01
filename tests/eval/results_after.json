@@ -1,0 +1,67 @@
+{
+  "queries": 120,
+  "exact_match": 99.2,
+  "fields": {
+    "intent": 100.0,
+    "location_name": 100.0,
+    "date_reference": 100.0,
+    "weather_parameter": 99.2,
+    "language": 100.0,
+    "climate_period": 100.0
+  },
+  "by_language": {
+    "en": {
+      "queries": 40,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hi": {
+      "queries": 28,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hinglish": {
+      "queries": 28,
+      "exact_match": 96.4,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 96.4,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "mr": {
+      "queries": 24,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    }
+  },
+  "failures": [
+    {
+      "id": 94,
+      "lang": "hinglish",
+      "query": "Kal Indore mein hawa kitni tez rahegi?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "wind",
+          "got": "strong_wind"
+        }
+      }
+    }
+  ]
+}

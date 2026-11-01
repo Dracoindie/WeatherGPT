@@ -1,0 +1,214 @@
+{
+  "queries": 24,
+  "exact_match": 41.7,
+  "fields": {
+    "intent": 100.0,
+    "location_name": 62.5,
+    "date_reference": 100.0,
+    "weather_parameter": 83.3,
+    "language": 95.8,
+    "climate_period": 75.0
+  },
+  "by_language": {
+    "en": {
+      "queries": 6,
+      "exact_match": 50.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 50.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "hi": {
+      "queries": 6,
+      "exact_match": 0.0,
+      "intent": 100.0,
+      "location_name": 16.7,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 83.3,
+      "climate_period": 100.0
+    },
+    "hinglish": {
+      "queries": 6,
+      "exact_match": 100.0,
+      "intent": 100.0,
+      "location_name": 100.0,
+      "date_reference": 100.0,
+      "weather_parameter": 100.0,
+      "language": 100.0,
+      "climate_period": 100.0
+    },
+    "mr": {
+      "queries": 6,
+      "exact_match": 16.7,
+      "intent": 100.0,
+      "location_name": 33.3,
+      "date_reference": 100.0,
+      "weather_parameter": 83.3,
+      "language": 100.0,
+      "climate_period": 0.0
+    }
+  },
+  "failures": [
+    {
+      "id": 2,
+      "lang": "en",
+      "query": "What will the maximum temperature be in Surat on Saturday?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "high_temperature",
+          "got": "temperature"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "lang": "en",
+      "query": "Will the wind be too strong to spray in Akola tomorrow?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "strong_wind",
+          "got": "wind"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "lang": "en",
+      "query": "Any thunderstorms forecast for Nagpur tonight?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "storm",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "lang": "hi",
+      "query": "भोपाल में अभी बारिश हो रही है क्या?",
+      "wrong": {
+        "location_name": {
+          "expected": "Bhopal",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 8,
+      "lang": "hi",
+      "query": "इंदौर में शनिवार को अधिकतम तापमान कितना रहेगा?",
+      "wrong": {
+        "location_name": {
+          "expected": "Indore",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 9,
+      "lang": "hi",
+      "query": "गुवाहाटी में कल बाढ़ का खतरा?",
+      "wrong": {
+        "location_name": {
+          "expected": "Guwahati",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 10,
+      "lang": "hi",
+      "query": "शिमला में आज रात ठंड कितनी होगी?",
+      "wrong": {
+        "location_name": {
+          "expected": "Shimla",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 11,
+      "lang": "hi",
+      "query": "क्या इस साल पटना में सामान्य से कम बारिश हुई?",
+      "wrong": {
+        "location_name": {
+          "expected": "Patna",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 12,
+      "lang": "hi",
+      "query": "दिल्ली में कल हवा की गुणवत्ता कैसी रहेगी?",
+      "wrong": {
+        "language": {
+          "expected": "hi",
+          "got": "mr"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "lang": "mr",
+      "query": "लातूरमध्ये आत्ता पाऊस पडतोय का?",
+      "wrong": {
+        "location_name": {
+          "expected": "Latur",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 20,
+      "lang": "mr",
+      "query": "अमरावतीत शनिवारी कमाल तापमान किती असेल?",
+      "wrong": {
+        "location_name": {
+          "expected": "Amravati",
+          "got": null
+        }
+      }
+    },
+    {
+      "id": 21,
+      "lang": "mr",
+      "query": "रत्नागिरीत उद्या पुराचा धोका आहे का?",
+      "wrong": {
+        "weather_parameter": {
+          "expected": "heavy_rain",
+          "got": "general"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "lang": "mr",
+      "query": "यंदा लातूरमध्ये सामान्यपेक्षा कमी पाऊस झाला का?",
+      "wrong": {
+        "location_name": {
+          "expected": "Latur",
+          "got": null
+        },
+        "climate_period": {
+          "expected": "this_year",
+          "got": "last_30_days"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "lang": "mr",
+      "query": "नांदेडमध्ये उद्या वारा फवारणीसाठी योग्य आहे का?",
+      "wrong": {
+        "location_name": {
+          "expected": "Nanded",
+          "got": null
+        }
+      }
+    }
+  ]
+}
