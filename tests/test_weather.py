@@ -269,3 +269,31 @@ def test_health_endpoint():
     body = resp.json()
     assert body["status"] == "ok"
     assert body["service"] == "WeatherGPT API"
+
+
+class TestWeatherEndpointReusesService:
+    """Task 6: /api/weather and /api/chat share fetch_validated_weather."""
+
+    def test_endpoint_delegates_to_query_service(self):
+        from test_chat import sample_weather
+
+        weather = sample_weather()
+        with patch("main.fetch_validated_weather", AsyncMock(return_value=weather)) as fetch:
+            resp = client.get("/api/weather?latitude=18.5204&longitude=73.8567")
+        assert resp.status_code == 200
+        fetch.assert_awaited_once_with(18.5204, 73.8567)
+
+    def test_validation_failure_returns_500(self):
+        with patch("main.fetch_validated_weather", AsyncMock(side_effect=KeyError("hourly"))):
+            resp = client.get("/api/weather?latitude=18.5204&longitude=73.8567")
+        assert resp.status_code == 500
+
+    def test_retrieved_at_is_utc(self):
+        import asyncio
+
+        from query_service import fetch_validated_weather
+
+        with patch("query_service.fetch_weather", AsyncMock(return_value=MOCK_OPEN_METEO_PAYLOAD)):
+            weather = asyncio.run(fetch_validated_weather(18.52, 73.86))
+        assert weather.retrieved_at.utcoffset().total_seconds() == 0
+        assert weather.timezone == "Asia/Kolkata"

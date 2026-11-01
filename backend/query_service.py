@@ -7,7 +7,7 @@ Temporal windows are computed here; the LLM must not invent dates.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -125,7 +125,8 @@ async def fetch_validated_weather(latitude: float, longitude: float) -> WeatherR
         latitude=raw["latitude"],
         longitude=raw["longitude"],
         timezone=raw["timezone"],
-        retrieved_at=datetime.now(tz=_zone(raw["timezone"])),
+        # Always UTC, for /api/weather and /api/chat alike.
+        retrieved_at=datetime.now(tz=timezone.utc),
         current=current,
         hourly=hourly,
     )
