@@ -1,6 +1,7 @@
 "use client";
 
 import AuthGuard from '@/components/auth/AuthGuard';
+import { API_BASE } from '@/lib/api/base';
 import { TopNav } from '@/components/layout/TopNav';
 import LocationPicker, { type LocationData } from '@/components/location/LocationPicker';
 import { useAuthContext } from '@/context/AuthContext';
@@ -79,8 +80,7 @@ export default function MapPage() {
     }
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
-      const resp = await fetch(`${apiBase}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`);
+      const resp = await fetch(`${API_BASE}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`);
       if (!resp.ok) throw new Error(`Weather API error: ${resp.status}`);
       const data: WeatherApiResponse = await resp.json();
       setWeatherData(data);

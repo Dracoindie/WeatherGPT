@@ -1,12 +1,11 @@
 import type { AlertsResponse } from '@/types/alerts';
+import { API_BASE } from '@/lib/api/base';
 
 export async function fetchAlerts(params: {
   latitude: number;
   longitude: number;
 }): Promise<AlertsResponse> {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
-  const url = new URL(`${base}/api/alerts`);
+  const url = new URL(`${API_BASE}/api/alerts`);
   url.searchParams.set('latitude', String(params.latitude));
   url.searchParams.set('longitude', String(params.longitude));
 

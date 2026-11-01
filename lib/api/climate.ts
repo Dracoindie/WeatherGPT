@@ -1,5 +1,6 @@
 // Climate API wrapper
 import type { ClimateResponse } from "@/types/climate";
+import { API_BASE } from "@/lib/api/base";
 
 export async function fetchClimate(
   latitude: number,
@@ -7,9 +8,7 @@ export async function fetchClimate(
   startDate?: string,
   endDate?: string
 ): Promise<ClimateResponse> {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
-  const url = new URL(`${base}/api/climate`);
+  const url = new URL(`${API_BASE}/api/climate`);
   url.searchParams.set("latitude", latitude.toString());
   url.searchParams.set("longitude", longitude.toString());
   if (startDate) url.searchParams.set("start_date", startDate);

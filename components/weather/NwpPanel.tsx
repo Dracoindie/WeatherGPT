@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchNwp } from '@/lib/api/nwp';
+import { fetchNwp, NwpUnavailableError } from '@/lib/api/nwp';
 import type { NwpResponse } from '@/types/nwp';
 
 interface NwpPanelProps {
@@ -10,19 +10,30 @@ interface NwpPanelProps {
 export function NwpPanel({ latitude, longitude }: NwpPanelProps) {
   const [data, setData] = useState<NwpResponse | null>(null);
   const [error, setError] = useState<string>('');
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     if (latitude === undefined || longitude === undefined) return;
     fetchNwp(latitude, longitude)
       .then((resp) => setData(resp))
-      .catch((e) => setError(e.message));
+      .catch((e) => {
+        if (e instanceof NwpUnavailableError) setUnavailable(true);
+        else setError(e.message);
+      });
   }, [latitude, longitude]);
 
-  const loading = !data && !error;
+  const loading = !data && !error && !unavailable;
 
 
   if (loading) {
     return <div className="rounded border border-line p-4">Loading NWP data...</div>;
+  }
+  if (unavailable) {
+    return (
+      <div className="rounded border border-line p-4 text-sm text-muted-foreground">
+        NWP (GFS) model data is unavailable on this server.
+      </div>
+    );
   }
   if (error) {
     return (

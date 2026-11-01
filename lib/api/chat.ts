@@ -5,6 +5,8 @@
  * Weather numbers are never invented here; they come from the API body.
  */
 
+import { API_BASE } from '@/lib/api/base'
+
 export type ChatIntentType = 'current_weather' | 'forecast' | 'unknown'
 export type DateReference =
   | 'now'
@@ -94,8 +96,6 @@ export interface ChatResponse {
   source: string
 }
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8000'
 
 export class ChatApiError extends Error {
   status: number

@@ -10,6 +10,7 @@
 
 import { useState } from 'react'
 import AuthGuard from '@/components/auth/AuthGuard'
+import { API_BASE } from '@/lib/api/base'
 import { TopNav } from '@/components/layout/TopNav'
 import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero'
 import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence'
@@ -86,9 +87,7 @@ export default function DashboardPage() {
 
     // Fetch real weather from the existing backend endpoint
     try {
-      const apiBase =
-        process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8000'
-      const url = `${apiBase}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`
+      const url = `${API_BASE}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`
       const resp = await fetch(url)
       if (!resp.ok) throw new Error(`Weather API error: ${resp.status}`)
       const data: WeatherApiResponse = await resp.json()
