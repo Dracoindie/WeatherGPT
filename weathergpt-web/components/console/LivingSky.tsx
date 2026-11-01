@@ -19,6 +19,7 @@ import { useI18n, type Language } from '@/context/I18nContext'
 import { useGeolocation } from '@/lib/location/useGeolocation'
 import { sky } from '@/lib/skyStore'
 import { sceneFromFacts } from '@/lib/weatherScene'
+import { cn } from '@/lib/utils'
 import { SkyEngine } from '@/components/sky/SkyEngine'
 import { DemoPanel } from '@/components/sky/DemoPanel'
 import { AskConsole } from './AskConsole'
@@ -38,6 +39,7 @@ import { RainGlass } from '@/components/panels/RainGlass'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { ForecastTimeline } from '@/components/panels/ForecastTimeline'
 import type { ThreadEntry } from './types'
+import type { ChatResponse } from '@/lib/api/chat'
 
 const SkyMap = dynamic(() => import('@/components/panels/SkyMap'), {
   ssr: false,
@@ -48,6 +50,25 @@ interface ForecastState {
   key: string
   data?: WeatherResponse
   error?: string
+}
+
+/** Last grounded answer on this device, shown again when offline. */
+const SAVED_KEY = 'wgpt:last-answer'
+
+interface SavedAnswer {
+  query: string
+  askedAt: string
+  response: ChatResponse
+}
+
+function readSaved(): SavedAnswer | null {
+  try {
+    const raw = localStorage.getItem(SAVED_KEY)
+    const saved = raw ? (JSON.parse(raw) as SavedAnswer) : null
+    return saved?.response?.weather ? saved : null
+  } catch {
+    return null
+  }
 }
 
 const HERE_QUERY: Record<Language, string> = {
@@ -69,6 +90,7 @@ export default function LivingSky() {
   const geoPending = useRef(false)
 
   const busy = entries.some((e) => e.status === 'pending')
+  const docked = entries.length > 0
   const active = entries.find((e) => e.id === activeId) ?? null
   const res = active?.status === 'done' ? active.response ?? null : null
   const severity = res?.advisory?.severity ?? 'low'
@@ -95,6 +117,40 @@ export default function LivingSky() {
     },
     [accessToken]
   )
+
+  // Remember the latest grounded answer for offline viewing.
+  useEffect(() => {
+    const last = [...entries].reverse().find((e) => e.status === 'done' && !e.saved && e.response?.weather)
+    if (!last?.response) return
+    try {
+      const saved: SavedAnswer = { query: last.query, askedAt: last.askedAt.toISOString(), response: last.response }
+      localStorage.setItem(SAVED_KEY, JSON.stringify(saved))
+    } catch {
+      // storage full or blocked: nothing to restore later
+    }
+  }, [entries])
+
+  // Offline with nothing asked yet: show the saved answer (labelled as saved).
+  useEffect(() => {
+    const restore = () => {
+      const saved = readSaved()
+      if (!saved) return
+      setEntries((prev) => {
+        if (prev.length) return prev
+        const id = nextId.current++
+        setActiveId(id)
+        return [
+          { id, query: saved.query, usedGps: false, askedAt: new Date(saved.askedAt), status: 'done', response: saved.response, saved: true },
+        ]
+      })
+    }
+    const initial = navigator.onLine ? 0 : window.setTimeout(restore, 0)
+    window.addEventListener('offline', restore)
+    return () => {
+      window.clearTimeout(initial)
+      window.removeEventListener('offline', restore)
+    }
+  }, [])
 
   // Drive the sky from the active response's verified facts.
   useEffect(() => {
@@ -148,7 +204,14 @@ export default function LivingSky() {
       <HighSeverityHud advisory={res?.advisory ?? null} />
       <SkyNav />
 
-      <main className="relative z-10 mx-auto grid max-w-[1500px] gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <main
+        className={cn(
+          'relative z-10 mx-auto grid max-w-[1500px] gap-6 px-4 pb-16 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px]',
+          // clear the bottom nav (and the docked console on phones)
+          'max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom))]',
+          docked && 'max-sm:pb-[calc(10rem+env(safe-area-inset-bottom))]'
+        )}
+      >
         <div className="min-w-0">
           <section className="mx-auto max-w-3xl pt-6 text-center sm:pt-12">
             <p className="sky-label">{t('sky.subtitle')}</p>
@@ -157,9 +220,17 @@ export default function LivingSky() {
                 {t('sky.title')}
               </span>
             </h1>
-            <div className="mt-8">
+            {/* On phones the console docks above the bottom nav once a question was asked. */}
+            <div
+              className={cn(
+                'mt-8',
+                docked &&
+                  'max-sm:fixed max-sm:inset-x-0 max-sm:bottom-[calc(4rem+env(safe-area-inset-bottom))] max-sm:z-40 max-sm:mt-0 max-sm:bg-gradient-to-t max-sm:from-[#02040a] max-sm:via-[#02040a]/90 max-sm:to-transparent max-sm:px-3 max-sm:pb-2 max-sm:pt-6'
+              )}
+            >
               <AskConsole
                 busy={busy}
+                docked={docked}
                 locating={geoStatus === 'requesting'}
                 onAsk={(m) => void ask(m)}
                 onUseLocation={useLocation}

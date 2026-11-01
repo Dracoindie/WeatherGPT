@@ -5,7 +5,7 @@
  * tests check that values flow from the API to the screen unchanged.
  */
 
-import type { Page, Route } from '@playwright/test'
+import type { BrowserContext, Page, Route } from '@playwright/test'
 
 export const PUNE = { name: 'Pune, Maharashtra, India', latitude: 18.5204, longitude: 73.8567 }
 
@@ -215,7 +215,9 @@ export interface MockLog {
   paths: string[]
 }
 
-export async function mockBackend(page: Page, opts: MockOptions = {}): Promise<MockLog> {
+/** Pass the BrowserContext instead of a Page when a service worker is active:
+ * context routes also see requests the worker makes. */
+export async function mockBackend(page: Page | BrowserContext, opts: MockOptions = {}): Promise<MockLog> {
   const log: MockLog = { chat: [], paths: [] }
 
   await page.route('http://localhost:8000/**', async (route) => {

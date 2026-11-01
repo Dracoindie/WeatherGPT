@@ -30,6 +30,8 @@ const DEVANAGARI = /[ऀ-ॿ]/
 
 interface AskConsoleProps {
   busy: boolean
+  /** docked at the bottom on phones: hide the chips to keep it compact */
+  docked?: boolean
   locating: boolean
   onAsk: (message: string) => void
   onUseLocation: () => void
@@ -77,7 +79,7 @@ function useCyclingPlaceholder(active: boolean): string {
   return text
 }
 
-export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleProps) {
+export function AskConsole({ busy, docked = false, locating, onAsk, onUseLocation }: AskConsoleProps) {
   const { t } = useI18n()
   const [value, setValue] = useState('')
   const [focused, setFocused] = useState(false)
@@ -132,7 +134,7 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
           <button
             type="submit"
             disabled={busy || value.trim() === ''}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-accent px-3 py-2 font-hud text-xs font-bold uppercase tracking-[0.18em] text-black shadow-[0_0_24px_-4px_var(--sky-accent)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 font-hud text-xs font-bold uppercase tracking-[0.18em] text-black shadow-[0_0_24px_-4px_var(--sky-accent)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUpRight className="size-4" />}
             <span className="hidden sm:inline">{t('sky.send')}</span>
@@ -140,7 +142,13 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
         </div>
       </form>
 
-      <div className="mt-4 flex flex-wrap justify-center gap-2">
+      {/* one swipeable row on phones, wrapped and centred from sm up */}
+      <div
+        className={cn(
+          'mt-4 -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0',
+          docked && 'max-sm:hidden'
+        )}
+      >
         {CHIPS.map((chip) => (
           <button
             key={chip}
@@ -148,7 +156,7 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
             disabled={busy}
             onClick={() => onAsk(chip)}
             className={cn(
-              'rounded-full border border-white/10 bg-black/35 px-3.5 py-1.5 text-[13px] text-hud-dim backdrop-blur-md transition hover:border-accent/50 hover:text-hud disabled:opacity-40',
+              'min-h-11 shrink-0 snap-start whitespace-nowrap rounded-full border border-white/10 bg-black/35 px-3.5 py-1.5 text-[13px] text-hud-dim backdrop-blur-md transition hover:border-accent/50 hover:text-hud disabled:opacity-40 sm:min-h-0',
               DEVANAGARI.test(chip) && 'deva'
             )}
           >
@@ -159,7 +167,7 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
           type="button"
           disabled={busy || locating}
           onClick={onUseLocation}
-          className="flex items-center gap-1.5 rounded-full border border-accent/50 bg-black/45 px-3.5 py-1.5 text-[13px] text-accent backdrop-blur-md transition hover:bg-black/60 disabled:opacity-40"
+          className="flex min-h-11 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/50 bg-black/45 px-3.5 py-1.5 sm:min-h-0 text-[13px] text-accent backdrop-blur-md transition hover:bg-black/60 disabled:opacity-40"
         >
           {locating ? <LoaderCircle className="size-3.5 animate-spin" /> : <Crosshair className="size-3.5" />}
           {locating ? t('sky.locating') : t('sky.useLocation')}

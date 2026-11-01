@@ -50,6 +50,7 @@ export function NwpPanel({ latitude, longitude }: NwpPanelProps) {
     <div className="rounded border border-line p-4">
       <h2 className="font-display text-sm font-semibold mb-2">NWP Model: {data.metadata.model}</h2>
       <p className="text-xs mb-2">Generated at: {data.metadata.generationTime}</p>
+      <div className="max-h-80 overflow-y-auto">
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b border-line">
@@ -70,6 +71,7 @@ export function NwpPanel({ latitude, longitude }: NwpPanelProps) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

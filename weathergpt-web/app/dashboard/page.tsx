@@ -180,7 +180,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
             <div className="space-y-5">
               <CurrentWeatherHero
                 status={weatherStatus}
@@ -195,14 +195,14 @@ export default function DashboardPage() {
             <WeatherIntelligence advisory={advisory} />
           </div>
 
-          <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
             <ChatPanel
               latitude={location?.latitude}
               longitude={location?.longitude}
               accessToken={isDemo ? undefined : session?.access_token}
               onAdvisoryChange={setAdvisory}
             />
-            <aside className="space-y-5">
+            <aside className="min-w-0 space-y-5">
               <ForecastPanel state={forecastState} />
               <NwpPanel latitude={location?.latitude} longitude={location?.longitude} />
               <TrustStrip />

@@ -9,4 +9,6 @@ export interface ThreadEntry {
   status: 'pending' | 'done' | 'error'
   response?: ChatResponse
   error?: string
+  /** restored from this device's last answer while offline */
+  saved?: boolean
 }

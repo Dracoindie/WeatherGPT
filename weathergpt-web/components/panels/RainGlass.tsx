@@ -10,12 +10,13 @@
  *
  * Driven by the shared eased scene (live.rain), so it fades in/out with the
  * sky. All panels share one requestAnimationFrame loop; nothing animates
- * under prefers-reduced-motion.
+ * under prefers-reduced-motion, and nothing renders in lite mode.
  */
 
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'framer-motion'
 import { live } from '@/lib/skyStore'
+import { useLiteMode } from '@/lib/liteMode'
 
 // ---------------------------------------------------------------------------
 // Shared ticker
@@ -124,10 +125,11 @@ const MAX_DROPS = 140
 export function RainGlass() {
   const ref = useRef<HTMLCanvasElement>(null)
   const reduced = useReducedMotion()
+  const { lite } = useLiteMode()
 
   useEffect(() => {
     const canvas = ref.current
-    if (!canvas || reduced) return
+    if (!canvas || reduced || lite) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     const lens = getSprite()
@@ -236,7 +238,8 @@ export function RainGlass() {
       ro.disconnect()
       io.disconnect()
     }
-  }, [reduced])
+  }, [reduced, lite])
 
+  if (lite) return null
   return <canvas ref={ref} className="rain-glass h-full w-full" aria-hidden="true" />
 }

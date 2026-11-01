@@ -56,7 +56,11 @@ export function ReplyCard({ entry, onTyped, onUseLocation }: ReplyCardProps) {
           <RadioTower className="size-4 text-accent" />
         )}
         <span className={cn('sky-label', needsLocation && '!text-amber-200')}>
-          {needsLocation ? t('sky.needLocation') : `WeatherGPT · ${res.intent.language}`}
+          {needsLocation
+            ? t('sky.needLocation')
+            : entry.saved
+              ? `Saved forecast · ${entry.askedAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`
+              : `WeatherGPT · ${res.intent.language}`}
         </span>
       </div>
       <Typewriter

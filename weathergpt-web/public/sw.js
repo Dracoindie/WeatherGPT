@@ -1,0 +1,122 @@
+/*
+ * WeatherGPT service worker.
+ *
+ * - App shell: "/", "/offline", manifest and icons are precached, plus the
+ *   /_next/static chunks referenced by "/" so the home page boots offline.
+ * - Pages: network-first; offline falls back to the cached page, then "/".
+ * - /_next/static: cache-first (file names are content-hashed).
+ * - Backend GET /api/{weather,forecast,alerts,climate}: network-first, the
+ *   last good response per URL is kept for offline viewing. POSTs (chat) and
+ *   Supabase are never cached.
+ */
+
+const VERSION = 'wgpt-v1'
+const SHELL = `${VERSION}-shell`
+const ASSETS = `${VERSION}-assets`
+const DATA = `${VERSION}-data`
+const SHELL_URLS = [
+  '/',
+  '/offline',
+  '/manifest.webmanifest',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+]
+const DATA_PATHS = /\/api\/(weather|forecast|alerts|climate)$/
+const MAX_DATA_ENTRIES = 40
+
+async function precache() {
+  const shell = await caches.open(SHELL)
+  await shell.addAll(SHELL_URLS)
+  // Chunks the home page needs, so an offline cold start can hydrate.
+  try {
+    const html = await (await fetch('/', { cache: 'no-store' })).text()
+    const chunks = [...new Set(html.match(/\/_next\/static\/[^"'\s)]+/g) || [])]
+    const assets = await caches.open(ASSETS)
+    await Promise.all(chunks.map((u) => assets.add(u).catch(() => undefined)))
+  } catch {
+    // best effort
+  }
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(precache().then(() => self.skipWaiting()))
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  )
+})
+
+// The page sends the static chunks it loaded before this worker controlled it.
+self.addEventListener('message', (event) => {
+  const data = event.data || {}
+  if (data.type !== 'cache-urls' || !Array.isArray(data.urls)) return
+  const urls = data.urls.filter((u) => {
+    try {
+      const url = new URL(u)
+      return url.origin === self.location.origin && url.pathname.startsWith('/_next/static/')
+    } catch {
+      return false
+    }
+  })
+  event.waitUntil(
+    caches.open(ASSETS).then((cache) => Promise.all(urls.map((u) => cache.add(u).catch(() => undefined))))
+  )
+})
+
+async function trim(cacheName, max) {
+  const cache = await caches.open(cacheName)
+  const keys = await cache.keys()
+  for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i])
+}
+
+async function networkFirst(request, cacheName, fallbacks = []) {
+  const cache = await caches.open(cacheName)
+  try {
+    const response = await fetch(request)
+    if (response.ok) {
+      await cache.delete(request) // re-insert so trim() drops the oldest
+      await cache.put(request, response.clone())
+      if (cacheName === DATA) trim(DATA, MAX_DATA_ENTRIES)
+    }
+    return response
+  } catch (err) {
+    const hit = await cache.match(request, { ignoreVary: true })
+    if (hit) return hit
+    for (const url of fallbacks) {
+      const fb = await caches.match(url)
+      if (fb) return fb
+    }
+    throw err
+  }
+}
+
+async function cacheFirst(request) {
+  const hit = await caches.match(request)
+  if (hit) return hit
+  const response = await fetch(request)
+  if (response.ok) (await caches.open(ASSETS)).put(request, response.clone())
+  return response
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event
+  if (request.method !== 'GET') return
+  const url = new URL(request.url)
+
+  if (request.mode === 'navigate' && url.origin === self.location.origin) {
+    event.respondWith(networkFirst(request, SHELL, ['/', '/offline']))
+    return
+  }
+  if (url.origin === self.location.origin && url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(cacheFirst(request))
+    return
+  }
+  if (DATA_PATHS.test(url.pathname)) {
+    event.respondWith(networkFirst(request, DATA))
+  }
+})

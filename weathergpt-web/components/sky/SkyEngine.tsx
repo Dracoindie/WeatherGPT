@@ -2,13 +2,15 @@
 
 /**
  * Chooses the sky renderer: WebGL (lazy, client-only) or, under
- * prefers-reduced-motion, the static CSS gradient with no shake or flashes.
+ * prefers-reduced-motion or lite mode, the static CSS gradient with no shake
+ * or flashes.
  */
 
 import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useReducedMotion } from 'framer-motion'
 import { sky } from '@/lib/skyStore'
+import { useLiteMode } from '@/lib/liteMode'
 import { StaticSky } from './StaticSky'
 
 const SkyCanvas = dynamic(() => import('./SkyCanvas'), { ssr: false })
@@ -24,7 +26,8 @@ function hasWebGL(): boolean {
 
 export function SkyEngine() {
   const reduced = useReducedMotion() ?? false
-  const webgl = typeof document !== 'undefined' && hasWebGL()
+  const { lite } = useLiteMode()
+  const webgl = !lite && typeof document !== 'undefined' && hasWebGL()
 
   // Without the render loop, keep the shared live scene in sync instantly.
   useEffect(() => {
