@@ -9,7 +9,7 @@ WeatherGPT alerts come from the deterministic alert engine (`backend/alerts/engi
 
 | Channel | Where | Status |
 |---------|-------|--------|
-| Web Push when severity **becomes high** | `backend/dissemination/job.py`, `public/sw.js` | Built; **sending needs `pywebpush`**, which is waiting for approval (see below) |
+| Web Push when severity **becomes high** | `backend/dissemination/job.py`, `backend/dissemination/push.py`, `public/sw.js` | Works once VAPID keys are set (sent with `pywebpush`, pinned in `backend/requirements.txt`) |
 | WhatsApp share | Alert cards on `/alerts`, chat answers | Works (a `wa.me` link, no API key) |
 | CAP 1.2 XML | `GET /api/alerts/cap?latitude=&longitude=&name=` | Works |
 
@@ -36,11 +36,27 @@ Run `supabase/schema.sql` in the Supabase SQL editor. It is idempotent; migratio
 
 ### 2. VAPID keys
 
-Generate a key pair once, for example with:
+VAPID keys identify your server to the browsers' push services. Generate one pair per deployment and keep it: if the keys change, every existing subscription stops working and users have to tap **Alert me** again.
+
+**Option A: Python (no extra install).** `cryptography` comes with `pywebpush`. From `backend/` with the venv active:
+
+```bash
+python -c "import base64; from cryptography.hazmat.primitives.asymmetric import ec; from cryptography.hazmat.primitives import serialization as s; k = ec.generate_private_key(ec.SECP256R1()); b = lambda x: base64.urlsafe_b64encode(x).rstrip(b'=').decode(); print('VAPID_PUBLIC_KEY=' + b(k.public_key().public_bytes(s.Encoding.X962, s.PublicFormat.UncompressedPoint))); print('VAPID_PRIVATE_KEY=' + b(k.private_numbers().private_value.to_bytes(32, 'big')))"
+```
+
+It prints two lines, ready to paste into `backend/.env`:
+- `VAPID_PUBLIC_KEY`: the 65-byte uncompressed P-256 public key, base64url (87 characters, starts with `B`). Browsers use it as the `applicationServerKey`.
+- `VAPID_PRIVATE_KEY`: the 32-byte private key, base64url (43 characters).
+
+**Option B: Node.** This gives the same format:
 
 ```bash
 npx web-push generate-vapid-keys   # one-off CLI run; not added to package.json
 ```
+
+**Check it.** Restart the backend, then call `GET /api/push/config`. It should return `"available": true` and your public key. The private key is never returned.
+
+Never commit the private key, and never put it in a `NEXT_PUBLIC_*` variable. The frontend gets the public key from `/api/push/config`.
 
 ### 3. Backend environment (`backend/.env` or the host's secrets)
 
@@ -55,7 +71,9 @@ npx web-push generate-vapid-keys   # one-off CLI run; not added to package.json
 
 ### 4. Install the sender
 
-Once approved, add and pin `pywebpush` in `backend/requirements.txt`. Until then, `/api/push/config` reports `available: false` with a reason. Users can still subscribe, but the job counts sends as `disabled` and does not mark anyone as notified.
+`pywebpush==2.5.0` is pinned in `backend/requirements.txt`, so `pip install -r requirements.txt` installs it. If it is missing or the VAPID keys are not set, `/api/push/config` reports `available: false` with a reason. Users can still subscribe, but the job counts sends as `disabled` and does not mark anyone as notified.
+
+Each send has a 10 s timeout. A network error or a push-service error other than 404/410 counts as `failed`, and the next run retries it.
 
 ### 5. Schedule the job
 

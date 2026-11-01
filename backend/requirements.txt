@@ -3,6 +3,8 @@ uvicorn[standard]==0.52.4
 httpx==0.28.1
 pydantic==2.13.5
 python-dotenv==1.2.3
+# Web Push sender for early-warning alerts (dissemination/push.py)
+pywebpush==2.5.0
 # NWP (GRIB via cfgrib/eccodes). Optional at runtime: /api/nwp is skipped if missing.
 xarray==2026.7.0
 cfgrib==0.9.15.1

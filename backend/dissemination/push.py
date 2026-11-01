@@ -1,9 +1,10 @@
 """
 Web Push sender (VAPID).
 
-Uses ``pywebpush`` when it is installed. It is NOT a project dependency yet
-(it needs approval), so without it the sender reports itself unavailable and
-the alert job records "disabled" instead of sending. Configuration:
+Sends with ``pywebpush`` (pinned in requirements.txt). If it is missing or the
+VAPID keys are not set, the sender reports itself unavailable and the alert job
+records "disabled" instead of sending. Configuration (see docs/EARLY_WARNING.md
+for generating the keys):
 
   VAPID_PUBLIC_KEY   base64url public key (also given to the browser)
   VAPID_PRIVATE_KEY  base64url private key (server only)
@@ -21,6 +22,7 @@ from typing import Literal, Optional
 logger = logging.getLogger(__name__)
 
 SendStatus = Literal["sent", "gone", "failed", "disabled"]
+SEND_TIMEOUT_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class WebPushSender:
                 vapid_private_key=self.config.private_key,
                 vapid_claims={"sub": self.config.subject},
                 ttl=6 * 3600,
+                timeout=SEND_TIMEOUT_S,
             )
             return "sent"
         except WebPushException as exc:
@@ -74,4 +77,7 @@ class WebPushSender:
             if status in (404, 410):
                 return "gone"  # the browser unsubscribed
             logger.warning("Web push failed (%s): %s", status, exc)
+            return "failed"
+        except Exception as exc:  # network errors, bad keys: retry next run, don't stop the job
+            logger.warning("Web push failed: %s", exc)
             return "failed"

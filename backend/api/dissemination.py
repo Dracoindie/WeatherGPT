@@ -58,7 +58,7 @@ async def push_config() -> dict:
     if vapid is None:
         reason = "VAPID keys are not configured on the server."
     elif not installed:
-        reason = "The server's Web Push sender (pywebpush) is not installed yet."
+        reason = "The server's Web Push sender (pywebpush) is not installed; run pip install -r requirements.txt."
     return {
         "available": vapid is not None and installed,
         # The public key is safe to share; subscriptions need it even before sending works.

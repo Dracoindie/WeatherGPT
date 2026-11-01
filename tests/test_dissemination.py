@@ -257,3 +257,80 @@ def test_push_config(monkeypatch):
     assert body["vapid_public_key"] == "BPub"
     assert body["available"] is False and "pywebpush" in body["reason"]
     assert "priv" not in str(body)
+
+
+# --- real pywebpush sending (HTTP mocked) ---
+
+def _b64(raw: bytes) -> str:
+    import base64
+
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def _keypair() -> tuple[str, str]:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    return _b64(pub), _b64(key.private_numbers().private_value.to_bytes(32, "big"))
+
+
+def _sender():
+    from dissemination.push import VapidConfig, WebPushSender
+
+    pub, priv = _keypair()  # generated the same way docs/EARLY_WARNING.md shows
+    return WebPushSender(VapidConfig(pub, priv, "mailto:ops@example.org"))
+
+
+def _browser_keys() -> tuple[str, str]:
+    p256dh, _ = _keypair()
+    return p256dh, _b64(os.urandom(16))
+
+
+def _response(status: int):
+    from unittest.mock import MagicMock
+
+    resp = MagicMock(status_code=status, text="", headers={})
+    resp.json.return_value = {}
+    return resp
+
+
+@pytest.mark.parametrize("status,expected", [(201, "sent"), (410, "gone"), (404, "gone"), (500, "failed")])
+def test_webpush_sender_encrypts_and_maps_status(status, expected):
+    sender = _sender()
+    assert sender.available
+    p256dh, auth = _browser_keys()
+    with patch("requests.post", return_value=_response(status)) as post:
+        result = sender.send("https://push.example.org/sub/1", p256dh, auth, {"title": "Heavy rain"})
+    assert result == expected
+    args, kwargs = post.call_args
+    assert args[0] == "https://push.example.org/sub/1"
+    assert kwargs["headers"]["content-encoding"] == "aes128gcm"
+    assert kwargs["headers"]["authorization"].startswith("vapid t=")
+    assert b"Heavy rain" not in kwargs["data"]  # the payload is encrypted
+
+
+def test_webpush_sender_network_error_is_failed_not_raised():
+    import requests
+
+    sender = _sender()
+    p256dh, auth = _browser_keys()
+    with patch("requests.post", side_effect=requests.ConnectionError("down")):
+        assert sender.send("https://push.example.org/sub/1", p256dh, auth, {"title": "x"}) == "failed"
+
+
+def test_webpush_sender_disabled_without_keys():
+    from dissemination.push import WebPushSender
+
+    assert WebPushSender(None).available is False
+    assert WebPushSender(None).send("https://push.example.org/sub/1", "k", "a", {}) == "disabled"
+
+
+def test_push_config_available_with_keys_and_pywebpush(monkeypatch):
+    pub, priv = _keypair()
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", pub)
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", priv)
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:ops@example.org")
+    body = client.get("/api/push/config").json()
+    assert body == {"available": True, "vapid_public_key": pub, "reason": None}
