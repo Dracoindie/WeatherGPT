@@ -54,7 +54,7 @@ export function DemoPanel() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="fixed left-1/2 top-3 z-[70] -translate-x-1/2 rounded-full border border-fuchsia-400/60 bg-fuchsia-500/15 px-3 py-1 font-readout text-[10px] font-semibold uppercase tracking-[0.3em] text-fuchsia-200 shadow-[0_0_24px_-6px_rgba(232,121,249,0.8)] backdrop-blur-md"
+            className="fixed left-1/2 top-[4.5rem] z-[70] -translate-x-1/2 whitespace-nowrap rounded-full border border-fuchsia-400/60 bg-fuchsia-500/15 px-3 py-1 font-readout text-[10px] font-semibold uppercase tracking-[0.3em] text-fuchsia-200 shadow-[0_0_24px_-6px_rgba(232,121,249,0.8)] backdrop-blur-md"
           >
             Demo mode · {demo.preset} · simulated sky
           </motion.button>

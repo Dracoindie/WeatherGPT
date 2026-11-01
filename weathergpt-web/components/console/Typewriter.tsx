@@ -35,9 +35,11 @@ export function Typewriter({ text, speed = 16, onDone, className }: TypewriterPr
       doneRef.current?.()
       return
     }
-    let i = 0
+    // Driven by elapsed time, not tick count: on a busy main thread (slow phone,
+    // software WebGL) ticks are starved, so catch up instead of crawling.
+    const start = performance.now()
     const id = window.setInterval(() => {
-      i += 1
+      const i = Math.min(parts.length, Math.floor((performance.now() - start) / speed) + 1)
       setCount(i)
       if (i >= parts.length) {
         window.clearInterval(id)

@@ -120,7 +120,7 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
               <span
                 aria-hidden="true"
                 className={cn(
-                  'pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden whitespace-nowrap text-base text-hud-dim sm:text-lg',
+                  'pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap text-base text-hud-dim sm:text-lg',
                   DEVANAGARI.test(placeholder) && 'deva'
                 )}
               >
@@ -159,7 +159,7 @@ export function AskConsole({ busy, locating, onAsk, onUseLocation }: AskConsoleP
           type="button"
           disabled={busy || locating}
           onClick={onUseLocation}
-          className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-[13px] text-accent backdrop-blur-md transition hover:bg-accent/20 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-full border border-accent/50 bg-black/45 px-3.5 py-1.5 text-[13px] text-accent backdrop-blur-md transition hover:bg-black/60 disabled:opacity-40"
         >
           {locating ? <LoaderCircle className="size-3.5 animate-spin" /> : <Crosshair className="size-3.5" />}
           {locating ? t('sky.locating') : t('sky.useLocation')}
