@@ -56,6 +56,8 @@ MOCK_OPEN_METEO_PAYLOAD = {
         "precipitation_probability": [10] * 72,
         "precipitation": [0.0] * 72,
         "wind_speed_10m": [10.0 + i * 0.05 for i in range(72)],
+        "weather_code": [2] * 72,
+        "relative_humidity_2m": [70.0] * 72,
     },
 }
 

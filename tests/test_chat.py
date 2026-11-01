@@ -43,6 +43,9 @@ def sample_weather(
     current_temp: float = 28.3,
     tomorrow_precip_per_hour: float = 0.2,
     tomorrow_prob: int = 80,
+    hourly_code: int = 2,
+    hourly_humidity: float = 65.0,
+    days: int = 7,
 ) -> WeatherResponse:
     tz = ZoneInfo("Asia/Kolkata")
     now = datetime.now(tz)
@@ -51,7 +54,9 @@ def sample_weather(
     probs: list[int] = []
     precs: list[float] = []
     winds: list[float] = []
-    for day_offset in range(0, 3):
+    codes: list[int] = []
+    hums: list[float] = []
+    for day_offset in range(0, days):
         day = now.date() + timedelta(days=day_offset)
         for hour in range(24):
             times.append(f"{day.isoformat()}T{hour:02d}:00")
@@ -63,6 +68,8 @@ def sample_weather(
                 probs.append(10)
                 precs.append(0.0)
             winds.append(12.5)
+            codes.append(hourly_code)
+            hums.append(hourly_humidity)
     return WeatherResponse(
         latitude=latitude,
         longitude=longitude,
@@ -82,6 +89,8 @@ def sample_weather(
             precipitation_probability=probs,
             precipitation=precs,
             wind_speed_10m=winds,
+            weather_code=codes,
+            relative_humidity_2m=hums,
         ),
     )
 

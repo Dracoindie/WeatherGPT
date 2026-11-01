@@ -45,7 +45,7 @@ class CurrentWeather(BaseModel):
 
 
 class HourlyWeather(BaseModel):
-    """Parallel arrays of hourly forecast data (3 days = 72 entries)."""
+    """Parallel arrays of hourly forecast data (7 days = 168 entries)."""
 
     time: list[str] = Field(..., description="ISO 8601 timestamps")
     temperature_2m: list[float] = Field(..., description="Hourly temperature (°C)")
@@ -54,6 +54,12 @@ class HourlyWeather(BaseModel):
     )
     precipitation: list[float] = Field(..., description="Hourly precipitation (mm)")
     wind_speed_10m: list[float] = Field(..., description="Hourly wind speed (km/h)")
+    weather_code: list[Optional[int]] = Field(
+        ..., description="Hourly WMO Weather Interpretation Code (WW code)"
+    )
+    relative_humidity_2m: list[Optional[float]] = Field(
+        ..., description="Hourly relative humidity at 2 m (%)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -78,4 +84,4 @@ class WeatherResponse(BaseModel):
         ..., description="UTC timestamp when this response was assembled"
     )
     current: CurrentWeather = Field(..., description="Current weather conditions")
-    hourly: HourlyWeather = Field(..., description="3-day hourly forecast")
+    hourly: HourlyWeather = Field(..., description="7-day hourly forecast")

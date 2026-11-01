@@ -35,10 +35,12 @@ HOURLY_VARIABLES = [
     "precipitation_probability",
     "precipitation",
     "wind_speed_10m",
+    "weather_code",
+    "relative_humidity_2m",
 ]
 
-# 3-day hourly forecast
-FORECAST_DAYS = 3
+# 7-day hourly forecast (today + 6 days), enough for every weekday name.
+FORECAST_DAYS = 7
 
 # Timeout in seconds (connect + read)
 TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
@@ -73,7 +75,7 @@ def _require_nested(parent: dict, parent_key: str, *keys: str) -> None:
 
 async def fetch_weather(latitude: float, longitude: float) -> dict[str, Any]:
     """
-    Fetch current + 3-day hourly weather from Open-Meteo for the given
+    Fetch current + 7-day hourly weather from Open-Meteo for the given
     coordinates.
 
     Returns a plain dict ready to be parsed into ``WeatherResponse``.

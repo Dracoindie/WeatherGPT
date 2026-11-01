@@ -11,7 +11,30 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 IntentType = Literal["current_weather", "forecast", "unknown"]
-DateReference = Literal["now", "today", "tomorrow", "tonight", "this_afternoon"]
+DateReference = Literal[
+    "now",
+    "today",
+    "tomorrow",
+    "day_after_tomorrow",
+    "tonight",
+    "this_afternoon",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+]
+WEEKDAYS: tuple[DateReference, ...] = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
 WeatherParameter = Literal[
     "temperature",
     "high_temperature",

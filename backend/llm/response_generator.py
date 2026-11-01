@@ -13,7 +13,7 @@ import re
 from typing import Optional
 
 from advisory import localized_advisory, should_mention_advisory
-from models.chat import ChatIntent, ResponseLanguage, WeatherFacts, AdvisoryResult
+from models.chat import WEEKDAYS, ChatIntent, ResponseLanguage, WeatherFacts, AdvisoryResult
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,9 @@ Rules:
 - Be concise (1–3 sentences).
 - You are not a meteorological data source; Open-Meteo is.
 """
+
+
+_HINDI_WEEKDAYS = ("सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार", "रविवार")
 
 
 def _fmt(value: Optional[float], digits: int = 1) -> Optional[str]:
@@ -109,11 +112,20 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
         "now": {"en": "right now", "hi": "अभी", "hinglish": "abhi"},
         "today": {"en": "today", "hi": "आज", "hinglish": "aaj"},
         "tomorrow": {"en": "tomorrow", "hi": "कल", "hinglish": "kal"},
+        "day_after_tomorrow": {
+            "en": "the day after tomorrow",
+            "hi": "परसों",
+            "hinglish": "parso",
+        },
         "tonight": {"en": "tonight", "hi": "आज रात", "hinglish": "aaj raat"},
         "this_afternoon": {
             "en": "this afternoon",
             "hi": "आज दोपहर",
             "hinglish": "aaj dopahar",
+        },
+        **{
+            day: {"en": f"on {day.capitalize()}", "hi": f"{hi} को", "hinglish": f"{day.capitalize()} ko"}
+            for day, hi in zip(WEEKDAYS, _HINDI_WEEKDAYS)
         },
     }
     # requested_time begins with the date_reference label
@@ -194,7 +206,7 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
         if param == "strong_wind" and wind:
             return f"{loc} में {when_phrase} हवा की गति {wind} किमी/घंटा तक है (Open-Meteo)।"
         if param == "humidity" and humidity:
-            return f"{loc} में वर्तमान आर्द्रता {humidity}% है (Open-Meteo)।"
+            return f"{loc} में {when_phrase} आर्द्रता {humidity}% है (Open-Meteo)।"
         parts = []
         if temp:
             parts.append(f"तापमान {temp}°C")
@@ -250,7 +262,7 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
         if param == "strong_wind" and wind:
             return f"{loc} mein {when_phrase} hawa {wind} km/h tak hai (Open-Meteo)."
         if param == "humidity" and humidity:
-            return f"{loc} mein humidity {humidity}% hai (Open-Meteo)."
+            return f"{loc} mein {when_phrase} humidity {humidity}% hai (Open-Meteo)."
         bits = []
         if temp:
             bits.append(f"temperature {temp}°C")
@@ -308,7 +320,7 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
     if param == "strong_wind" and wind:
         return f"Wind speed in {loc} {when_phrase} reaches up to {wind} km/h (Open-Meteo)."
     if param == "humidity" and humidity:
-        return f"Relative humidity in {loc} is {humidity}% (Open-Meteo)."
+        return f"Relative humidity in {loc} {when_phrase} is {humidity}% (Open-Meteo)."
     chunks = []
     if temp:
         chunks.append(f"{temp}°C")

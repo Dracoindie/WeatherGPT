@@ -42,6 +42,8 @@ def _mock_weather_response(
             precipitation_probability=[10] * 24,
             precipitation=[hourly_precip_max] * 24,
             wind_speed_10m=[hourly_wind_max] * 24,
+            weather_code=[weather_code] * 24,
+            relative_humidity_2m=[50.0] * 24,
         ),
     )
 

@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Optional
+from typing import Optional, get_args
 
 from models.chat import (
+    WEEKDAYS,
     ChatIntent,
     DateReference,
     IntentType,
@@ -114,18 +115,36 @@ _CITY_DEVANAGARI = {
     "कोलकाता": "Kolkata",
 }
 
+# Weekday names: English, romanised Hindi (Hinglish) and Devanagari.
+_WEEKDAY_PATTERNS: dict[DateReference, tuple[str, str]] = {
+    "monday": (r"monday|som(?:v|w)aa?r", "सोमवार"),
+    "tuesday": (r"tuesday|mangal(?:v|w)aa?r", "मंगलवार"),
+    "wednesday": (r"wednesday|budh(?:v|w)aa?r", "बुधवार"),
+    "thursday": (
+        r"thursday|guru(?:v|w)aa?r|brihaspati(?:v|w)aa?r|veer(?:v|w)aa?r",
+        "गुरुवार|बृहस्पतिवार|वीरवार",
+    ),
+    "friday": (r"friday|shukra(?:v|w)aa?r", "शुक्रवार"),
+    "saturday": (r"saturday|shani(?:v|w)aa?r", "शनिवार"),
+    "sunday": (r"sunday|ravi(?:v|w)aa?r|it(?:v|w)aa?r", "रविवार|इतवार"),
+}
+_WEEKDAY_WORDS = "|".join(roman for roman, _ in _WEEKDAY_PATTERNS.values())
+_DAY_AFTER_TOMORROW = r"day after tomorrow|parso|parson"
+
 _PARSE_SYSTEM = """You extract weather-query slots. Reply with JSON only:
 {
   "intent": "current_weather" | "forecast" | "unknown",
   "location_name": string or null,
-  "date_reference": "now" | "today" | "tomorrow" | "tonight" | "this_afternoon",
+  "date_reference": "now" | "today" | "tomorrow" | "day_after_tomorrow" | "tonight" | "this_afternoon" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday",
   "weather_parameter": "temperature" | "high_temperature" | "precipitation" | "heavy_rain" | "rain_likelihood" | "wind" | "strong_wind" | "storm" | "humidity" | "advisory" | "general",
   "language": "en" | "hi" | "hinglish"
 }
 Rules:
 - location_name is a place the user named. If none, null. Never invent a city.
 - Never output coordinates.
-- "kal" / "tomorrow" → tomorrow. "aaj" / "today" → today. "raat" / "tonight" → tonight.
+- "kal" / "tomorrow" → tomorrow. "parso" / "परसों" / "day after tomorrow" → day_after_tomorrow.
+- "aaj" / "today" → today. "raat" / "tonight" → tonight.
+- Weekday names in English, Hindi (सोमवार…) or Hinglish (somvar…) → that weekday in lowercase English.
 - "baarish" / "rain" → precipitation. temperature words → temperature.
 - Hindi in Devanagari → language "hi". Mixed Hindi roman + English → "hinglish".
 """
@@ -152,9 +171,14 @@ def detect_language(message: str) -> ResponseLanguage:
         "hawa",
         "tapman",
         "tapmaan",
+        "parso",
     )
     lower = _normalize(message)
     if any(tok in lower for tok in hinglish_tokens):
+        return "hinglish"
+    # Romanised Hindi weekday names (somvar, shukrawar, …), not the English ones.
+    hinglish_weekdays = "|".join(p.split("|", 1)[1] for p, _ in _WEEKDAY_PATTERNS.values())
+    if re.search(rf"\b(?:{hinglish_weekdays})\b", lower):
         return "hinglish"
     return "en"
 
@@ -177,7 +201,7 @@ def _extract_location(message: str) -> Optional[str]:
             return _title_place(city)
 
     patterns = [
-        r"\bin\s+([A-Za-z][A-Za-z ]{1,40}?)\s+(?:tomorrow|today|tonight|afternoon)\b",
+        rf"\bin\s+([A-Za-z][A-Za-z ]{{1,40}}?)\s+(?:on\s+)?(?:{_DAY_AFTER_TOMORROW}|tomorrow|today|tonight|afternoon|{_WEEKDAY_WORDS})\b",
         r"\bin\s+([A-Za-z][A-Za-z ]{1,40})\??$",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+(?:mein|me|ka|ki|ke)\b",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+weather\b",
@@ -212,6 +236,10 @@ def _extract_location(message: str) -> Optional[str]:
         "mausam",
         "kaisa",
         "kya",
+        "parso",
+        "parson",
+        "day",
+        *WEEKDAYS,
     }
     for pattern in patterns:
         match = re.search(pattern, message, flags=re.IGNORECASE)
@@ -226,6 +254,12 @@ def _extract_location(message: str) -> Optional[str]:
 
 def _extract_date(message: str) -> DateReference:
     lower = _normalize(message)
+    # Before "kal" / "tomorrow": "day after tomorrow" contains "tomorrow".
+    if re.search(rf"\b(?:{_DAY_AFTER_TOMORROW})\b", lower) or "परसों" in message:
+        return "day_after_tomorrow"
+    for day, (roman, devanagari) in _WEEKDAY_PATTERNS.items():
+        if re.search(rf"\b(?:{roman})\b", lower) or re.search(devanagari, message):
+            return day
     if re.search(r"[\u0900-\u097F]*कल\b", message) or re.search(
         r"\b(kal|tomorrow)\b", lower
     ):
@@ -273,7 +307,7 @@ def _extract_parameter(message: str) -> WeatherParameter:
 
 def _extract_intent(message: str, date_ref: DateReference, param: WeatherParameter) -> IntentType:
     lower = _normalize(message)
-    if date_ref in {"tomorrow", "tonight", "this_afternoon"}:
+    if date_ref in {"tomorrow", "day_after_tomorrow", "tonight", "this_afternoon", *WEEKDAYS}:
         return "forecast"
     if date_ref == "today" and param == "precipitation":
         return "forecast"
@@ -309,13 +343,7 @@ def parse_query_fallback(message: str) -> ChatIntent:
 
 def _intent_from_llm_dict(data: dict, fallback: ChatIntent) -> ChatIntent:
     allowed_intent: set[str] = {"current_weather", "forecast", "unknown"}
-    allowed_date: set[str] = {
-        "now",
-        "today",
-        "tomorrow",
-        "tonight",
-        "this_afternoon",
-    }
+    allowed_date: set[str] = set(get_args(DateReference))
     allowed_param: set[str] = {
         "temperature",
         "high_temperature",

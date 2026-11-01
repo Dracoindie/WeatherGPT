@@ -7,11 +7,11 @@ Temporal windows are computed here; the LLM must not invent dates.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from models.chat import ChatIntent, DateReference, WeatherFacts, WeatherParameter
+from models.chat import WEEKDAYS, ChatIntent, DateReference, WeatherFacts, WeatherParameter
 from models.weather import CurrentWeather, HourlyWeather, WeatherResponse
 from weather.open_meteo import fetch_weather
 
@@ -25,15 +25,22 @@ WMO_DESCRIPTIONS: dict[int, str] = {
     51: "Light drizzle",
     53: "Drizzle",
     55: "Dense drizzle",
+    56: "Light freezing drizzle",
+    57: "Dense freezing drizzle",
     61: "Light rain",
     63: "Rain",
     65: "Heavy rain",
+    66: "Light freezing rain",
+    67: "Heavy freezing rain",
     71: "Light snow",
     73: "Snow",
     75: "Heavy snow",
+    77: "Snow grains",
     80: "Light rain showers",
     81: "Rain showers",
     82: "Heavy rain showers",
+    85: "Light snow showers",
+    86: "Heavy snow showers",
     95: "Thunderstorm",
     96: "Thunderstorm with slight hail",
     99: "Thunderstorm with heavy hail",
@@ -64,29 +71,46 @@ def _parse_local(ts: str, tz: ZoneInfo) -> datetime:
 
 
 def _label(date_ref: DateReference) -> str:
+    if date_ref in WEEKDAYS:
+        return date_ref.capitalize()
     return {
         "now": "now",
         "today": "today",
         "tomorrow": "tomorrow",
+        "day_after_tomorrow": "day after tomorrow",
         "tonight": "tonight",
         "this_afternoon": "this afternoon",
     }[date_ref]
 
 
+def _target_date(date_ref: DateReference, today: date) -> date:
+    """Local calendar day a date reference points at."""
+    if date_ref == "tomorrow":
+        return today + timedelta(days=1)
+    if date_ref == "day_after_tomorrow":
+        return today + timedelta(days=2)
+    if date_ref in WEEKDAYS:
+        # Next occurrence, counting today: "Friday" asked on a Friday is today.
+        return today + timedelta(days=(WEEKDAYS.index(date_ref) - today.weekday()) % 7)
+    return today
+
+
+# "Tonight" runs from 20:00 until the early hours of the next morning.
+TONIGHT_START_HOUR = 20
+TONIGHT_END_HOUR = 6  # exclusive, next day
+
+
 def _hour_in_window(dt: datetime, now: datetime, date_ref: DateReference) -> bool:
-    today = now.date()
-    tomorrow = today + timedelta(days=1)
     if date_ref == "now":
         return False
-    if date_ref == "today":
-        return dt.date() == today
-    if date_ref == "tomorrow":
-        return dt.date() == tomorrow
+    target = _target_date(date_ref, now.date())
     if date_ref == "tonight":
-        return dt.date() == today and dt.hour >= 20
+        return (dt.date() == target and dt.hour >= TONIGHT_START_HOUR) or (
+            dt.date() == target + timedelta(days=1) and dt.hour < TONIGHT_END_HOUR
+        )
     if date_ref == "this_afternoon":
-        return dt.date() == today and 12 <= dt.hour <= 17
-    return False
+        return dt.date() == target and 12 <= dt.hour <= 17
+    return dt.date() == target
 
 
 def _use_current(intent: ChatIntent) -> bool:
@@ -138,6 +162,8 @@ def select_period_facts(
         probs = weather.hourly.precipitation_probability
         precs = weather.hourly.precipitation
         winds = weather.hourly.wind_speed_10m
+        codes = weather.hourly.weather_code
+        hums = weather.hourly.relative_humidity_2m
 
         indexes = [
             i
@@ -157,6 +183,8 @@ def select_period_facts(
         sel_probs = [probs[i] for i in indexes if probs[i] is not None]
         sel_precs = [precs[i] for i in indexes if precs[i] is not None]
         sel_winds = [winds[i] for i in indexes if winds[i] is not None]
+        sel_codes = [codes[i] for i in indexes if codes[i] is not None]
+        sel_hums = [hums[i] for i in indexes if hums[i] is not None]
 
         start = times[indexes[0]]
         end = times[indexes[-1]]
@@ -169,6 +197,8 @@ def select_period_facts(
         representative = midday if midday is not None else (sum(sel_temps) / len(sel_temps) if sel_temps else None)
 
         max_prob = max(int(p) for p in sel_probs) if sel_probs else None
+        # WMO codes grow with significance, so the max is the period's headline weather.
+        code = max(sel_codes) if sel_codes else None
 
         facts = WeatherFacts(
             source="open-meteo",
@@ -181,14 +211,11 @@ def select_period_facts(
             precipitation=round(sum(sel_precs), 1) if sel_precs else None,
             precipitation_probability=int(max_prob) if max_prob is not None else None,
             wind_speed_10m=round(max(sel_winds), 1) if sel_winds else None,
-            weather_code=weather.current.weather_code if intent.date_reference == "today" else None,
-            weather_description=None,
+            relative_humidity_2m=round(sum(sel_hums) / len(sel_hums), 1) if sel_hums else None,
+            weather_code=code,
+            weather_description=weather_code_description(code),
             period_available=True,
         )
-
-        if intent.weather_parameter == "humidity":
-            # Hourly humidity is not requested from Open-Meteo; only current is available.
-            facts.relative_humidity_2m = weather.current.relative_humidity_2m
 
     return facts
 
