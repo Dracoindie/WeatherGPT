@@ -19,7 +19,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGeolocation } from '@/lib/location/useGeolocation'
 import { reverseGeocode } from '@/lib/location/reverseGeocode'
-import { Crosshair, MapPin, PencilLine, Search } from 'lucide-react'
+import { Crosshair, LoaderCircle, MapPin, PencilLine, Search } from 'lucide-react'
+import { useI18n } from '@/context/I18nContext'
 
 export interface LocationData {
   latitude: number
@@ -37,6 +38,7 @@ export default function LocationPicker({
   defaultLocation,
 }: LocationPickerProps) {
   const { coords, status, error: geoError, requestLocation } = useGeolocation()
+  const { t } = useI18n()
   const [resolvedName, setResolvedName] = useState<string>(
     defaultLocation?.name ?? ''
   )
@@ -88,7 +90,7 @@ export default function LocationPicker({
       )
       const results = await resp.json()
       if (!results?.length) {
-        setManualError('Location not found. Please try a different name.')
+        setManualError(t('location.notFound'))
         return
       }
       const r = results[0]
@@ -100,7 +102,7 @@ export default function LocationPicker({
       setShowManual(false)
       setManualInput('')
     } catch {
-      setManualError('Could not search for that location. Please try again.')
+      setManualError(t('location.searchFailed'))
     } finally {
       setGeocoding(false)
     }
@@ -110,49 +112,47 @@ export default function LocationPicker({
   const hasDenied = status === 'denied' || status === 'unavailable' || status === 'timeout'
 
   return (
-    <div className="w-full rounded-[14px] border border-line bg-panel p-3 shadow-sm sm:w-[360px]">
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-fog">Location context</p>
+    <div className="sky-glass w-full p-3 sm:w-[360px]">
+      <p className="sky-label mb-2 flex items-center gap-1.5">
+        <MapPin className="size-3 text-accent" aria-hidden="true" /> {t('location.context')}
+      </p>
 
-      {/* Resolved location display */}
       {resolvedName && !showManual && (
-        <div className="flex items-center justify-between gap-2 rounded-[10px] bg-teal-soft px-3 py-2">
-          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
-            <MapPin className="size-4 shrink-0 text-teal" aria-hidden="true" />
-            <span className="truncate">{resolvedName}</span>
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-accent/25 bg-accent/10 px-3 py-2">
+          <span className="min-w-0 truncate text-sm font-medium text-hud" title={resolvedName}>
+            {resolvedName}
           </span>
           <button
             type="button"
             onClick={() => setShowManual(true)}
-            className="shrink-0 text-xs font-medium text-teal underline-offset-2 hover:underline"
+            className="shrink-0 font-readout text-[11px] uppercase tracking-[0.14em] text-accent hover:underline"
           >
-            Change
+            {t('location.change')}
           </button>
         </div>
       )}
 
-      {/* Primary GPS button */}
       {!resolvedName && !showManual && (
         <button
+          type="button"
           onClick={requestLocation}
           disabled={isRequesting || geocoding}
-          className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-2.5 text-sm font-medium text-panel transition-colors hover:bg-ink/90 disabled:opacity-60"
+          className="sky-btn sky-btn-primary w-full"
         >
           {isRequesting || geocoding ? (
             <>
-              <span className="animate-spin">⌛</span> Detecting location…
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> {t('location.detecting')}
             </>
           ) : (
-            <><Crosshair className="size-4" aria-hidden="true" /> Use my current location</>
+            <>
+              <Crosshair className="size-4" aria-hidden="true" /> {t('location.button')}
+            </>
           )}
         </button>
       )}
 
-      {/* Geolocation error message */}
-      {geoError && (
-        <p className="mt-2 text-xs text-amber">{geoError}</p>
-      )}
+      {geoError && <p className="mt-2 text-xs text-sev-watch">{geoError}</p>}
 
-      {/* Show manual entry when: denied, or user clicks "Change" */}
       {(hasDenied || showManual) && !geocoding && (
         <>
           <form onSubmit={handleManualSubmit} className="flex gap-2">
@@ -160,38 +160,42 @@ export default function LocationPicker({
               type="text"
               value={manualInput}
               onChange={(e) => setManualInput(e.target.value)}
-              placeholder="Enter city or place…"
-              className="min-w-0 flex-1 rounded-[10px] border border-line bg-canvas px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-teal/30"
+              placeholder={t('location.placeholder')}
+              aria-label={t('location.placeholder')}
+              className="sky-input min-w-0 flex-1"
             />
             <button
               type="submit"
               disabled={!manualInput.trim() || geocoding}
-              className="grid size-9 place-items-center rounded-[10px] bg-ink text-panel hover:bg-ink/90 disabled:opacity-50"
+              aria-label={t('location.search')}
+              className="sky-btn sky-btn-primary size-11 shrink-0 px-0"
             >
               <Search className="size-4" aria-hidden="true" />
             </button>
           </form>
-          {manualError && (
-            <p className="mt-1 text-xs text-red-500">{manualError}</p>
-          )}
+          {manualError && <p className="mt-1.5 text-xs text-sev-warning">{manualError}</p>}
           {!hasDenied && (
             <button
-              onClick={() => { setShowManual(false); setManualInput('') }}
-              className="mt-2 text-xs text-ink-soft underline"
+              type="button"
+              onClick={() => {
+                setShowManual(false)
+                setManualInput('')
+              }}
+              className="mt-2 text-xs text-hud-dim underline hover:text-hud"
             >
-              Cancel
+              {t('location.cancel')}
             </button>
           )}
         </>
       )}
 
-      {/* Fallback: also offer manual if user doesn't want GPS */}
       {!resolvedName && !showManual && !isRequesting && !geocoding && (
         <button
+          type="button"
           onClick={() => setShowManual(true)}
-          className="mt-2 flex items-center gap-1 text-xs text-ink-soft underline hover:text-ink"
+          className="mt-2 flex items-center gap-1 text-xs text-hud-dim underline hover:text-hud"
         >
-          <PencilLine className="size-3" aria-hidden="true" /> Enter location manually instead
+          <PencilLine className="size-3" aria-hidden="true" /> {t('location.manualInstead')}
         </button>
       )}
     </div>

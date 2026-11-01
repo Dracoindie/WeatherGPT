@@ -1,20 +1,29 @@
 'use client'
 
+/**
+ * The location's alert status (GET /api/alerts, next 24 h). This is the ONLY
+ * place a page states whether a location has alerts; chat advisories describe
+ * the period a question asked about and are labelled with it.
+ */
+
 import Link from 'next/link'
 import { AlertTriangle, ChevronRight, CloudOff, RotateCw, ShieldCheck } from 'lucide-react'
-import { SeverityBadge } from '@/components/common/SeverityBadge'
+import { SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
+import { fill, useI18n } from '@/context/I18nContext'
 import type { WeatherAlert } from '@/types/alerts'
 
 interface AlertBannerProps {
   alerts: WeatherAlert[]
   locationName?: string
   loading?: boolean
-  /** Alerts could not be evaluated: never show "conditions normal" in that case. */
+  /** Alerts could not be evaluated: never show "no alerts" in that case. */
   error?: string | null
   /** Alerts were evaluated from the last good data because the service is down. */
   staleSince?: string | null
   onRetry?: () => void
 }
+
+const RANK = { advisory: 1, watch: 2, warning: 3 } as const
 
 function timeOf(iso: string) {
   const d = new Date(iso)
@@ -22,25 +31,19 @@ function timeOf(iso: string) {
 }
 
 export function AlertBanner({ alerts, locationName, loading, error, staleSince, onRetry }: AlertBannerProps) {
+  const { t } = useI18n()
   if (loading) return null
 
   if (error) {
     return (
-      <div
-        role="status"
-        className="flex flex-col items-start justify-between gap-2 rounded-[12px] border border-amber/40 bg-amber-soft px-4 py-2.5 text-xs text-ink sm:flex-row sm:items-center"
-      >
-        <div className="flex items-center gap-2">
-          <CloudOff className="size-4 shrink-0 text-amber" />
+      <div role="status" className="sky-glass flex flex-col items-start justify-between gap-2 border-sev-watch/40 px-4 py-3 text-sm sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2 text-hud">
+          <CloudOff className="size-4 shrink-0 text-sev-watch" />
           <span>{error}</span>
         </div>
         {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="inline-flex shrink-0 items-center gap-1 font-mono text-[11px] hover:underline"
-          >
-            <RotateCw className="size-3" /> Retry
+          <button type="button" onClick={onRetry} className="sky-btn sky-btn-subtle min-h-9">
+            <RotateCw className="size-3.5" /> {t('banner.retry')}
           </button>
         )}
       </div>
@@ -48,21 +51,20 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
   }
 
   const staleNote = staleSince ? (
-    <p className="mt-1 text-[11px] text-amber">
-      Weather service not responding — based on data from {timeOf(staleSince)}.
-    </p>
+    <p className="mt-1 text-[11px] text-sev-watch">{fill(t('banner.stale'), { time: timeOf(staleSince) })}</p>
   ) : null
+  const place = locationName ? locationName.split(',')[0] : t('banner.thisPlace')
 
   if (!alerts || alerts.length === 0) {
     return (
-      <div className="rounded-[12px] border border-line bg-panel px-4 py-2.5 text-xs text-ink-soft">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-teal" />
-            <span>No active weather alerts for {locationName ?? 'current location'}. Conditions normal.</span>
+      <div role="status" className="sky-glass px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-hud">
+            <ShieldCheck className="size-4 shrink-0 text-sev-none" />
+            <span>{fill(t('banner.none'), { place })}</span>
           </div>
-          <Link href="/alerts" className="inline-flex items-center gap-1 font-mono text-[11px] text-teal hover:underline">
-            Details <ChevronRight className="size-3" />
+          <Link href="/alerts" className="inline-flex items-center gap-1 font-readout text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+            {t('banner.details')} <ChevronRight className="size-3" />
           </Link>
         </div>
         {staleNote}
@@ -70,30 +72,32 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
     )
   }
 
-  const topAlert = alerts[0]
+  const top = [...alerts].sort((a, b) => RANK[b.severity] - RANK[a.severity])[0]
+  const color = SEVERITY_VAR[top.severity]
 
   return (
-    <div className="flex flex-col items-start justify-between gap-3 rounded-[12px] border border-coral/40 bg-coral-soft px-4 py-3 text-ink sm:flex-row sm:items-center">
-      <div className="flex items-center gap-3">
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-coral text-panel">
+    <div
+      role="status"
+      className="sky-glass flex flex-col items-start justify-between gap-3 px-4 py-3 sm:flex-row sm:items-center"
+      style={{ borderColor: `color-mix(in srgb, ${color} 50%, transparent)`, boxShadow: `0 0 60px -30px ${color}` }}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl" style={{ color, background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
           <AlertTriangle className="size-4" />
         </span>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-display text-xs font-semibold text-ink">{topAlert.condition}</span>
-            <SeverityBadge severity={topAlert.severity} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-hud text-sm font-semibold text-hud">{top.condition}</span>
+            <SeverityBadge level={top.severity} />
+            {alerts.length > 1 && <span className="text-[11px] text-hud-dim">{fill(t('banner.more'), { n: alerts.length - 1 })}</span>}
           </div>
-          <p className="line-clamp-1 text-xs text-ink-soft">{topAlert.headline}</p>
-          <p className="text-[10px] text-ink-soft">Generated by WeatherGPT, not an official IMD warning.</p>
+          <p className="line-clamp-1 text-sm text-hud-dim">{top.headline}</p>
+          <p className="text-[10px] text-hud-dim">Generated by WeatherGPT, not an official IMD warning.</p>
           {staleNote}
         </div>
       </div>
-
-      <Link
-        href="/alerts"
-        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-3 py-1 font-mono text-[11px] text-panel transition-colors hover:bg-ink/90"
-      >
-        View {alerts.length} Alert{alerts.length > 1 ? 's' : ''} <ChevronRight className="size-3" />
+      <Link href="/alerts" className="sky-btn sky-btn-ghost min-h-9 shrink-0">
+        {t('banner.view')} <ChevronRight className="size-3.5" />
       </Link>
     </div>
   )

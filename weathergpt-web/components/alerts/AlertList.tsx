@@ -1,9 +1,9 @@
 'use client'
 
-import { AlertTriangle, ShieldCheck, Clock, MapPin } from 'lucide-react'
-import { SeverityBadge } from '@/components/common/SeverityBadge'
+import { AlertTriangle, Clock, MapPin, ShieldCheck } from 'lucide-react'
+import { SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
 import { ShareWhatsApp } from '@/components/common/ShareWhatsApp'
-import { useI18n } from '@/context/I18nContext'
+import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import type { WeatherAlert } from '@/types/alerts'
 
 interface AlertListProps {
@@ -13,43 +13,42 @@ interface AlertListProps {
   error?: string | null
 }
 
+/** Short place name: "Pune, Maharashtra, India" -> "Pune". */
+export const shortPlace = (name?: string | null) => (name ? name.split(',')[0].trim() : '')
+
 export function AlertList({ alerts, locationName, loading, error }: AlertListProps) {
   const { t } = useI18n()
 
   if (loading) {
     return (
-      <div className="rounded-[16px] border border-line bg-panel p-8 text-center">
-        <div className="mx-auto size-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-        <p className="mt-3 font-mono text-xs uppercase tracking-widest text-ink-soft">
-          Evaluating meteorological alerts…
-        </p>
+      <div className="sky-glass p-8 text-center">
+        <div className="mx-auto size-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        <p className="sky-label mt-3">{t('alerts.loading')}</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="rounded-[16px] border border-coral/30 bg-coral-soft p-5 text-sm text-coral">
-        <div className="flex items-center gap-2 font-medium">
+      <div role="alert" className="sky-glass border-sev-watch/40 p-5 text-sm">
+        <div className="flex items-center gap-2 font-medium text-sev-watch">
           <AlertTriangle className="size-4 shrink-0" />
-          <span>Could not retrieve active alerts</span>
+          <span>{t('alerts.failed')}</span>
         </div>
-        <p className="mt-1 text-xs opacity-90">{error}</p>
+        <p className="mt-1 text-xs text-hud-dim">{error}</p>
       </div>
     )
   }
 
   if (!alerts || alerts.length === 0) {
     return (
-      <div className="rounded-[16px] border border-line bg-panel p-8 text-center">
-        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-teal-soft text-teal">
+      <div className="sky-glass p-8 text-center">
+        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-sev-none/15 text-sev-none">
           <ShieldCheck className="size-6" />
         </div>
-        <h3 className="mt-4 font-display text-base font-semibold text-ink">
-          {t('alerts.none')}
-        </h3>
-        <p className="mt-1.5 font-body text-xs text-ink-soft max-w-md mx-auto">
-          {t('alerts.routine')} All observed parameters for {locationName ? <span className="font-semibold text-ink">{locationName}</span> : 'the selected area'} are currently within standard baseline limits.
+        <h3 className="mt-4 font-hud text-lg font-semibold text-hud">{t('alerts.none')}</h3>
+        <p className="mx-auto mt-1.5 max-w-md text-sm text-hud-dim">
+          {locationName ? fill(t('alerts.noneFor'), { place: shortPlace(locationName) }) : t('alerts.pickFirst')}
         </p>
       </div>
     )
@@ -57,74 +56,68 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
 
   return (
     <div className="space-y-4">
-      {alerts.map((alert) => (
-        <article
-          key={alert.id}
-          className="rounded-[16px] border border-line bg-panel p-5 transition-all hover:border-line/90 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 pb-3.5">
-            <div className="flex items-center gap-2.5">
-              <span className="grid size-8 place-items-center rounded-[9px] bg-coral-soft text-coral">
-                <AlertTriangle className="size-4" />
-              </span>
-              <div>
-                <h3 className="font-display text-base font-semibold text-ink">
-                  {alert.condition}
-                </h3>
-                <div className="flex items-center gap-2 text-xs text-ink-soft">
-                  {locationName && (
+      {alerts.map((alert) => {
+        const color = SEVERITY_VAR[alert.severity]
+        const param = t(`param.${alert.relevant_parameter}` as TranslationKey) || alert.relevant_parameter
+        return (
+          <article
+            key={alert.id}
+            className="sky-glass p-5"
+            style={{ borderColor: `color-mix(in srgb, ${color} 45%, transparent)`, boxShadow: `0 0 50px -28px ${color}` }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-3.5">
+              <div className="flex min-w-0 items-start gap-3">
+                <span
+                  className="grid size-9 shrink-0 place-items-center rounded-xl"
+                  style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}
+                >
+                  <AlertTriangle className="size-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-hud text-lg font-semibold text-hud">{alert.condition}</h3>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-hud-dim">
+                    {locationName && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="size-3 text-accent" />
+                        {shortPlace(locationName)}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
-                      <MapPin className="size-3 text-teal" />
-                      {locationName}
+                      <Clock className="size-3" />
+                      {alert.time_window}
                     </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <Clock className="size-3 text-fog" />
-                    {alert.time_window}
-                  </span>
+                  </div>
                 </div>
+              </div>
+              <SeverityBadge level={alert.severity} />
+            </div>
+
+            <p className="mt-3 text-sm font-medium text-hud">{alert.headline}</p>
+            <p className="mt-1 text-sm leading-relaxed text-hud-dim">{alert.description}</p>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                <span className="sky-label">{t('alerts.threshold')}</span>
+                <p className="mt-1 font-readout text-sm text-hud">
+                  {param}: <span style={{ color }}>{alert.relevant_value} {alert.unit}</span>{' '}
+                  <span className="text-hud-dim">(threshold: {alert.threshold_value} {alert.unit})</span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-black/25 p-3">
+                <span className="sky-label">{t('alerts.action')}</span>
+                <p className="mt-1 text-sm text-hud-dim">{alert.recommended_action}</p>
               </div>
             </div>
 
-            <SeverityBadge severity={alert.severity} />
-          </div>
-
-          <p className="mt-3 font-body text-sm font-medium text-ink">
-            {alert.headline}
-          </p>
-
-          <p className="mt-1 font-body text-xs text-ink-soft leading-relaxed">
-            {alert.description}
-          </p>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[10px] bg-canvas p-3 border border-line/50">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-fog">
-                {t('alerts.threshold')}
-              </span>
-              <p className="mt-1 font-mono text-xs font-medium text-ink">
-                {alert.relevant_parameter}: <span className="text-teal font-semibold">{alert.relevant_value} {alert.unit}</span> (threshold: {alert.threshold_value} {alert.unit})
-              </p>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] text-hud-dim">Generated by WeatherGPT, not an official IMD warning.</p>
+              <ShareWhatsApp
+                text={`⚠ ${alert.condition}${locationName ? ` — ${locationName}` : ''}: ${alert.headline}. ${alert.recommended_action}`}
+              />
             </div>
-
-            <div className="rounded-[10px] bg-canvas p-3 border border-line/50">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-fog">
-                {t('alerts.action')}
-              </span>
-              <p className="mt-1 font-body text-xs text-ink-soft">
-                {alert.recommended_action}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] text-ink-soft">Generated by WeatherGPT, not an official IMD warning.</p>
-            <ShareWhatsApp
-              text={`⚠ ${alert.condition}${locationName ? ` — ${locationName}` : ''}: ${alert.headline}. ${alert.recommended_action}`}
-            />
-          </div>
-        </article>
-      ))}
+          </article>
+        )
+      })}
     </div>
   )
 }

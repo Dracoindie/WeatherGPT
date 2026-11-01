@@ -9,6 +9,9 @@ import { AVIATION } from './support/roleFixtures'
  * come from the generated table, which mirrors backend/llm/weather_codes.py.
  */
 
+// The location button follows the UI language too.
+const LOCATION_BUTTON = { hi: 'मेरा वर्तमान स्थान उपयोग करें', mr: 'माझे सध्याचे ठिकाण वापरा' } as const
+
 const ENGLISH = new Set(Object.values(WMO_DESCRIPTIONS.en))
 
 const LANGS = [
@@ -49,15 +52,15 @@ for (const { code, label } of LANGS) {
     await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
     await mockBackend(page)
     await enterDemo(page)
+    await page.getByRole('button', { name: /use my current location/i }).first().click()
     await page.getByRole('button', { name: label, exact: true }).first().click()
-    await page.getByRole('button', { name: /use my current location|मेरी|माझे|location/i }).first().click()
     // current conditions (code 61) + 7 forecast days
     await expect(page.getByTestId('weather-description').first()).toBeVisible({ timeout: 20_000 })
     await expectNoEnglish(page, 2)
 
     await page.locator('a[href="/map"]').first().dispatchEvent('click')
     await page.waitForURL('**/map')
-    await page.getByRole('button', { name: /use my current location|मेरी|माझे|location/i }).first().click()
+    await page.getByRole('button', { name: LOCATION_BUTTON[code] }).first().click()
     await expect(page.locator('.leaflet-popup [data-testid="weather-description"]')).toBeVisible({ timeout: 20_000 })
     await expectNoEnglish(page, 1)
   })

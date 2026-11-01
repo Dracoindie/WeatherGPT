@@ -31,9 +31,8 @@ export function ShareWhatsApp({
       rel="noopener noreferrer"
       className={cn(
         'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
-        tone === 'sky'
-          ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20'
-          : 'border-emerald-600/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-200',
+        // one theme: the Living Sky green on every page (tone kept for older callers)
+        tone && 'border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20',
         className
       )}
     >
