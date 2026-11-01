@@ -179,3 +179,26 @@ class TestAdvisorySeesPeriodFacts:
         text = "Pune tomorrow reaches 36.2°C, and 18.4 mm of rain is expected."
         assert not is_grounded(text, facts)
         assert is_grounded(text, facts, advisory)
+
+
+class TestGroundingDates:
+    def _facts(self):
+        return WeatherFacts(
+            location="Pune",
+            requested_time="tomorrow (2026-11-02T00:00 to 2026-11-02T23:00)",
+            timezone="Asia/Kolkata",
+            temperature_2m=31.0,
+            precipitation=4.0,
+        )
+
+    def test_reply_with_window_date_is_grounded(self):
+        assert is_grounded("On 2 November 2026 Pune will see 31°C and 4 mm of rain.", self._facts())
+
+    def test_iso_date_and_padded_day_are_grounded(self):
+        assert is_grounded("Pune on 2026-11-02 (day 02, until 23:00): 31°C.", self._facts())
+
+    def test_date_outside_window_rejected(self):
+        assert not is_grounded("On 5 November Pune will see 31°C.", self._facts())
+
+    def test_unrelated_numbers_still_rejected(self):
+        assert not is_grounded("Pune will see 45°C tomorrow.", self._facts())

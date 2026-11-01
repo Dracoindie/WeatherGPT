@@ -67,6 +67,10 @@ def allowed_numbers(facts: WeatherFacts) -> set[str]:
         tokens.add(str(int(facts.precipitation_probability)))
     if facts.weather_code is not None:
         tokens.add(str(int(facts.weather_code)))
+    # Date/time parts of the window, e.g. "2026-11-02T15:00" allows 2026, 11, 2, 15...
+    for part in re.findall(r"\d+", facts.requested_time):
+        tokens.add(part)
+        tokens.add(str(int(part)))
     tokens.discard("")
     return tokens
 
