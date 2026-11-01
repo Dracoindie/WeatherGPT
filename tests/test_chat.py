@@ -520,3 +520,75 @@ class TestAdvisoryIntelligence:
         assert body["intent"]["weather_parameter"] == "advisory"
         assert body["advisory"]["severity"] == "low"
         assert "normal" in body["advisory"]["advisory"].lower()
+
+
+class TestGeocoderFailure:
+    """Nominatim down: a reply in the user's language, not a bare 502."""
+
+    @pytest.mark.parametrize(
+        "message,language,expected",
+        [
+            ("What is the weather in Pune?", "en", "I couldn't look up 'Pune' right now"),
+            ("पुणे में मौसम कैसा है?", "hi", "अभी 'Pune' की जगह नहीं ढूँढ पाया"),
+            ("Pune ka weather kaisa hai?", "hinglish", "Abhi 'Pune' ki location dhoondh nahi paaya"),
+            ("पुण्यात आज हवामान कसे आहे?", "mr", "आत्ता 'Pune' हे ठिकाण शोधता आले नाही"),
+        ],
+    )
+    def test_geocoder_down_replies_in_users_language(self, message, language, expected):
+        patches = chat_patches()
+        fetch = AsyncMock()
+        with (
+            patch("api.chat.geocode_place", AsyncMock(side_effect=RuntimeError("Location service is temporarily unavailable."))),
+            patches[1],
+            patch("api.chat.fetch_validated_weather", fetch),
+            patches[3],
+        ):
+            resp = post_chat(message)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["intent"]["language"] == language
+        assert body["message"].startswith(expected)
+        assert body["location"] is None and body["weather"] is None
+        fetch.assert_not_called()
+
+    def test_real_geocoder_network_error_is_handled(self):
+        """Exercise geocoding.py's own RuntimeError path, not a mocked one."""
+        import httpx
+
+        from geocoding import clear_cache
+
+        clear_cache()
+        patches = chat_patches()
+        with (
+            patch("geocoding._nominatim_get", AsyncMock(side_effect=httpx.ConnectError("down"))),
+            patches[1],
+            patches[2],
+            patches[3],
+        ):
+            resp = post_chat("Will it rain in Pune tomorrow?")
+        assert resp.status_code == 200
+        assert "Please try again in a moment, or share your location." in resp.json()["message"]
+
+    def test_no_place_still_asks_for_a_city(self):
+        geocode = AsyncMock(side_effect=RuntimeError("down"))
+        patches = chat_patches(trusted=None)
+        with patch("api.chat.geocode_place", geocode), patches[1], patches[2], patches[3]:
+            resp = post_chat("उद्या पाऊस पडेल का?")
+        assert resp.status_code == 200
+        assert resp.json()["message"].startswith("कृपया शहर किंवा ठिकाण सांगा")
+        geocode.assert_not_called()
+
+    def test_reverse_geocode_failure_still_answers_for_the_coordinates(self):
+        patches = chat_patches()
+        with (
+            patches[0],
+            patch("api.chat.reverse_geocode", AsyncMock(side_effect=RuntimeError("down"))),
+            patches[2],
+            patches[3],
+        ):
+            resp = post_chat("Will it rain tomorrow?", latitude=18.52, longitude=73.85)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["location"]["source"] == "request_coordinates"
+        assert body["location"]["name"] == "selected location"
+        assert body["weather"] is not None

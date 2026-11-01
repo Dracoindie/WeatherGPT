@@ -36,7 +36,7 @@ from climate.analysis import fetch_climate_facts
 from geocoding import geocode_place, reverse_geocode
 from llm.follow_up import apply_context
 from llm.query_parser import parse_query
-from llm.response_generator import ask_for_location, generate_response, unknown_location
+from llm.response_generator import ask_for_location, generate_response, geocoder_unavailable, unknown_location
 from llm.source_replies import climate_template, grounded_reply, nwp_template, nwp_unavailable
 from models.chat import ChatIntent, ChatRequest, ChatResponse, ResolvedLocation
 from air.service import fetch_air_quality, summarise, trailing_24h
@@ -48,6 +48,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class GeocoderUnavailable(Exception):
+    """The place lookup itself failed (Nominatim down), as opposed to "no such place"."""
+
+
 async def _resolve_location(
     intent: ChatIntent, body: ChatRequest, authorization: Optional[str]
 ) -> ResolvedLocation | None | str:
@@ -57,7 +61,7 @@ async def _resolve_location(
             geo = await geocode_place(intent.location_name)
         except RuntimeError as exc:
             logger.error("Geocode failed for location: %s", intent.location_name, exc_info=exc)
-            raise HTTPException(status_code=502, detail=f"Failed to geocode location: {intent.location_name}") from exc
+            raise GeocoderUnavailable(intent.location_name) from exc
         if geo is None:
             logger.warning("No location found for: %s", intent.location_name)
             return intent.location_name
@@ -68,8 +72,9 @@ async def _resolve_location(
         try:
             label = await reverse_geocode(body.latitude, body.longitude)
         except RuntimeError as exc:
-            logger.error("Reverse geocode failed for coordinates: %.4f, %.4f", body.latitude, body.longitude, exc_info=exc)
-            raise HTTPException(status_code=502, detail="Failed to reverse geocode coordinates") from exc
+            # The coordinates are enough to answer; only the place label is missing.
+            logger.warning("Reverse geocode failed for coordinates: %.4f, %.4f", body.latitude, body.longitude, exc_info=exc)
+            label = None
         logger.info("Chat location from request coordinates")
         return ResolvedLocation(
             name=label or "selected location",
@@ -164,6 +169,8 @@ async def chat(
 
     try:
         resolved = await _resolve_location(intent, body, authorization)
+    except GeocoderUnavailable as exc:
+        return ChatResponse(message=geocoder_unavailable(intent, str(exc)), intent=intent, source="open-meteo")
     except HTTPException:
         raise
     except Exception as exc:

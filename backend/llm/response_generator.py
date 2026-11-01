@@ -517,6 +517,17 @@ def unknown_location(intent: ChatIntent, place: str) -> str:
     return f"Could not find a location named '{place}'. Try a different city name."
 
 
+def geocoder_unavailable(intent: ChatIntent, place: str) -> str:
+    """The place lookup failed (service down), which is not the same as "no such place"."""
+    if intent.language == "mr":
+        return f"आत्ता '{place}' हे ठिकाण शोधता आले नाही. कृपया थोड्या वेळाने पुन्हा प्रयत्न करा किंवा तुमचे लोकेशन शेअर करा."
+    if intent.language == "hi":
+        return f"अभी '{place}' की जगह नहीं ढूँढ पाया। कृपया थोड़ी देर बाद फिर कोशिश करें या अपनी लोकेशन शेयर करें।"
+    if intent.language == "hinglish":
+        return f"Abhi '{place}' ki location dhoondh nahi paaya. Thodi der baad phir try karo ya apni location share karo."
+    return f"I couldn't look up '{place}' right now. Please try again in a moment, or share your location."
+
+
 async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: Optional[AdvisoryResult] = None) -> str:
     templated = template_response(intent, facts)
     if advisory and should_mention_advisory(advisory, intent.weather_parameter):

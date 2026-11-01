@@ -254,6 +254,11 @@ stays in English.
 3. Trusted default from a verified Supabase session (`backend/auth/trusted_location.py`, RLS)
 4. HTTP **200** asking the user for a location (`location` and `weather` are `null`) — not HTTP 400
 
+If the geocoder itself is down (as opposed to not knowing the place), chat still answers with HTTP
+**200** and a reply in the user's language, for example "I couldn't look up 'Pune' right now. Please
+try again in a moment, or share your location." If only the reverse lookup of request coordinates
+fails, the answer uses the coordinates and calls the place "selected location".
+
 **Anonymous vs authenticated**
 
 - Anonymous: works when the message names a place, or the body includes both coordinates.
