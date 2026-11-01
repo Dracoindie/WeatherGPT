@@ -1,0 +1,119 @@
+'use client'
+
+import { useState } from 'react'
+import AuthGuard from '@/components/auth/AuthGuard'
+import { TopNav } from '@/components/layout/TopNav'
+import LocationPicker, { type LocationData } from '@/components/location/LocationPicker'
+import { AlertList } from '@/components/alerts/AlertList'
+import { TrustStrip } from '@/components/common/TrustStrip'
+import { fetchAlerts } from '@/lib/api/alerts'
+import type { WeatherAlert } from '@/types/alerts'
+import { BellRing, ShieldAlert } from 'lucide-react'
+
+export default function AlertsPage() {
+  const [location, setLocation] = useState<LocationData | null>(null)
+  const [alerts, setAlerts] = useState<WeatherAlert[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleLocationSelected(loc: LocationData) {
+    setLocation(loc)
+    setLoading(true)
+    setError(null)
+
+    try {
+      const data = await fetchAlerts({ latitude: loc.latitude, longitude: loc.longitude })
+      setAlerts(data.alerts)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch weather alerts.')
+      setAlerts([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AuthGuard>
+      <div className="min-h-screen bg-canvas flex flex-col">
+        <TopNav />
+
+        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8 flex-grow w-full">
+          <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
+                <ShieldAlert className="size-3.5" />
+                Deterministic Early Warning Engine
+              </div>
+              <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+                Weather Alerts & Safety Advisories
+              </h1>
+              <p className="mt-1 text-xs text-ink-soft">
+                Continuous rule-based meteorological hazard evaluation based on verified Open-Meteo observations and 24-hour horizon forecasts.
+              </p>
+            </div>
+            <LocationPicker
+              onLocationSelected={handleLocationSelected}
+              defaultLocation={location}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <section aria-label="Active meteorological alerts">
+              <AlertList
+                alerts={alerts}
+                locationName={location?.name}
+                loading={loading}
+                error={error}
+              />
+            </section>
+
+            <aside className="space-y-5">
+              <div className="rounded-[16px] border border-line bg-panel p-5">
+                <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-fog">
+                  <BellRing className="size-3.5 text-teal" />
+                  Alert Thresholds
+                </div>
+                <div className="mt-3 space-y-2.5 text-xs">
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Heavy Rain</span>
+                    <span className="font-mono font-medium text-ink">≥ 15.0 mm</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Extreme Rain</span>
+                    <span className="font-mono font-medium text-coral">≥ 50.0 mm</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">High Heat</span>
+                    <span className="font-mono font-medium text-amber">≥ 35.0 °C</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Extreme Heat</span>
+                    <span className="font-mono font-medium text-coral">≥ 40.0 °C</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Cold Chilly</span>
+                    <span className="font-mono font-medium text-teal">≤ 5.0 °C</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Strong Wind</span>
+                    <span className="font-mono font-medium text-amber">≥ 40.0 km/h</span>
+                  </div>
+                  <div className="flex justify-between border-b border-line/40 pb-1.5">
+                    <span className="text-ink-soft">Storm Gale</span>
+                    <span className="font-mono font-medium text-coral">≥ 65.0 km/h</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-soft">Thunderstorms</span>
+                    <span className="font-mono font-medium text-coral">WMO 95, 96, 99</span>
+                  </div>
+                </div>
+              </div>
+
+              <TrustStrip />
+            </aside>
+          </div>
+        </main>
+      </div>
+    </AuthGuard>
+  )
+}

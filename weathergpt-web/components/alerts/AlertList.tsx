@@ -1,0 +1,122 @@
+'use client'
+
+import { AlertTriangle, ShieldCheck, Clock, MapPin } from 'lucide-react'
+import { SeverityBadge } from '@/components/common/SeverityBadge'
+import { useI18n } from '@/context/I18nContext'
+import type { WeatherAlert } from '@/types/alerts'
+
+interface AlertListProps {
+  alerts: WeatherAlert[]
+  locationName?: string
+  loading?: boolean
+  error?: string | null
+}
+
+export function AlertList({ alerts, locationName, loading, error }: AlertListProps) {
+  const { t } = useI18n()
+
+  if (loading) {
+    return (
+      <div className="rounded-[16px] border border-line bg-panel p-8 text-center">
+        <div className="mx-auto size-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+        <p className="mt-3 font-mono text-xs uppercase tracking-widest text-ink-soft">
+          Evaluating meteorological alerts…
+        </p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[16px] border border-coral/30 bg-coral-soft p-5 text-sm text-coral">
+        <div className="flex items-center gap-2 font-medium">
+          <AlertTriangle className="size-4 shrink-0" />
+          <span>Could not retrieve active alerts</span>
+        </div>
+        <p className="mt-1 text-xs opacity-90">{error}</p>
+      </div>
+    )
+  }
+
+  if (!alerts || alerts.length === 0) {
+    return (
+      <div className="rounded-[16px] border border-line bg-panel p-8 text-center">
+        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-teal-soft text-teal">
+          <ShieldCheck className="size-6" />
+        </div>
+        <h3 className="mt-4 font-display text-base font-semibold text-ink">
+          {t('alerts.none')}
+        </h3>
+        <p className="mt-1.5 font-body text-xs text-ink-soft max-w-md mx-auto">
+          {t('alerts.routine')} All observed parameters for {locationName ? <span className="font-semibold text-ink">{locationName}</span> : 'the selected area'} are currently within standard baseline limits.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {alerts.map((alert) => (
+        <article
+          key={alert.id}
+          className="rounded-[16px] border border-line bg-panel p-5 transition-all hover:border-line/90 shadow-sm"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 pb-3.5">
+            <div className="flex items-center gap-2.5">
+              <span className="grid size-8 place-items-center rounded-[9px] bg-coral-soft text-coral">
+                <AlertTriangle className="size-4" />
+              </span>
+              <div>
+                <h3 className="font-display text-base font-semibold text-ink">
+                  {alert.condition}
+                </h3>
+                <div className="flex items-center gap-2 text-xs text-ink-soft">
+                  {locationName && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3 text-teal" />
+                      {locationName}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Clock className="size-3 text-fog" />
+                    {alert.time_window}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <SeverityBadge severity={alert.severity} />
+          </div>
+
+          <p className="mt-3 font-body text-sm font-medium text-ink">
+            {alert.headline}
+          </p>
+
+          <p className="mt-1 font-body text-xs text-ink-soft leading-relaxed">
+            {alert.description}
+          </p>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[10px] bg-canvas p-3 border border-line/50">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-fog">
+                {t('alerts.threshold')}
+              </span>
+              <p className="mt-1 font-mono text-xs font-medium text-ink">
+                {alert.relevant_parameter}: <span className="text-teal font-semibold">{alert.relevant_value} {alert.unit}</span> (threshold: {alert.threshold_value} {alert.unit})
+              </p>
+            </div>
+
+            <div className="rounded-[10px] bg-canvas p-3 border border-line/50">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-fog">
+                {t('alerts.action')}
+              </span>
+              <p className="mt-1 font-body text-xs text-ink-soft">
+                {alert.recommended_action}
+              </p>
+            </div>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
