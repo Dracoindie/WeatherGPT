@@ -92,6 +92,10 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
   - `lib/push.ts`, `public/sw.js`: Web Push and offline cache
   - `lib/voice/`: speech recognition and synthesis in en-IN, hi-IN and mr-IN
   - `lib/liteMode.ts`: automatic lite mode
+  - `components/ui/`: the design system (`AppShell`, `PageHeader`, `SeverityBadge`, `SkyButton`, `SkyInput`; `GlassPanel` lives in `components/panels/`)
+  - `lib/format.ts`: human-friendly dates, windows, sources and m/s→km/h
+  - `lib/useLocationWeather.ts`: weather, forecast and alerts for a picked place (dashboard and map)
+  - `lib/gridFill.ts`: balanced panel grids with no holes
 - **PWA:** `app/manifest.ts` and the service worker. The mobile layout has a bottom nav and a docked console, with no horizontal scroll at 390 px.
 - `weathergpt-web/` was imported with `git subtree`. It is a normal folder in this repo, not a submodule.
 
@@ -120,6 +124,41 @@ The role is sent in `ChatRequest.role` and saved in `profiles.role` (migration 6
 - `schema.sql` is the full schema: sections 1–5, then migration 6 (`profiles.role`) and migration 7 (`alert_subscriptions` + RLS). It is idempotent.
 - `migrations_6_7.sql` contains only 6 and 7, for a database that already has 1–5. Keep it in sync with `schema.sql`.
 
+## Design rules (one design: Living Sky)
+
+Every page must look like it belongs to the Living Sky home. Before adding UI, reuse what exists.
+
+1. **Shell.** Every route renders inside `<AppShell>` (`components/ui/AppShell.tsx`). It gives the sky background, the one nav (`SkyNav`), the bottom nav and the page padding. Never add another nav or header.
+2. **Background.** Inner pages use the CSS `StaticSky` (no WebGL); call `useSkyFromCurrent(current, timezone)` when the page has current weather. Only `/` runs the WebGL scene. The sky must cover the full page height (it fades into `--sky-floor`).
+3. **Tokens, not hex.** Text is `text-hud` / `text-hud-dim`, the accent is `text-accent` / `bg-accent`, lines are `border-white/10`. Severity uses only `--sev-none | advisory | watch | warning | unknown` (Tailwind `sev-*`, or `SEVERITY_VAR` for inline styles). Do not use the old light classes (`bg-panel`, `text-ink`, `teal`, `coral`): they are aliases kept only for safety.
+4. **Components.**
+   - Surfaces are `GlassPanel` (or the `.sky-glass` class), with the label in `.sky-label`.
+   - Buttons are `SkyButton` / `SkyLinkButton` (`primary | ghost | subtle`), and inputs are `SkyInput` / `.sky-input`.
+   - Page titles use `PageHeader`.
+   - Severity is shown with `SeverityBadge`.
+   - Use `LocationPicker` for places.
+5. **One chat.** The chat is the Living Sky console. Other pages link to it with `askHref(question, coords)` (`/?q=…&lat=…&lon=…`); never embed a second chat box.
+6. **One source of truth for warnings.**
+   - The location status is `AlertBanner`, fed by `/api/alerts`.
+   - Thresholds come from `backend/thresholds.py` via `/api/alerts/thresholds`; never hard-code a threshold in the UI.
+   - Chat advisories are labelled with their period.
+7. **Units and formatting.**
+   - km/h for wind everywhere. Convert m/s with `msToKmh`.
+   - Never show raw ISO timestamps or raw source ids. Use `formatDay`, `formatLocalTime`, `formatWindow` and `formatSource` from `lib/format.ts`.
+   - Weather descriptions come from `useDescribeWeather()`.
+8. **Layout.**
+   - Grids must have no holes at 390, 768 and 1440 px. For conditional panels, use `lib/gridFill` (`panelSpanClasses`).
+   - No horizontal page scroll at 390 px: wide tables scroll inside their panel or switch to a vertical layout.
+   - Nothing important may be truncated mid-word; prefer wrapping or an ellipsis with `title`.
+9. **Language.** All new UI text goes in the `I18nContext` dictionary in all four languages (en, hi, hinglish, mr). Use `fill()` for `{placeholders}`.
+10. **Charts.** Load the dataviz skill first.
+    - One y-axis per chart: different units get separate charts.
+    - Validate series colours against the dark surface.
+    - Hover and focus tooltips; a table view behind a toggle.
+11. **Check it.**
+    - After any UI change, run `AUDIT_DIR=screenshots/wip npx playwright test e2e/audit.spec.ts` and look at the images at both widths before committing.
+    - `e2e/design-system.spec.ts` and `e2e/home-layout.spec.ts` guard the shell, nav, grid and truncation rules.
+
 ## Running and testing
 
 ```powershell
@@ -135,11 +174,12 @@ npm run dev               # http://localhost:3000
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 600 passed. Everything is mocked, so no network is needed. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 645 passed. Everything is mocked, so no network is needed. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build` | succeeds. **Needed before Playwright**, which runs `next start` on port 3100. |
-| E2E | `npx playwright test --grep-invert @screens` | 56 passed, 8 skipped (desktop-only tests in the mobile project) |
+| E2E | `npx playwright test --grep-invert @screens` | 79 passed, 19 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec) |
 | Screenshots | `npx playwright test --grep @screens` | 14 passed. Output goes to `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored). |
+| Design audit | `AUDIT_DIR=screenshots/audit-after npx playwright test e2e/audit.spec.ts` | 6 passed. Every route signed out and in demo, 1440 and 390 px (`docs/DESIGN_AUDIT.md`). |
 | Parser benchmark | `backend/.venv/Scripts/python tests/eval/run_eval.py --quiet`; add `--queries tests/eval/heldout.jsonl` for the held-out set | **91.7% held-out (the headline)**, 99.2% tuning set |
 
 **Test notes:**
@@ -163,6 +203,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
 
 - `README.md`: API reference, chat flow, date references, parameters
 - `IMPROVEMENTS_REPORT.md`: SIH26068 coverage, commits, accuracy, open items
+- `docs/DESIGN_AUDIT.md`: design audit, before and after
 - `docs/EARLY_WARNING.md`: push, CAP, WhatsApp, VAPID setup, the job
 - `docs/ROLE_ADVISORIES.md`: farmer and aviation thresholds
 - `docs/AUTH_LOCATION_ARCHITECTURE.md`: trusted location and RLS

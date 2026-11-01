@@ -115,4 +115,28 @@ The real engine was then run (not mocked) on a forecast with 20 mm of rain in 24
 
 ## After
 
-_(filled in when the overhaul is done)_
+**Screenshots:** `weathergpt-web/screenshots/audit-after/{desktop,mobile}/` (same spec, `AUDIT_DIR=screenshots/audit-after`). Compare each file with the same name in `audit-before/`.
+
+| # | Finding | Fixed in | Result |
+|---|---------|----------|--------|
+| 1 | Three visual styles | `d5832b8`, then one commit per page | Living Sky is the only style. Tokens are on `:root` (the old light token names are aliases of the sky palette, so nothing can render light). Every route renders in `AppShell`. Shared components are in `components/ui`. Inner pages get the CSS `StaticSky`, driven by the current weather code and local hour (`useSkyFromCurrent`); only the home page runs WebGL. |
+| 2 | Navigation differs | `d5832b8` | One `SkyNav` everywhere. The logo and "Living Sky" always go home, and the active page is marked (`aria-current`). Settings is a real panel (language, role, lite mode). `BottomNav` is one dark style and includes the risk board. `/classic` is removed (404). Language is remembered per device. |
+| 3 | WATCH banner next to "No active advisory" | `7c63ad9` | The chat-driven "Weather Intelligence" card is gone. The location status comes only from `/api/alerts` (the alert banner, which shows the most severe alert). Chat advisories are labelled with their period ("Advisory · Mon 2 Nov, 00:00–23:00"). Alert and advisory levels come from the same rule table. |
+| 4 | "threshold: 35 mm" vs "≥ 15 mm" | `7c63ad9` | `backend/thresholds.py` is the single table, served at `GET /api/alerts/thresholds`; `/alerts` renders it. The 35 was mock data; the real engine gives 15 (tested). pytest checks the e2e fixture against the table. |
+| 5 | GFS in m/s | `f1f0fef` | Converted to km/h (`msToKmh`). The model run time is readable. |
+| 6 | Home grid holes, sky seam | `76b490c`, `d5832b8` | Panels span the full width under the console and log. `lib/gridFill` balances widths per breakpoint so every row is full (e2e checks it at 1440 and 390). The sky fades into `--sky-floor`, which the page background also uses (e2e checks coverage). |
+| 7 | Truncated placeholder and WINDOW | `76b490c` | Examples fit at 390 px and use an ellipsis, never a mid-word cut. WINDOW reads "Mon 2 Nov, 00:00–23:00". |
+| 8 | Duplicate chat box, raw values | `f1f0fef`, `0191e98`, `9c5de56` | Dashboard and map link to the Living Sky console (`/?q=…&lat=…&lon=…`). "Open-Meteo · Sun 1 Nov, 15:00 · Asia/Kolkata" replaces "open-meteo · 2026-11-01T14:00". Climate dates read "Fri 2 Oct". |
+
+**Other fixes made along the way:**
+- Auth pages: labelled inputs, inline errors, a link home, and text in four languages.
+- Climate: a line chart and a separate rain chart, with palette-validated colours, tooltips, and the table behind a toggle. It no longer loads hard-coded Pune coordinates.
+- Map popup and the risk board use the same dark CARTO basemap. Leaflet popups, tooltips and attribution use the sky palette.
+- The five severity colours (`--sev-*`) are the same on badges, banners, cards and map dots.
+- Dashboard and map share one data hook (`lib/useLocationWeather.ts`).
+- Removed dead code: `TopNav`, `ChatPanel`, `ChatAsk`, `WeatherIntelligence` and the light `Panel`.
+
+**Left as is:**
+- Map tiles in screenshots are the flat mocked tile; real tiles are dark CARTO.
+- Full-page captures still show the fixed bottom nav and the docked console mid-image. That is a capture artifact.
+- `/disaster` default districts still carry hard-coded coordinates. See "Needs your input" in `IMPROVEMENTS_REPORT.md`.

@@ -7,12 +7,13 @@ All eight tasks are done, with one focused commit per task (plus the alerts-502 
 **Tags**
 - `demo-v1` (`1dffa1b`) is the state before this work, so `git log demo-v1..HEAD` shows everything below.
 - `demo-v2` (`e92a072`) is the state after task 8.
+- `demo-v3` (`a32582e`) is the state before the env, test-push, i18n and design work below.
 
-**Checks** (run after the follow-up commits)
-- Backend: `pytest tests/` gives **600 passed** (488 at `demo-v2`; 293 at `demo-v1`).
+**Checks** (run after the design overhaul, `76b490c`)
+- Backend: `pytest tests/` gives **645 passed** (600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
 - Frontend: eslint is clean and `npm run build` succeeds.
-- E2E: Playwright **56 passed** and 8 skipped across desktop and mobile. The skipped tests are desktop-only tests in the mobile project.
-- Screenshots: **14 passed**.
+- E2E: Playwright **79 passed** and 19 skipped across desktop and mobile. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
+- Screenshots: **14 passed**. Design audit: **6 passed** (`screenshots/audit-{before,after}/`).
 
 ## What was done
 
@@ -99,21 +100,51 @@ Full-page captures show the fixed sky, the docked console and the bottom nav at 
 | `ad79a9a` | **`supabase/migrations_6_7.sql`.** Only migrations 6 and 7, for a database that already has 1–5. It is idempotent and runs in one transaction. Tested twice on Postgres 16 with a stubbed `auth` schema. |
 | — | This report is committed to the repo, and a root `CLAUDE.md` (architecture, data sources, rules, roles, how to run the tests) gives future sessions full context. |
 
+## Env safety, test push, translated descriptions, design overhaul
+
+`git log demo-v3..HEAD` shows these 13 commits. Nothing was pushed, and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `ec943f6` | **Env setup safety.**<br>- The root `.env.example` lists every frontend and backend variable in two sections and says the backend uses names without `NEXT_PUBLIC_`.<br>- At startup, and in the alert job, the backend logs a rename hint when only `NEXT_PUBLIC_SUPABASE_URL` / `_ANON_KEY` are set. They are never used as a fallback, and values are never logged.<br>- PowerShell steps (venv, job, `Invoke-RestMethod`, Task Scheduler) are in `docs/EARLY_WARNING.md`.<br>- `weathergpt-web/.env.local.example` is now tracked (placeholders only). |
+| `62f55c2` | **Send test alert.**<br>- `POST /api/push/test` verifies the Supabase token (`/auth/v1/user`) and reads only the caller's subscriptions (their JWT and RLS, plus a `user_id` filter; foreign rows are dropped).<br>- It sends "TEST: WeatherGPT demo alert, not an official IMD warning", at most once per minute per user.<br>- It never writes `last_severity`.<br>- The `/alerts` button is shown only to signed-in users with a subscription. It reports sent / failed / no subscription / disabled / rate-limited.<br>- 13 tests. |
+| `baed953` | **Translated weather descriptions in the UI.**<br>- `lib/i18n/weatherCodes.generated.ts` is generated from `backend/llm/weather_codes.py` by `backend/llm/export_weather_codes.py`, and a pytest fails if it is stale.<br>- The answer panel, aviation briefing, dashboard, forecast and map popup follow the UI language.<br>- Playwright checks that no English description appears in Hindi or Marathi. |
+| `9787b7f` | `docs/DESIGN_AUDIT.md` with findings from screenshots of every route (signed out and demo, 1440 and 390), plus the opt-in `e2e/audit.spec.ts`. |
+| `d5832b8` | **Design system.**<br>- Living Sky tokens on `:root`, with five severity colours.<br>- `components/ui` (`AppShell`, `PageHeader`, `SeverityBadge`, `SkyButton`, `SkyInput`).<br>- One nav with an active state and a real Settings panel.<br>- A static sky on inner pages that covers the full page.<br>- `/classic` removed; language remembered. |
+| `7c63ad9` | **One source of truth for warnings.**<br>- `backend/thresholds.py` (values **and** levels) drives the engine, chat advisories, risk board, push and CAP. `GET /api/alerts/thresholds` feeds the `/alerts` table.<br>- The "35 mm" was mock data; the real engine reports 15 mm.<br>- The dashboard's chat-driven "No active advisory" card was removed. |
+| `8c5014c` | Sign-in, sign-up and offline pages in the shell: labelled inputs and four languages. |
+| `bc17cde` | Alerts page: severity-coloured cards, API threshold table, restyled push opt-in and test button. |
+| `f1f0fef` | Dashboard: no second chat box (it links to the console with the picked coordinates), a balanced grid, GFS in **km/h**, and human-friendly times and sources. |
+| `0191e98` | Map: shared data hook, dark basemap, sky-palette popups. Dead chat components removed. |
+| `9c5de56` | Climate: headline numbers, a temperature chart and a separate rain chart (palette-validated), the table behind a toggle. **No more hard-coded Pune coordinates on load.** |
+| `ccdd9cf` | Risk board: shared severity badges and colours (map circles match), dark basemap. |
+| `76b490c` | Home: balanced panel grid with no holes (`lib/gridFill`), placeholder that fits at 390 px, readable WINDOW, Marathi in the subtitle. |
+
+Design rules for future work are in `CLAUDE.md` ("Design rules"). Before and after details are in `docs/DESIGN_AUDIT.md`.
+
+### See a real test notification
+
+1. Start the backend with the venv active (`cd backend; .\.venv\Scripts\Activate.ps1; uvicorn main:app --port 8000`). `GET http://localhost:8000/api/push/config` must say `"available": true`.
+2. Start the frontend (`cd weathergpt-web; npm run dev`) and open `http://localhost:3000` in Chrome or Edge. Push needs `localhost` or HTTPS.
+3. **Sign in** with a real Supabase account (top right → Sign in). Demo mode has no account and cannot subscribe.
+4. Open **Alerts** and pick a location ("Use my current location", or type a city).
+5. In **Push alerts**, tap **Alert me for …** and allow notifications when the browser asks. The place appears in the list under the button.
+6. Tap **Send test alert**. Within a few seconds the OS shows "WeatherGPT test alert: TEST: WeatherGPT demo alert, not an official IMD warning", and the panel says "Test alert sent". Clicking the notification opens `/alerts`.
+7. A second tap within a minute says "One test per minute". If it says the alert could not be delivered:
+   - check that notifications for `localhost` are allowed in the browser and in Windows (Settings → System → Notifications);
+   - then tap **Alert me** again.
+
 ## Needs your input
 
-1. **Web Push setup.** `pywebpush` is installed and pinned. To send pushes:
-   - generate VAPID keys and set `VAPID_*` (`docs/EARLY_WARNING.md`, step 2)
-   - set `SUPABASE_SERVICE_ROLE_KEY` and `ALERT_JOB_TOKEN`
-   - schedule the job (step 5)
-2. **Supabase:** run `supabase/migrations_6_7.sql` in the SQL Editor. It adds `profiles.role` and `alert_subscriptions`, and its last statement prints a check.
-3. **Restart the backend** and run `pip install -r requirements.txt` to pick up `pywebpush`.
-4. **Untested end to end:**
-   - signed-in push subscribing (no test Supabase account)
-   - a real push delivery to a browser (sending is tested with HTTP mocked)
-   - real-device speech recognition for mr-IN (e2e uses fakes)
-5. **Still in English:** the weather description on the answer panel, the aviation panel, and the dashboard and map pages. These follow the UI, not the reply. Chat replies are fully translated.
-6. **E2E and your dev server:** with `npm run dev` running, the parallel Playwright run can become CPU-starved and WebGL-heavy tests time out. Use `npx playwright test --workers=1` while the dev server runs, or stop it first.
-7. **Scope notes:**
-   - There is no WRF source; WRF questions get GFS.
-   - The Indian AQI is computed from modelled PM, not read from CPCB stations, and replies say so.
-   - The smart-city feature is only partial.
+1. **See a real notification.** Follow "See a real test notification" above. This is the one step I could not do: it needs your Supabase account, a browser permission prompt and the OS notification centre.
+2. **Default districts on `/disaster` have hard-coded coordinates.** This breaks ground rule 3 and predates this work. To fix it, store names only and geocode them (1 request/s, cached). The first load would take about 15 s for 15 districts, unless the backend caches them. Should I make that change?
+3. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session, so the **Send test alert** button is checked only for "not shown in demo mode". The endpoint behind it has 13 backend tests.
+4. **Rate limit is per backend process.** The test-push limit (1 per minute per user) is in memory. With several backend workers or instances, use a shared store (for example a Supabase row) if that matters.
+5. **Flaky backend test.** One full pytest run had a single failure that did not reproduce in the next 11 runs. All runs now use `-rf`, so if it comes back the name will be printed.
+6. **`docs/DESIGN_AUDIT.md` commit.** It was committed after lint and the (skipped) audit spec only, not the full suite. It contains no code; every later commit ran the full suite.
+7. **Still open from before:**
+   - real-device speech recognition for mr-IN
+   - no WRF source
+   - AQI is modelled, not CPCB stations
+   - smart-city feature only partial
+   - with `npm run dev` running, use `npx playwright test --workers=1`
