@@ -132,7 +132,8 @@ export function CloudLayer({ octaves, scale, depth, alpha, renderOrder, seed }: 
     u.uAspect.value = rig.aspect
     u.uSunElev.value = p.sunElevation
     u.uBottom.value.setRGB(...p.bottom)
-    u.uOffset.value.set(seed + rig.drift * depth, seed * 0.37)
+    // The shader samples at uv + offset, so subtracting moves clouds along the wind.
+    u.uOffset.value.set(seed - rig.driftX * depth, seed * 0.37 - rig.driftY * depth)
     u.uParallax.value.set(rig.px * 0.025 * depth, rig.py * 0.018 * depth)
   })
 

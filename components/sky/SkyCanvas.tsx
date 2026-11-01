@@ -42,7 +42,10 @@ function Controller() {
     const ease = Math.min(1, dt * 2.5)
     rig.px += (pointer.current.x - rig.px) * ease
     rig.py += (pointer.current.y - rig.py) * ease
-    rig.drift += dt * (0.006 + live.windKmh * 0.0012)
+    const driftSpeed = 0.006 + live.windKmh * 0.0012
+    rig.driftX += dt * driftSpeed * live.windX
+    // vertical drift reads as movement toward / away from the horizon; keep it subtle
+    rig.driftY += dt * driftSpeed * live.windY * 0.4
     rig.shake *= Math.exp(-dt * 7)
     const sx = (Math.random() - 0.5) * rig.shake
     const sy = (Math.random() - 0.5) * rig.shake

@@ -90,7 +90,8 @@ export function Rain({ max, splashes }: { max: number; splashes: number }) {
     const u = r.material.uniforms
     u.uTime.value = t
     u.uSpeed.value = 9 + live.windKmh * 0.06 + intensity * 4
-    u.uSlant.value = Math.min(0.75, live.windKmh / 85)
+    // Horizontal slant follows the wind's screen-x component (a north/south wind falls straight).
+    u.uSlant.value = Math.min(0.75, live.windKmh / 85) * live.windX
     u.uOpacity.value = Math.min(1, 0.35 + intensity)
     u.uFlash.value = flash.value
     u.uAspect.value = rig.aspect
@@ -130,7 +131,7 @@ export function Snow({ max }: { max: number }) {
     p.geometry.setDrawRange(0, Math.floor(max * live.snow))
     const u = p.material.uniforms
     u.uTime.value = clock.elapsedTime
-    u.uDrift.value = 0.1 + live.windKmh * 0.025
+    u.uDrift.value = (0.1 + live.windKmh * 0.025) * live.windX
     u.uPixelRatio.value = gl.getPixelRatio()
     u.uOpacity.value = Math.min(1, live.snow * 1.5)
     u.uAspect.value = rig.aspect

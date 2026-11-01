@@ -10,8 +10,9 @@ export const rig = {
   py: 0,
   /** camera shake amplitude (decays) */
   shake: 0,
-  /** accumulated cloud drift offset */
-  drift: 0,
+  /** accumulated cloud drift offset along the wind (screen x / y) */
+  driftX: 0,
+  driftY: 0,
   aspect: 1,
 }
 

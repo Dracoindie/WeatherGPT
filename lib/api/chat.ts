@@ -10,8 +10,16 @@ export type DateReference =
   | 'now'
   | 'today'
   | 'tomorrow'
+  | 'day_after_tomorrow'
   | 'tonight'
   | 'this_afternoon'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday'
+  | 'sunday'
 export type WeatherParameter =
   | 'temperature'
   | 'high_temperature'
@@ -49,6 +57,8 @@ export interface WeatherFacts {
   precipitation: number | null
   precipitation_probability: number | null
   wind_speed_10m: number | null
+  /** degrees the wind blows from, at the period's peak-wind hour */
+  wind_direction_10m: number | null
   relative_humidity_2m: number | null
   weather_code: number | null
   weather_description: string | null

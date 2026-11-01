@@ -2,7 +2,8 @@
  * Weather → sky scene mapping for the Living Sky renderer.
  *
  * Inputs are only values returned by the backend (WMO weather_code,
- * precipitation, precipitation_probability, wind_speed_10m, temperature).
+ * precipitation, precipitation_probability, wind_speed_10m,
+ * wind_direction_10m, temperature).
  * Outputs are purely visual parameters (0..1 intensities, colours) — they are
  * never displayed as weather numbers.
  */
@@ -30,6 +31,9 @@ export interface SceneParams {
   storm: number
   /** km/h — drives drift speed and rain slant */
   windKmh: number
+  /** screen-space direction the wind blows toward: +x = right, +y = up (unit vector) */
+  windX: number
+  windY: number
   /** 0..1 heat shimmer strength (only when temperature ≥ 35 °C) */
   heat: number
   /** local hour of day at the location, 0..24 (fractional) */
@@ -44,6 +48,8 @@ export const NUMERIC_KEYS = [
   'fog',
   'storm',
   'windKmh',
+  'windX',
+  'windY',
   'heat',
 ] as const satisfies readonly (keyof SceneParams)[]
 
@@ -61,9 +67,29 @@ function base(hour: number): SceneParams {
     fog: 0,
     storm: 0,
     windKmh: 8,
+    windX: 1,
+    windY: 0,
     heat: 0,
     hour,
   }
+}
+
+/**
+ * Screen vector for a meteorological wind direction (degrees the wind blows
+ * FROM). The viewer faces north, so an easterly (90°) drifts left and a
+ * southerly (180°) drifts up toward the horizon. Unknown → default rightward.
+ */
+export function windVector(fromDeg: number | null | undefined): { x: number; y: number } {
+  if (fromDeg == null || !Number.isFinite(fromDeg)) return { x: 1, y: 0 }
+  const rad = (fromDeg * Math.PI) / 180
+  return { x: -Math.sin(rad), y: -Math.cos(rad) }
+}
+
+function withWind(s: SceneParams, fromDeg: number | null | undefined): SceneParams {
+  const v = windVector(fromDeg)
+  s.windX = v.x
+  s.windY = v.y
+  return s
 }
 
 // ---------------------------------------------------------------------------
@@ -241,9 +267,9 @@ export function sceneFromFacts(facts: WeatherFacts, ref: DateReference): ScenePa
   if (facts.weather_code != null) {
     const s = sceneFromCode(facts.weather_code, hour, wind, rate ?? 0)
     s.heat = heatFrom(temp)
-    return s
+    return withWind(s, facts.wind_direction_10m)
   }
-  return sceneFromConditions(
+  const s = sceneFromConditions(
     {
       rateMmPerHour: rate,
       probability: facts.precipitation_probability,
@@ -252,18 +278,31 @@ export function sceneFromFacts(facts: WeatherFacts, ref: DateReference): ScenePa
     },
     hour
   )
+  return withWind(s, facts.wind_direction_10m)
 }
 
 export function sceneFromHourly(hourly: HourlyWeather, index: number): SceneParams {
-  return sceneFromConditions(
+  const hour = hourOfTimestamp(hourly.time[index] ?? '')
+  const rate = hourly.precipitation[index] ?? null
+  const wind = hourly.wind_speed_10m[index] ?? null
+  const temp = hourly.temperature_2m[index] ?? null
+  // Hourly weather_code (when the backend sends it) beats the derived scene.
+  const code = hourly.weather_code?.[index]
+  if (code != null) {
+    const s = sceneFromCode(code, hour, wind ?? 8, rate ?? 0)
+    s.heat = heatFrom(temp)
+    return withWind(s, hourly.wind_direction_10m?.[index])
+  }
+  const s = sceneFromConditions(
     {
-      rateMmPerHour: hourly.precipitation[index] ?? null,
+      rateMmPerHour: rate,
       probability: hourly.precipitation_probability[index] ?? null,
-      windKmh: hourly.wind_speed_10m[index] ?? null,
-      tempC: hourly.temperature_2m[index] ?? null,
+      windKmh: wind,
+      tempC: temp,
     },
-    hourOfTimestamp(hourly.time[index] ?? '')
+    hour
   )
+  return withWind(s, hourly.wind_direction_10m?.[index])
 }
 
 export function defaultScene(): SceneParams {

@@ -10,6 +10,8 @@ export interface CurrentWeather {
   relative_humidity_2m: number
   precipitation: number
   wind_speed_10m: number
+  /** degrees the wind blows from (0 = north, 90 = east) */
+  wind_direction_10m: number
   weather_code: number
 }
 
@@ -19,6 +21,9 @@ export interface HourlyWeather {
   precipitation_probability: (number | null)[]
   precipitation: number[]
   wind_speed_10m: number[]
+  weather_code: (number | null)[]
+  relative_humidity_2m: (number | null)[]
+  wind_direction_10m: (number | null)[]
 }
 
 export interface WeatherResponse {

@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * 72 h hourly timeline from GET /api/weather: temperature line + rain
+ * 7-day hourly timeline from GET /api/weather: temperature line + rain
  * probability bars (SVG). Scrubbing an hour previews that hour's scene in the
  * live sky; "Live" returns the sky to the chat answer.
  */
