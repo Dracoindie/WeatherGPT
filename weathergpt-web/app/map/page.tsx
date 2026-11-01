@@ -1,201 +1,97 @@
-"use client";
+'use client'
 
-import AuthGuard from '@/components/auth/AuthGuard';
-import { API_BASE } from '@/lib/api/base';
+/**
+ * /map: the picked place on the map with its current conditions and 24 h
+ * alert status. Data loading is shared with /dashboard (useLocationWeather).
+ */
+
+import dynamic from 'next/dynamic'
+import AuthGuard from '@/components/auth/AuthGuard'
+import { AlertBanner } from '@/components/alerts/AlertBanner'
+import { TrustStrip } from '@/components/common/TrustStrip'
+import LocationPicker from '@/components/location/LocationPicker'
+import { GlassPanel } from '@/components/panels/GlassPanel'
 import { AppShell } from '@/components/ui/AppShell'
-import LocationPicker, { type LocationData } from '@/components/location/LocationPicker';
-import { useAuthContext } from '@/context/AuthContext';
-import { useDemoContext } from '@/context/DemoContext';
-import { upsertProfile } from '@/lib/profile/profileService';
-import { fetchForecast } from '@/lib/api/forecast';
-import { ALERTS_UNAVAILABLE_MESSAGE, fetchAlerts } from '@/lib/api/alerts';
-import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero';
-import { ForecastPanel } from '@/components/weather/ForecastPanel';
-import { ChatPanel } from '@/components/chat/ChatPanel';
-import { TrustStrip } from '@/components/common/TrustStrip';
-import dynamic from 'next/dynamic';
+import { PageHeader } from '@/components/ui/PageHeader'
+import { CurrentWeatherHero } from '@/components/weather/CurrentWeatherHero'
+import { ForecastPanel } from '@/components/weather/ForecastPanel'
+import { fill, useI18n } from '@/context/I18nContext'
+import { useDescribeWeather } from '@/lib/i18n/weather'
+import { useLocationWeather } from '@/lib/useLocationWeather'
 
-// Leaflet touches `window` at import time, so the map must not render on the server.
-const InteractiveMap = dynamic(
-  () => import('@/components/map/InteractiveMap').then((m) => m.InteractiveMap),
-  { ssr: false }
-);
-import { AlertBanner } from '@/components/alerts/AlertBanner';
-import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes';
-import type { WeatherAlert } from '@/types/alerts';
-import { useState } from 'react'
-import { describeWeather, useDescribeWeather } from '@/lib/i18n/weather';
-
-
-interface WeatherApiResponse {
-  source: string;
-  timezone: string;
-  current: {
-    temperature_2m: number;
-    relative_humidity_2m: number;
-    precipitation: number;
-    wind_speed_10m: number;
-    weather_code: number;
-    time: string;
-  };
-}
-
-type WeatherStatus = 'idle' | 'loading' | 'ready' | 'error';
+const InteractiveMap = dynamic(() => import('@/components/map/InteractiveMap').then((m) => m.InteractiveMap), {
+  ssr: false,
+  loading: () => <div className="h-full min-h-[360px] animate-pulse rounded-xl bg-white/[0.03]" />,
+})
 
 export default function MapPage() {
-  const describe = useDescribeWeather();
-  const { user, session } = useAuthContext();
-  const { isDemo } = useDemoContext();
-  const [location, setLocation] = useState<LocationData | null>(null);
-  const [weatherData, setWeatherData] = useState<WeatherApiResponse | null>(null);
-  const [weatherStatus, setWeatherStatus] = useState<WeatherStatus>('idle');
-  const [weatherError, setWeatherError] = useState('');
-  const [forecastState, setForecastState] = useState<DataState<WeatherResponse>>({ status: 'idle' });
-  const [alerts, setAlerts] = useState<WeatherAlert[]>([]);
-  const [alertsLoading, setAlertsLoading] = useState(false);
-  const [alertsError, setAlertsError] = useState<string | null>(null);
-  const [alertsStaleSince, setAlertsStaleSince] = useState<string | null>(null);
-
-  async function handleLocationSelected(loc: LocationData) {
-    setLocation(loc);
-    setWeatherError('');
-    setWeatherStatus('loading');
-
-    if (user && !isDemo) {
-      await upsertProfile(user.id, {
-        default_latitude: loc.latitude,
-        default_longitude: loc.longitude,
-        default_location_name: loc.name,
-        location_permission: true,
-      });
-    }
-
-    try {
-      const resp = await fetch(`${API_BASE}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`);
-      if (!resp.ok) throw new Error(`Weather API error: ${resp.status}`);
-      const data: WeatherApiResponse = await resp.json();
-      setWeatherData(data);
-      setWeatherStatus('ready');
-
-      // Fetch forecast
-      try {
-        setForecastState({ status: 'loading' });
-        const forecastData = await fetchForecast({ latitude: loc.latitude, longitude: loc.longitude });
-        const enriched = forecastData.daily.map(d => ({
-          date: d.date,
-          temperatureMaxC: d.max_temperature ?? 0,
-          temperatureMinC: d.min_temperature ?? 0,
-          precipitationMm: d.precipitation_sum ?? 0,
-          precipitationProbability: d.precipitation_probability_max ?? 0,
-          windSpeedKmh: d.max_wind_speed ?? 0,
-          condition: describeWeather(d.weather_code, 'en') ?? 'Unknown',
-          weatherCode: d.weather_code,
-        }));
-        setForecastState({ status: 'ready', data: { forecast: enriched } });
-      } catch (err) {
-        setForecastState({ status: 'error', error: err instanceof Error ? err.message : 'Forecast fetch failed' });
-      }
-
-      // Fetch alerts
-      await loadAlerts(loc);
-    } catch (err) {
-      setWeatherStatus('error');
-      setWeatherError(err instanceof Error ? err.message : 'Could not fetch weather. Is the backend running?');
-    }
-  }
-
-  async function loadAlerts(loc: LocationData) {
-    setAlertsLoading(true);
-    setAlertsError(null);
-    try {
-      const alertData = await fetchAlerts({ latitude: loc.latitude, longitude: loc.longitude });
-      setAlerts(alertData.alerts);
-      setAlertsStaleSince(alertData.stale ? alertData.data_retrieved_at ?? null : null);
-    } catch (err) {
-      setAlerts([]);
-      setAlertsStaleSince(null);
-      setAlertsError(err instanceof Error ? err.message : ALERTS_UNAVAILABLE_MESSAGE);
-    } finally {
-      setAlertsLoading(false);
-    }
-  }
-
-  const conditionLabel =
-    weatherData?.current.weather_code != null
-      ? (describe(weatherData.current.weather_code) ?? undefined)
-      : undefined;
+  const { t } = useI18n()
+  const describe = useDescribeWeather()
+  const w = useLocationWeather()
+  const code = w.weather?.current.weather_code
+  const conditionLabel = code != null ? describe(code) ?? undefined : undefined
 
   return (
     <AppShell>
       <AuthGuard>
-          <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-6 sm:flex-row sm:items-end">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">Live meteorological context</p>
-              <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-                Interactive Weather Map
-              </h1>
-            </div>
-            <LocationPicker onLocationSelected={handleLocationSelected} defaultLocation={location} />
-          </div>
+        <PageHeader
+          eyebrow={t('map.eyebrow')}
+          title={t('map.title')}
+          description={t('map.intro')}
+          actions={<LocationPicker onLocationSelected={w.selectLocation} defaultLocation={w.location} />}
+        />
 
-          <div className="mb-5">
+        {!w.location ? (
+          <div className="sky-glass p-8 text-center text-sm text-hud-dim">{t('map.pick')}</div>
+        ) : (
+          <div className="space-y-5">
             <AlertBanner
-              alerts={alerts}
-              locationName={location?.name}
-              loading={alertsLoading}
-              error={alertsError}
-              staleSince={alertsStaleSince}
-              onRetry={location ? () => void loadAlerts(location) : undefined}
+              alerts={w.alerts}
+              locationName={w.location.name}
+              loading={w.alertsLoading}
+              error={w.alertsError}
+              staleSince={w.alertsStaleSince}
+              onRetry={w.retryAlerts}
             />
-          </div>
 
-          {weatherError && (
-            <div className="mb-4 rounded-[12px] border border-coral/30 bg-coral-soft p-4 text-sm text-coral">
-              Weather data is temporarily unavailable. {weatherError}
-            </div>
-          )}
+            {w.weatherError && (
+              <div role="alert" className="sky-glass border-sev-watch/40 p-4 text-sm text-hud">
+                {t('dashboard.unavailable')} <span className="text-hud-dim">{w.weatherError}</span>
+              </div>
+            )}
 
-          {/* Map and side panels */}
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-            <div className="h-96 xl:h-auto min-h-[400px]">
-              {location ? (
-                <InteractiveMap
-                  latitude={location.latitude}
-                  longitude={location.longitude}
-                  locationName={location.name}
-                  alertsCount={alerts.length}
-                  conditionLabel={conditionLabel}
-                />
-              ) : (
-                <div className="flex h-full min-h-[350px] items-center justify-center rounded-[16px] border border-line bg-panel text-ink-soft">
-                  Select a location to view the interactive map.
+            <div className="grid gap-5 lg:grid-cols-3">
+              <GlassPanel wet={false} className="flex min-h-[420px] flex-col p-2 sm:p-2 lg:col-span-2">
+                <div className="min-h-0 flex-1">
+                  <InteractiveMap
+                    latitude={w.location.latitude}
+                    longitude={w.location.longitude}
+                    locationName={w.location.name}
+                    alertsCount={w.alerts.length}
+                    conditionLabel={conditionLabel}
+                    alertsText={fill(t('map.alerts'), { n: w.alerts.length })}
+                    normalText={t('map.normal')}
+                  />
                 </div>
-              )}
+              </GlassPanel>
+              <div className="min-w-0">
+                <CurrentWeatherHero
+                  status={w.weatherStatus}
+                  current={w.weather?.current}
+                  locationName={w.location.name}
+                  timezone={w.weather?.timezone}
+                  source={w.weather?.source}
+                  conditionLabel={conditionLabel}
+                  compact
+                />
+              </div>
             </div>
-            <div className="space-y-5">
-              <CurrentWeatherHero
-                status={weatherStatus}
-                current={weatherData?.current}
-                locationName={location?.name}
-                timezone={weatherData?.timezone}
-                source={weatherData?.source}
-                conditionLabel={conditionLabel}
-              />
-            </div>
-          </div>
 
-          <section className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <ChatPanel
-              latitude={location?.latitude}
-              longitude={location?.longitude}
-              accessToken={isDemo ? undefined : session?.access_token}
-            />
-            <aside className="space-y-5">
-              <ForecastPanel state={forecastState} />
-              <TrustStrip />
-            </aside>
-          </section>
-        </AuthGuard>
+            <ForecastPanel state={w.forecast} />
+            <TrustStrip />
+          </div>
+        )}
+      </AuthGuard>
     </AppShell>
-  );
+  )
 }

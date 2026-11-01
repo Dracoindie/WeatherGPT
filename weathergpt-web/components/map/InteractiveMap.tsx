@@ -22,34 +22,40 @@ interface Props {
   alertsCount?: number;
   /** Current conditions, already in the selected UI language. */
   conditionLabel?: string;
+  /** Localised status lines for the popup. */
+  alertsText?: string;
+  normalText?: string;
 }
 
 const escapeHtml = (v: string) =>
   v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-export function InteractiveMap({ latitude, longitude, locationName, alertsCount, conditionLabel }: Props) {
+/** The same dark CARTO basemap as the risk board and the Living Sky geo-lock map. */
+const TILES = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+export function InteractiveMap({ latitude, longitude, locationName, alertsCount, conditionLabel, alertsText, normalText }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!mapRef.current) return;
     const map = L.map(mapRef.current).setView([latitude, longitude], 11);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+    L.tileLayer(TILES, {
+      attribution: '© OpenStreetMap contributors © CARTO',
       maxZoom: 18,
     }).addTo(map);
 
     const marker = L.marker([latitude, longitude]).addTo(map);
 
-    const title = locationName ? escapeHtml(locationName) : `Coordinates: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+    const title = locationName ? escapeHtml(locationName) : `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
     const alertHtml = (alertsCount && alertsCount > 0)
-      ? `<div style="color: #e11d48; font-weight: 600; margin-top: 4px;">⚠️ ${alertsCount} active alert${alertsCount > 1 ? 's' : ''}</div>`
-      : `<div style="color: #0d9488; font-weight: 500; margin-top: 4px;">✓ Conditions normal</div>`;
+      ? `<div style="color: var(--sev-warning); font-weight: 600; margin-top: 6px;">⚠ ${escapeHtml(alertsText ?? `${alertsCount} active alert(s)`)}</div>`
+      : `<div style="color: var(--sev-none); margin-top: 6px;">✓ ${escapeHtml(normalText ?? 'No active alerts')}</div>`;
 
     marker.bindPopup(`
-      <div style="font-family: sans-serif; font-size: 13px; line-height: 1.4;">
+      <div style="font-size: 13px; line-height: 1.45;">
         <strong style="font-size: 14px;">${title}</strong>
-        <div style="color: #64748b; font-size: 11px;">${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E</div>
-        ${conditionLabel ? `<div data-testid="weather-description" style="margin-top: 4px;">${escapeHtml(conditionLabel)}</div>` : ''}
+        <div style="color: var(--sky-text-dim); font-size: 11px;">${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E</div>
+        ${conditionLabel ? `<div data-testid="weather-description" style="margin-top: 6px;">${escapeHtml(conditionLabel)}</div>` : ''}
         ${alertHtml}
       </div>
     `).openPopup();
@@ -57,12 +63,7 @@ export function InteractiveMap({ latitude, longitude, locationName, alertsCount,
     return () => {
       map.remove();
     };
-  }, [latitude, longitude, locationName, alertsCount, conditionLabel]);
+  }, [latitude, longitude, locationName, alertsCount, conditionLabel, alertsText, normalText]);
 
-  return (
-    <div
-      ref={mapRef}
-      className="h-full w-full min-h-[350px] rounded-[16px] overflow-hidden border border-line z-0"
-    />
-  );
+  return <div ref={mapRef} className="z-0 h-full min-h-[360px] w-full overflow-hidden rounded-xl" />;
 }

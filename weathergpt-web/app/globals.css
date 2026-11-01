@@ -326,16 +326,18 @@ body {
   .sky-input:focus { border-color: color-mix(in srgb, var(--sky-accent) 60%, transparent); }
 }
 
-/* Leaflet popups in the Living Sky palette */
-.leaflet-container { background: #0a1220; font-family: inherit; }
-.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+/* Leaflet in the Living Sky palette. Scoped under .sky-root so these beat
+   leaflet.css, which loads later with the map chunk. */
+.sky-root .leaflet-container { background: #0a1220; font-family: inherit; }
+.sky-root .leaflet-popup-content-wrapper,
+.sky-root .leaflet-popup-tip {
   background: rgba(8, 14, 26, 0.94);
   color: var(--sky-text);
   border: 1px solid var(--sky-line);
   box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9);
 }
-.leaflet-popup-content-wrapper { border-radius: 14px; }
-.leaflet-container a.leaflet-popup-close-button { color: var(--sky-text-dim); }
-.leaflet-control-attribution { background: rgba(2, 4, 10, 0.7) !important; color: var(--sky-text-dim) !important; }
-.leaflet-control-attribution a { color: var(--sky-accent) !important; }
-.leaflet-bar a { background: rgba(8, 14, 26, 0.92); color: var(--sky-text); border-color: var(--sky-line); }
+.sky-root .leaflet-popup-content-wrapper { border-radius: 14px; }
+.sky-root .leaflet-container a.leaflet-popup-close-button { color: var(--sky-text-dim); }
+.sky-root .leaflet-container .leaflet-control-attribution { background: rgba(2, 4, 10, 0.7); color: var(--sky-text-dim); }
+.sky-root .leaflet-container .leaflet-control-attribution a { color: var(--sky-accent); }
+.sky-root .leaflet-bar a { background: rgba(8, 14, 26, 0.92); color: var(--sky-text); border-color: var(--sky-line); }

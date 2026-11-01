@@ -28,6 +28,8 @@ interface CurrentWeatherHeroProps {
   timezone?: string
   source?: string
   conditionLabel?: string
+  /** In a narrow column: readouts stay two per row. */
+  compact?: boolean
 }
 
 function Readout({ label, value, icon }: { label: string; value: string | null; icon: React.ReactNode }) {
@@ -50,7 +52,7 @@ export function updatedLine(current: CurrentWeatherData, source: string | undefi
   return [formatSource(source ?? 'open-meteo'), formatLocalTime(current.time, language), timezone].filter(Boolean).join(' · ')
 }
 
-export function CurrentWeatherHero({ status, current, locationName, timezone, source, conditionLabel }: CurrentWeatherHeroProps) {
+export function CurrentWeatherHero({ status, current, locationName, timezone, source, conditionLabel, compact = false }: CurrentWeatherHeroProps) {
   const { t, language } = useI18n()
   const loading = status === 'loading'
   const note =
@@ -93,7 +95,7 @@ export function CurrentWeatherHero({ status, current, locationName, timezone, so
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className={`mt-5 grid grid-cols-2 gap-2 ${compact ? '' : 'sm:grid-cols-4'}`}>
         <Readout
           label={t('field.precipitation')}
           value={loading ? null : current ? `${current.precipitation} mm` : '—'}
