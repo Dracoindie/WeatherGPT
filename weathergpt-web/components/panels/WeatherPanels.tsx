@@ -10,6 +10,7 @@ import { Crosshair, Droplets, MapPin, Navigation, Satellite, Wind } from 'lucide
 import type { ResolvedLocation, WeatherFacts } from '@/lib/api/chat'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
+import { useDescribeWeather } from '@/lib/i18n/weather'
 import { CountUp, formatValue } from './CountUp'
 import { GlassPanel } from './GlassPanel'
 
@@ -344,6 +345,7 @@ function coord(v: number, pos: string, neg: string) {
 
 export function LocationPanel({ location, facts }: { location: ResolvedLocation; facts: WeatherFacts | null }) {
   const { t } = useI18n()
+  const describe = useDescribeWeather()
   const SourceIcon = location.source === 'request_coordinates' ? Crosshair : location.source === 'trusted_user_default' ? Navigation : MapPin
 
   return (
@@ -377,7 +379,7 @@ export function LocationPanel({ location, facts }: { location: ResolvedLocation;
         {facts?.weather_description && (
           <p className="mt-3 flex items-center gap-2 text-sm text-hud">
             <Satellite className="size-4 text-accent" />
-            {facts.weather_description}
+            <span data-testid="weather-description">{describe(facts.weather_code, facts.weather_description)}</span>
             {facts.weather_code != null && <span className="font-readout text-[10px] text-hud-dim">WMO {facts.weather_code}</span>}
           </p>
         )}

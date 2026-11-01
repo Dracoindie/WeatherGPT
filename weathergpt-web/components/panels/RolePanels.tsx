@@ -20,6 +20,7 @@ import {
 } from '@/lib/api/roles'
 import type { UserRole } from '@/lib/role'
 import { cn } from '@/lib/utils'
+import { useDescribeWeather } from '@/lib/i18n/weather'
 import { formatValue } from './CountUp'
 import { GlassPanel } from './GlassPanel'
 import { panelItem } from './WeatherPanels'
@@ -141,13 +142,14 @@ function FarmBody({ a }: { a: FarmAdvice }) {
 }
 
 function AviationBody({ b }: { b: AviationBriefing }) {
+  const describe = useDescribeWeather()
   const cells: [string, string][] = [
     ['Visibility', `${fmt(b.visibility_km)} km${b.visibility_band ? ` · ${b.visibility_band.replace('_', ' ')}` : ''}`],
     ['Cloud cover', `${fmt(b.cloud_cover_percent)}%`],
     ['Wind', `${fmt(b.wind_direction_deg)}° / ${fmt(b.wind_kt)} kt (${fmt(b.wind_kmh)} km/h)`],
     ['Gusts', b.gust_kt == null ? '—' : `${fmt(b.gust_kt)} kt (${fmt(b.gust_kmh)} km/h)`],
     ['Precipitation', `${fmt(b.precipitation_mm)} mm`],
-    ['Weather', b.weather_description ? `${b.weather_description} (WMO ${b.weather_code})` : `WMO ${b.weather_code}`],
+    ['Weather', `${describe(b.weather_code, b.weather_description)} (WMO ${b.weather_code})`],
   ]
   return (
     <>
@@ -155,7 +157,7 @@ function AviationBody({ b }: { b: AviationBriefing }) {
         {cells.map(([k, v]) => (
           <div key={k}>
             <dt className="sky-label">{k}</dt>
-            <dd className="font-readout text-sm text-hud">{v}</dd>
+            <dd className="font-readout text-sm text-hud" data-testid={k === 'Weather' ? 'weather-description' : undefined}>{v}</dd>
           </div>
         ))}
       </dl>

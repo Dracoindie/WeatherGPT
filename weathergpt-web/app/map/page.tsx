@@ -25,18 +25,9 @@ import { AlertBanner } from '@/components/alerts/AlertBanner';
 import type { AdvisoryResult } from '@/components/weather/WeatherIntelligence';
 import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes';
 import type { WeatherAlert } from '@/types/alerts';
-import { useState } from 'react';
+import { useState } from 'react'
+import { describeWeather, useDescribeWeather } from '@/lib/i18n/weather';
 
-// Reuse same WMO description mapping from dashboard
-const WMO_DESCRIPTIONS: Record<number, string> = {
-  0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
-  45: 'Fog', 48: 'Icy fog',
-  51: 'Light drizzle', 53: 'Drizzle', 55: 'Dense drizzle',
-  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain',
-  71: 'Light snow', 73: 'Snow', 75: 'Heavy snow',
-  80: 'Light showers', 81: 'Showers', 82: 'Heavy showers',
-  95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Heavy thunderstorm',
-};
 
 interface WeatherApiResponse {
   source: string;
@@ -54,6 +45,7 @@ interface WeatherApiResponse {
 type WeatherStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export default function MapPage() {
+  const describe = useDescribeWeather();
   const { user, session } = useAuthContext();
   const { isDemo } = useDemoContext();
   const [location, setLocation] = useState<LocationData | null>(null);
@@ -99,7 +91,8 @@ export default function MapPage() {
           precipitationMm: d.precipitation_sum ?? 0,
           precipitationProbability: d.precipitation_probability_max ?? 0,
           windSpeedKmh: d.max_wind_speed ?? 0,
-          condition: WMO_DESCRIPTIONS[d.weather_code] ?? 'Unknown',
+          condition: describeWeather(d.weather_code, 'en') ?? 'Unknown',
+          weatherCode: d.weather_code,
         }));
         setForecastState({ status: 'ready', data: { forecast: enriched } });
       } catch (err) {
@@ -131,7 +124,9 @@ export default function MapPage() {
   }
 
   const conditionLabel =
-    weatherData?.current.weather_code != null ? (WMO_DESCRIPTIONS[weatherData.current.weather_code] ?? 'Unknown') : undefined;
+    weatherData?.current.weather_code != null
+      ? (describe(weatherData.current.weather_code) ?? undefined)
+      : undefined;
 
   return (
     <AuthGuard>
@@ -174,6 +169,7 @@ export default function MapPage() {
                   longitude={location.longitude}
                   locationName={location.name}
                   alertsCount={alerts.length}
+                  conditionLabel={conditionLabel}
                 />
               ) : (
                 <div className="flex h-full min-h-[350px] items-center justify-center rounded-[16px] border border-line bg-panel text-ink-soft">

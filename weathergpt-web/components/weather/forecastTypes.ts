@@ -30,7 +30,9 @@ export interface ForecastDay {
   precipitationMm: number;
   precipitationProbability: number;
   windSpeedKmh: number;
+  /** English fallback; the UI shows describeWeather(weatherCode) in the selected language. */
   condition: string;
+  weatherCode?: number | null;
 }
 
 export interface WeatherResponse {

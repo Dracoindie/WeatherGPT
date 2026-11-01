@@ -97,7 +97,7 @@ export function CurrentWeatherHero({
             </span>
           </div>
           {conditionLabel && current && (
-            <p className="mt-3 text-base font-medium text-ink">{conditionLabel}</p>
+            <p data-testid="weather-description" className="mt-3 text-base font-medium text-ink">{conditionLabel}</p>
           )}
           <StateNote className="mt-2">{note}</StateNote>
           {timezone && (

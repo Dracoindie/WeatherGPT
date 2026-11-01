@@ -9,6 +9,7 @@
 'use client'
 
 import { useState } from 'react'
+import { describeWeather, useDescribeWeather } from '@/lib/i18n/weather'
 import AuthGuard from '@/components/auth/AuthGuard'
 import { API_BASE } from '@/lib/api/base'
 import { TopNav } from '@/components/layout/TopNav'
@@ -32,16 +33,6 @@ import { AlertBanner } from '@/components/alerts/AlertBanner'
 import Link from 'next/link'
 import { BellRing, ChartNoAxesColumnIncreasing, MapPinned, Settings2 } from 'lucide-react'
 
-// WMO weather code -> human readable description
-const WMO_DESCRIPTIONS: Record<number, string> = {
-  0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
-  45: 'Fog', 48: 'Icy fog',
-  51: 'Light drizzle', 53: 'Drizzle', 55: 'Dense drizzle',
-  61: 'Light rain', 63: 'Rain', 65: 'Heavy rain',
-  71: 'Light snow', 73: 'Snow', 75: 'Heavy snow',
-  80: 'Light showers', 81: 'Showers', 82: 'Heavy showers',
-  95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Heavy thunderstorm',
-}
 
 interface WeatherApiResponse {
   source: string
@@ -59,6 +50,7 @@ interface WeatherApiResponse {
 type WeatherStatus = 'idle' | 'loading' | 'ready' | 'error'
 
 export default function DashboardPage() {
+  const describe = useDescribeWeather()
   const { user, session } = useAuthContext()
   const { isDemo } = useDemoContext()
   const [location, setLocation] = useState<LocationData | null>(null)
@@ -106,7 +98,8 @@ export default function DashboardPage() {
           precipitationMm: d.precipitation_sum ?? 0,
           precipitationProbability: d.precipitation_probability_max ?? 0,
           windSpeedKmh: d.max_wind_speed ?? 0,
-          condition: WMO_DESCRIPTIONS[d.weather_code] ?? 'Unknown',
+          condition: describeWeather(d.weather_code, 'en') ?? 'Unknown',
+          weatherCode: d.weather_code,
         }))
         setForecastState({ status: 'ready', data: { forecast: enriched } })
       } catch (err) {
@@ -143,7 +136,7 @@ export default function DashboardPage() {
 
   const conditionLabel =
     weatherData?.current.weather_code != null
-      ? (WMO_DESCRIPTIONS[weatherData.current.weather_code] ?? 'Unknown')
+      ? (describe(weatherData.current.weather_code) ?? undefined)
       : undefined
 
   return (

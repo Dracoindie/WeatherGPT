@@ -24,7 +24,7 @@ Start here, then read `README.md` (API reference) and `IMPROVEMENTS_REPORT.md` (
    If the geocoder is down, reply in the user's language with HTTP 200, not a 502.
 5. **Replies are in the user's language:** `en`, `hi` (Devanagari), `hinglish` (romanised), `mr` (Marathi).
    - New user-facing text needs all four.
-   - WMO descriptions are translated in `llm/weather_codes.py`.
+   - WMO descriptions are translated in `llm/weather_codes.py`. The UI uses `weathergpt-web/lib/i18n/weatherCodes.generated.ts`, generated from it by `backend/llm/export_weather_codes.py` (a test fails if it is stale). Use `useDescribeWeather()`; never add another description table.
    - The API's `weather_description` and the `advisory` object stay English.
 6. **Secrets stay out of git.**
    - All env files are git-ignored except `*.example`.

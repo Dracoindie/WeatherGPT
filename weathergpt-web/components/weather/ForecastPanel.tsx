@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import type { DataState, WeatherResponse } from '@/components/weather/forecastTypes';
+import { useDescribeWeather } from '@/lib/i18n/weather';
 
 /** "Sun, 1 Nov" for an ISO date, without a timezone shift. */
 function dayLabel(iso: string): string {
@@ -21,6 +22,7 @@ function dayLabel(iso: string): string {
  */
 export function ForecastPanel({ state }: { state: DataState<WeatherResponse> }) {
   const { status, data, error } = state;
+  const describe = useDescribeWeather();
 
   useEffect(() => {
     // No side‑effects needed; placeholder for potential future logic.
@@ -63,7 +65,7 @@ export function ForecastPanel({ state }: { state: DataState<WeatherResponse> }) 
               {day.temperatureMaxC}° <span className="text-ink-soft">/ {day.temperatureMinC}°</span>
             </span>
           </div>
-          <div className="mt-0.5 truncate text-xs text-ink-soft">{day.condition}</div>
+          <div data-testid="weather-description" className="mt-0.5 truncate text-xs text-ink-soft">{describe(day.weatherCode, day.condition)}</div>
           <dl className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-ink-soft">
             <div>
               <dt className="sr-only">Rain chance</dt>

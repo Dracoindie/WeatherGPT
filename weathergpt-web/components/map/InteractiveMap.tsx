@@ -20,9 +20,14 @@ interface Props {
   longitude: number;
   locationName?: string;
   alertsCount?: number;
+  /** Current conditions, already in the selected UI language. */
+  conditionLabel?: string;
 }
 
-export function InteractiveMap({ latitude, longitude, locationName, alertsCount }: Props) {
+const escapeHtml = (v: string) =>
+  v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+export function InteractiveMap({ latitude, longitude, locationName, alertsCount, conditionLabel }: Props) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +40,7 @@ export function InteractiveMap({ latitude, longitude, locationName, alertsCount 
 
     const marker = L.marker([latitude, longitude]).addTo(map);
 
-    const title = locationName || `Coordinates: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+    const title = locationName ? escapeHtml(locationName) : `Coordinates: ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
     const alertHtml = (alertsCount && alertsCount > 0)
       ? `<div style="color: #e11d48; font-weight: 600; margin-top: 4px;">⚠️ ${alertsCount} active alert${alertsCount > 1 ? 's' : ''}</div>`
       : `<div style="color: #0d9488; font-weight: 500; margin-top: 4px;">✓ Conditions normal</div>`;
@@ -44,6 +49,7 @@ export function InteractiveMap({ latitude, longitude, locationName, alertsCount 
       <div style="font-family: sans-serif; font-size: 13px; line-height: 1.4;">
         <strong style="font-size: 14px;">${title}</strong>
         <div style="color: #64748b; font-size: 11px;">${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E</div>
+        ${conditionLabel ? `<div data-testid="weather-description" style="margin-top: 4px;">${escapeHtml(conditionLabel)}</div>` : ''}
         ${alertHtml}
       </div>
     `).openPopup();
@@ -51,7 +57,7 @@ export function InteractiveMap({ latitude, longitude, locationName, alertsCount 
     return () => {
       map.remove();
     };
-  }, [latitude, longitude, locationName, alertsCount]);
+  }, [latitude, longitude, locationName, alertsCount, conditionLabel]);
 
   return (
     <div
