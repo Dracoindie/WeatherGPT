@@ -144,6 +144,8 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.saved_locations  TO authenticated
 
 -- ---------------------------------------------------------------------------
 -- 6. Migration 2026-11: role mode on profiles
+--    (Sections 6 and 7 are also in migrations_6_7.sql for databases that
+--    already have 1-5; keep the two in sync.)
 --    Changes what WeatherGPT replies emphasise; never the numbers.
 --    Covered by the existing profiles RLS policies (own row only).
 -- ---------------------------------------------------------------------------

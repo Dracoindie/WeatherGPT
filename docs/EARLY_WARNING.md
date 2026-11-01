@@ -32,7 +32,7 @@ WeatherGPT alerts come from the deterministic alert engine (`backend/alerts/engi
 
 ### 1. Database
 
-Run `supabase/schema.sql` in the Supabase SQL editor. It is idempotent; migrations 6 and 7 add `profiles.role` and `alert_subscriptions`.
+In the Supabase SQL editor, run `supabase/migrations_6_7.sql` on a database that already has sections 1–5 of the schema. On a new database, run `supabase/schema.sql` instead. Both are idempotent; migrations 6 and 7 add `profiles.role` and `alert_subscriptions`. The last statement of `migrations_6_7.sql` prints a check: `profiles.role` defaults to `'citizen'`, and `alert_subscriptions` has RLS on with 2 policies.
 
 ### 2. VAPID keys
 
