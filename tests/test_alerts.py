@@ -33,6 +33,7 @@ def _mock_weather_response(
             relative_humidity_2m=50.0,
             precipitation=precipitation,
             wind_speed_10m=wind_speed,
+            wind_direction_10m=180.0,
             weather_code=weather_code,
             time="2026-09-22T10:00:00Z",
         ),
@@ -44,6 +45,7 @@ def _mock_weather_response(
             wind_speed_10m=[hourly_wind_max] * 24,
             weather_code=[weather_code] * 24,
             relative_humidity_2m=[50.0] * 24,
+            wind_direction_10m=[180.0] * 24,
         ),
     )
 

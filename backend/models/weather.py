@@ -38,6 +38,9 @@ class CurrentWeather(BaseModel):
     relative_humidity_2m: float = Field(..., description="Relative humidity at 2 m (%)")
     precipitation: float = Field(..., description="Precipitation in the last hour (mm)")
     wind_speed_10m: float = Field(..., description="Wind speed at 10 m (km/h)")
+    wind_direction_10m: float = Field(
+        ..., description="Direction the wind blows from at 10 m (degrees, 0 = north)"
+    )
     weather_code: int = Field(
         ..., description="WMO Weather Interpretation Code (WW code)"
     )
@@ -59,6 +62,9 @@ class HourlyWeather(BaseModel):
     )
     relative_humidity_2m: list[Optional[float]] = Field(
         ..., description="Hourly relative humidity at 2 m (%)"
+    )
+    wind_direction_10m: list[Optional[float]] = Field(
+        ..., description="Hourly wind direction at 10 m (degrees the wind blows from)"
     )
 
 

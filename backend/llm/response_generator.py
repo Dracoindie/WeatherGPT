@@ -52,6 +52,7 @@ def allowed_numbers(facts: WeatherFacts) -> set[str]:
         facts.temperature_max,
         facts.precipitation,
         facts.wind_speed_10m,
+        facts.wind_direction_10m,
         facts.relative_humidity_2m,
     ]
     tokens: set[str] = set()

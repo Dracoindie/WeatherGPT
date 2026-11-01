@@ -48,6 +48,7 @@ MOCK_OPEN_METEO_PAYLOAD = {
         "relative_humidity_2m": 74.0,
         "precipitation": 0.0,
         "wind_speed_10m": 12.5,
+        "wind_direction_10m": 250.0,
         "weather_code": 2,
     },
     "hourly": {
@@ -58,6 +59,7 @@ MOCK_OPEN_METEO_PAYLOAD = {
         "wind_speed_10m": [10.0 + i * 0.05 for i in range(72)],
         "weather_code": [2] * 72,
         "relative_humidity_2m": [70.0] * 72,
+        "wind_direction_10m": [250.0] * 72,
     },
 }
 
@@ -223,6 +225,10 @@ class TestWeatherEndpointIntegration:
         assert "hourly" in body
         assert "retrieved_at" in body
         assert body["current"]["temperature_2m"] == 28.3
+        assert body["current"]["wind_direction_10m"] == 250.0
+        assert len(body["hourly"]["wind_direction_10m"]) == 72
+        assert body["hourly"]["weather_code"][0] == 2
+        assert body["hourly"]["relative_humidity_2m"][0] == 70.0
 
     def test_upstream_timeout_returns_502(self):
         with patch("weather.open_meteo.httpx.AsyncClient") as mock_client_cls:

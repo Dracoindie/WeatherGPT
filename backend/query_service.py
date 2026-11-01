@@ -151,6 +151,7 @@ def select_period_facts(
             temperature_2m=current.temperature_2m,
             precipitation=current.precipitation,
             wind_speed_10m=current.wind_speed_10m,
+            wind_direction_10m=current.wind_direction_10m,
             relative_humidity_2m=current.relative_humidity_2m,
             weather_code=current.weather_code,
             weather_description=weather_code_description(current.weather_code),
@@ -164,6 +165,7 @@ def select_period_facts(
         winds = weather.hourly.wind_speed_10m
         codes = weather.hourly.weather_code
         hums = weather.hourly.relative_humidity_2m
+        dirs = weather.hourly.wind_direction_10m
 
         indexes = [
             i
@@ -199,6 +201,11 @@ def select_period_facts(
         max_prob = max(int(p) for p in sel_probs) if sel_probs else None
         # WMO codes grow with significance, so the max is the period's headline weather.
         code = max(sel_codes) if sel_codes else None
+        # Direction at the hour of peak wind, matching wind_speed_10m.
+        peak_wind = max(
+            (i for i in indexes if winds[i] is not None), key=lambda i: winds[i], default=None
+        )
+        direction = dirs[peak_wind] if peak_wind is not None else None
 
         facts = WeatherFacts(
             source="open-meteo",
@@ -211,6 +218,7 @@ def select_period_facts(
             precipitation=round(sum(sel_precs), 1) if sel_precs else None,
             precipitation_probability=int(max_prob) if max_prob is not None else None,
             wind_speed_10m=round(max(sel_winds), 1) if sel_winds else None,
+            wind_direction_10m=round(direction) if direction is not None else None,
             relative_humidity_2m=round(sum(sel_hums) / len(sel_hums), 1) if sel_hums else None,
             weather_code=code,
             weather_description=weather_code_description(code),
@@ -222,15 +230,19 @@ def select_period_facts(
 
 # Facts each parameter hides so the reply stays on topic.
 _FOCUS_DROPS: dict[WeatherParameter, tuple[str, ...]] = {
-    "temperature": ("precipitation", "precipitation_probability", "wind_speed_10m"),
-    "high_temperature": ("precipitation", "precipitation_probability", "wind_speed_10m"),
-    "precipitation": ("wind_speed_10m", "relative_humidity_2m"),
-    "heavy_rain": ("wind_speed_10m", "relative_humidity_2m"),
-    "rain_likelihood": ("wind_speed_10m", "relative_humidity_2m"),
+    "temperature": (
+        "precipitation", "precipitation_probability", "wind_speed_10m", "wind_direction_10m"
+    ),
+    "high_temperature": (
+        "precipitation", "precipitation_probability", "wind_speed_10m", "wind_direction_10m"
+    ),
+    "precipitation": ("wind_speed_10m", "wind_direction_10m", "relative_humidity_2m"),
+    "heavy_rain": ("wind_speed_10m", "wind_direction_10m", "relative_humidity_2m"),
+    "rain_likelihood": ("wind_speed_10m", "wind_direction_10m", "relative_humidity_2m"),
     "wind": ("precipitation", "precipitation_probability", "relative_humidity_2m"),
     "strong_wind": ("precipitation", "precipitation_probability", "relative_humidity_2m"),
     "storm": ("relative_humidity_2m",),
-    "humidity": ("precipitation", "wind_speed_10m"),
+    "humidity": ("precipitation", "wind_speed_10m", "wind_direction_10m"),
     "advisory": (),
     "general": (),
 }

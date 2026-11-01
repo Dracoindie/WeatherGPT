@@ -94,6 +94,9 @@ class WeatherFacts(BaseModel):
     precipitation: Optional[float] = None
     precipitation_probability: Optional[int] = None
     wind_speed_10m: Optional[float] = None
+    wind_direction_10m: Optional[float] = Field(
+        None, description="Degrees the wind blows from (0 = north), at the peak-wind hour"
+    )
     relative_humidity_2m: Optional[float] = None
     weather_code: Optional[int] = None
     weather_description: Optional[str] = None

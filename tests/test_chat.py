@@ -80,6 +80,7 @@ def sample_weather(
             relative_humidity_2m=74.0,
             precipitation=0.0,
             wind_speed_10m=12.5,
+            wind_direction_10m=250.0,
             weather_code=2,
             time=now.replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M"),
         ),
@@ -91,6 +92,7 @@ def sample_weather(
             wind_speed_10m=winds,
             weather_code=codes,
             relative_humidity_2m=hums,
+            wind_direction_10m=[250.0] * len(times),
         ),
     )
 

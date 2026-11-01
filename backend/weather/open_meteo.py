@@ -27,6 +27,7 @@ CURRENT_VARIABLES = [
     "relative_humidity_2m",
     "precipitation",
     "wind_speed_10m",
+    "wind_direction_10m",
     "weather_code",
 ]
 
@@ -37,6 +38,7 @@ HOURLY_VARIABLES = [
     "wind_speed_10m",
     "weather_code",
     "relative_humidity_2m",
+    "wind_direction_10m",
 ]
 
 # 7-day hourly forecast (today + 6 days), enough for every weekday name.
