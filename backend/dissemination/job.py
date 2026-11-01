@@ -125,7 +125,10 @@ async def run_job(
 
 
 async def run_from_env() -> JobReport:
+    from env_check import warn_misnamed_env_vars
     from query_service import fetch_validated_weather
+
+    warn_misnamed_env_vars()
 
     store = SupabaseSubscriptionStore.from_env()
     if store is None:

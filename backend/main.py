@@ -34,6 +34,10 @@ from api.air import router as air_router  # noqa: E402
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from env_check import warn_misnamed_env_vars  # noqa: E402
+
+warn_misnamed_env_vars()
+
 # /api/nwp needs xarray + cfgrib (and the eccodes library); the API starts without them.
 try:
     import cfgrib  # noqa: F401  (raises RuntimeError if the eccodes library is missing)

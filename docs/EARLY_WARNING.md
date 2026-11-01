@@ -91,6 +91,44 @@ curl -X POST -H "X-Job-Token: $ALERT_JOB_TOKEN" https://<api-host>/api/alerts/ch
 
 Both print or return a report with `checked`, `became_high`, `sent`, `gone`, `failed`, `disabled` and `weather_errors`.
 
+**The job must run with the backend venv active** (or with `backend\.venv\Scripts\python.exe` directly). The system Python does not have `pywebpush`, `httpx` or `python-dotenv`, and the job would either fail to import or report `push_available: false`.
+
+#### Windows (PowerShell)
+
+```powershell
+# 1. Activate the venv (from the repo root)
+cd backend
+.\.venv\Scripts\Activate.ps1
+# If scripts are blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+# 2. Run the job once (reads backend\.env)
+python -m dissemination.job
+
+# Without activating, the same thing:
+.\.venv\Scripts\python.exe -m dissemination.job
+```
+
+Call the HTTP trigger with `Invoke-RestMethod`. Read the token from your environment rather than typing it into the command history:
+
+```powershell
+$env:ALERT_JOB_TOKEN = "<paste your token>"   # current session only
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/alerts/check" `
+  -Headers @{ "X-Job-Token" = $env:ALERT_JOB_TOKEN } |
+  ConvertTo-Json -Depth 5
+```
+
+Scheduling on Windows (every 15 minutes, Task Scheduler):
+
+```powershell
+$py = (Resolve-Path .\.venv\Scripts\python.exe).Path
+$action = New-ScheduledTaskAction -Execute $py -Argument "-m dissemination.job" -WorkingDirectory (Get-Location).Path
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15)
+Register-ScheduledTask -TaskName "WeatherGPT alert job" -Action $action -Trigger $trigger
+```
+
+**Env var names.** The backend reads `SUPABASE_URL` and `SUPABASE_ANON_KEY`, not the frontend's `NEXT_PUBLIC_` names. If `backend\.env` only has the prefixed names, the backend and the job log a warning telling you to rename them; they are never used as a fallback. Every variable is listed in the root `.env.example`.
+
 ## CAP mapping
 
 | WeatherGPT | CAP `severity` | `urgency` | `responseType` |
