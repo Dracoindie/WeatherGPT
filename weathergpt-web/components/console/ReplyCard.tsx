@@ -6,6 +6,7 @@ import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 import { RainGlass } from '@/components/panels/RainGlass'
 import { Typewriter } from './Typewriter'
+import { ShareWhatsApp } from '@/components/common/ShareWhatsApp'
 import type { ThreadEntry } from './types'
 
 const DEVANAGARI = /[ऀ-ॿ]/
@@ -71,6 +72,11 @@ export function ReplyCard({ entry, onTyped, onUseLocation }: ReplyCardProps) {
           DEVANAGARI.test(res.message) && 'deva'
         )}
       />
+      {!needsLocation && (
+        <div className="mt-3 flex justify-end">
+          <ShareWhatsApp tone="sky" text={`${entry.query}\n${res.message}`} />
+        </div>
+      )}
       {needsLocation && (
         <button
           type="button"

@@ -28,6 +28,7 @@ from api.forecast import router as forecast_router  # noqa: E402
 from api.alerts import router as alerts_router  # noqa: E402
 from api.climate import router as climate_router  # noqa: E402
 from api.roles import router as roles_router  # noqa: E402
+from api.dissemination import router as dissemination_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ else:
 app.include_router(alerts_router)
 app.include_router(climate_router)
 app.include_router(roles_router)
+app.include_router(dissemination_router)
 
 
 # ---------------------------------------------------------------------------

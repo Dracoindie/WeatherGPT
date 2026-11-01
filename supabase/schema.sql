@@ -154,3 +154,43 @@ ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
 ALTER TABLE public.profiles
     ADD CONSTRAINT profiles_role_check
     CHECK (role IN ('citizen', 'farmer', 'aviation', 'disaster_manager', 'researcher'));
+
+-- ---------------------------------------------------------------------------
+-- 7. Migration 2026-11: early-warning subscriptions (Web Push)
+--    A browser subscribes the signed-in user to alerts for one location.
+--    Users manage only their own rows (RLS). The backend alert job reads all
+--    rows with the service-role key (bypasses RLS; backend-only secret).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.alert_subscriptions (
+    id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          UUID        NOT NULL DEFAULT auth.uid() REFERENCES auth.users (id) ON DELETE CASCADE,
+    location_name    TEXT        NOT NULL,
+    latitude         DOUBLE PRECISION NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+    longitude        DOUBLE PRECISION NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+    endpoint         TEXT        NOT NULL,
+    p256dh           TEXT        NOT NULL,
+    auth             TEXT        NOT NULL,
+    language         TEXT        NOT NULL DEFAULT 'en',
+    last_severity    TEXT        NOT NULL DEFAULT 'none',
+    last_notified_at TIMESTAMPTZ,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, endpoint, latitude, longitude)
+);
+
+CREATE INDEX IF NOT EXISTS alert_subscriptions_user_idx ON public.alert_subscriptions (user_id);
+
+ALTER TABLE public.alert_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own alert subscriptions"   ON public.alert_subscriptions;
+DROP POLICY IF EXISTS "Users can manage own alert subscriptions" ON public.alert_subscriptions;
+
+CREATE POLICY "Users can view own alert subscriptions"
+    ON public.alert_subscriptions FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can manage own alert subscriptions"
+    ON public.alert_subscriptions FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.alert_subscriptions TO authenticated;
