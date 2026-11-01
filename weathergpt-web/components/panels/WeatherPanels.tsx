@@ -11,6 +11,7 @@ import type { ResolvedLocation, WeatherFacts } from '@/lib/api/chat'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 import { useDescribeWeather } from '@/lib/i18n/weather'
+import { formatWindow } from '@/lib/format'
 import { CountUp, formatValue } from './CountUp'
 import { GlassPanel } from './GlassPanel'
 
@@ -77,7 +78,7 @@ export function TemperaturePanel({ facts }: { facts: WeatherFacts }) {
   const cool = thermalColor(tmin ?? main - 6)
 
   return (
-    <motion.div variants={panelItem}>
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel label={t('panel.temperature')} className="h-full">
         <div className="flex items-center gap-4">
           <div className="relative size-36 shrink-0">
@@ -174,7 +175,7 @@ export function RainPanel({ facts }: { facts: WeatherFacts }) {
   const level = prob != null ? prob / 100 : null
 
   return (
-    <motion.div variants={panelItem}>
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel label={t('panel.rain')} className="h-full">
         <div className="flex items-center gap-5">
           {level != null ? (
@@ -229,7 +230,7 @@ export function WindPanel({ facts }: { facts: WeatherFacts }) {
   const period = kmh <= 0 ? 0 : Math.max(0.35, 9 / (1 + kmh / 5))
 
   return (
-    <motion.div variants={panelItem}>
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel label={t('panel.wind')} className="h-full">
         <div className="flex items-center gap-5">
           <div className="relative size-32 shrink-0">
@@ -293,7 +294,7 @@ export function HumidityPanel({ facts }: { facts: WeatherFacts }) {
   const C = 2 * Math.PI * 46
 
   return (
-    <motion.div variants={panelItem}>
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel label={t('panel.humidity')} className="h-full">
         <div className="flex items-center gap-5">
           <div className="relative size-32 shrink-0">
@@ -344,12 +345,12 @@ function coord(v: number, pos: string, neg: string) {
 }
 
 export function LocationPanel({ location, facts }: { location: ResolvedLocation; facts: WeatherFacts | null }) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const describe = useDescribeWeather()
   const SourceIcon = location.source === 'request_coordinates' ? Crosshair : location.source === 'trusted_user_default' ? Navigation : MapPin
 
   return (
-    <motion.div variants={panelItem} className="sm:col-span-2 xl:col-span-1">
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel label={t('panel.location')} className="h-full" aside={<VerifiedBadge />}>
         <div className="flex items-start gap-3">
           <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10">
@@ -372,7 +373,7 @@ export function LocationPanel({ location, facts }: { location: ResolvedLocation;
               <dt className="text-hud-dim">TZ</dt>
               <dd className="truncate text-right text-hud">{facts.timezone}</dd>
               <dt className="text-hud-dim">WINDOW</dt>
-              <dd className="truncate text-right text-hud" title={facts.requested_time}>{facts.requested_time}</dd>
+              <dd className="text-right text-hud" title={facts.requested_time}>{formatWindow(facts.requested_time, language)}</dd>
             </>
           )}
         </dl>

@@ -41,7 +41,8 @@ import {
 } from '@/components/panels/WeatherPanels'
 import { RainGlass } from '@/components/panels/RainGlass'
 import { ClimateComparePanel, GfsPanel } from '@/components/panels/SourcePanels'
-import { AirPanels } from '@/components/panels/AirPanels'
+import { AirErrorPanel, AqiPanel, UvPanel, useAirQuality } from '@/components/panels/AirPanels'
+import { PANEL_GRID, panelSpanClasses, type Slot } from '@/lib/gridFill'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { ForecastTimeline } from '@/components/panels/ForecastTimeline'
 import type { ThreadEntry } from './types'
@@ -242,6 +243,31 @@ export default function LivingSky() {
     requestLocation()
   }, [requestLocation])
 
+  // Panels for the active answer, in reading order. Widths are balanced per
+  // breakpoint by lib/gridFill so rows never end with a hole.
+  const air = useAirQuality(res?.location?.latitude, res?.location?.longitude)
+  const panels: (Slot & { node: React.ReactNode })[] = []
+  if (res?.location) {
+    const w = res.weather
+    panels.push({ key: 'loc', span: 1, node: <LocationPanel location={res.location} facts={w} /> })
+    if (w?.period_available) {
+      panels.push({ key: 'temp', span: 1, node: <TemperaturePanel facts={w} /> })
+      panels.push({ key: 'rain', span: 1, node: <RainPanel facts={w} /> })
+      panels.push({ key: 'wind', span: 1, node: <WindPanel facts={w} /> })
+      panels.push({ key: 'hum', span: 1, node: <HumidityPanel facts={w} /> })
+    }
+    if (res.climate) panels.push({ key: 'climate', span: 2, node: <ClimateComparePanel facts={res.climate} /> })
+    if (res.nwp) panels.push({ key: 'gfs', span: 2, node: <GfsPanel facts={res.nwp} /> })
+    if (air?.error) panels.push({ key: 'air', span: 1, node: <AirErrorPanel error={air.error} /> })
+    else if (air?.data) {
+      panels.push({ key: 'aqi', span: 1, node: <AqiPanel report={air.data} /> })
+      panels.push({ key: 'uv', span: 1, node: <UvPanel report={air.data} /> })
+    }
+    // last: a sentence reads well across a wide row
+    if (res.advisory) panels.push({ key: 'adv', span: 2, node: <AdvisoryPanel advisory={res.advisory} window={w?.requested_time} /> })
+  }
+  const panelSpans = panelSpanClasses(panels)
+
   return (
     <MotionConfig reducedMotion="user">
     <AppShell
@@ -324,6 +350,14 @@ export default function LivingSky() {
             </AnimatePresence>
           </section>
 
+        </div>
+
+        <aside className="max-lg:order-last lg:sticky lg:top-4 lg:self-start lg:pt-6">
+          <ConversationThread entries={entries} activeId={activeId} onSelect={setActiveId} />
+        </aside>
+
+        {/* Answer panels span the full width under the console and the log: no empty column. */}
+        <div className="min-w-0 lg:col-span-2">
           <AnimatePresence>
             {res?.location && typedId === active?.id && (
               <motion.section
@@ -332,21 +366,13 @@ export default function LivingSky() {
                 animate="show"
                 exit={{ opacity: 0 }}
                 variants={{ show: { transition: { staggerChildren: 0.09 } } }}
-                className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                className={cn('mt-2', PANEL_GRID)}
               >
-                <LocationPanel location={res.location} facts={res.weather} />
-                {res.weather?.period_available && (
-                  <>
-                    <TemperaturePanel facts={res.weather} />
-                    <RainPanel facts={res.weather} />
-                    <WindPanel facts={res.weather} />
-                    <HumidityPanel facts={res.weather} />
-                  </>
-                )}
-                {res.climate && <ClimateComparePanel facts={res.climate} />}
-                {res.nwp && <GfsPanel facts={res.nwp} />}
-                {res.advisory && <AdvisoryPanel advisory={res.advisory} window={res.weather?.requested_time} />}
-                <AirPanels latitude={res.location.latitude} longitude={res.location.longitude} />
+                {panels.map((p, i) => (
+                  <div key={p.key} className={cn('min-w-0', panelSpans[i])}>
+                    {p.node}
+                  </div>
+                ))}
               </motion.section>
             )}
           </AnimatePresence>
@@ -378,10 +404,6 @@ export default function LivingSky() {
             </section>
           )}
         </div>
-
-        <aside className="lg:sticky lg:top-4 lg:self-start lg:pt-6">
-          <ConversationThread entries={entries} activeId={activeId} onSelect={setActiveId} />
-        </aside>
     </AppShell>
     </MotionConfig>
   )

@@ -29,7 +29,7 @@ export function AdvisoryPanel({ advisory, window }: { advisory: AdvisoryResult; 
   const period = formatWindow(window, language)
   const Icon = ICON[advisory.severity]
   return (
-    <motion.div variants={panelItem} className="sm:col-span-2">
+    <motion.div variants={panelItem} className="h-full">
       <GlassPanel
         label={period ? `${t('panel.advisory')} · ${period}` : t('panel.advisory')}
         className={cn('h-full', advisory.severity !== 'low' && 'border-accent/40 shadow-[0_0_50px_-20px_var(--sky-accent)]')}

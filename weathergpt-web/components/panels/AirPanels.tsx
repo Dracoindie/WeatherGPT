@@ -49,12 +49,19 @@ const UV_LABEL: Record<UvCategory, Record<Language, string>> = {
 
 const fmt = (v: number | null | undefined) => (v == null ? '—' : formatValue(v))
 
-export function AirPanels({ latitude, longitude }: { latitude: number; longitude: number }) {
-  const { t, language } = useI18n()
-  const key = `${latitude.toFixed(4)},${longitude.toFixed(4)}`
-  const [state, setState] = useState<{ key: string; data?: AirQualityReport; error?: string } | null>(null)
+export interface AirState {
+  key: string
+  data?: AirQualityReport
+  error?: string
+}
+
+/** Air quality for a point (GET /api/air-quality); null while loading. */
+export function useAirQuality(latitude: number | null | undefined, longitude: number | null | undefined): AirState | null {
+  const key = latitude != null && longitude != null ? `${latitude.toFixed(4)},${longitude.toFixed(4)}` : null
+  const [state, setState] = useState<AirState | null>(null)
 
   useEffect(() => {
+    if (key == null || latitude == null || longitude == null) return
     const ctrl = new AbortController()
     getAirQuality(latitude, longitude, ctrl.signal)
       .then((data) => setState({ key, data }))
@@ -67,25 +74,26 @@ export function AirPanels({ latitude, longitude }: { latitude: number; longitude
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  const current = state?.key === key ? state : null
-  if (!current) return null
-  if (current.error) {
-    return (
-      <motion.div variants={panelItem}>
-        <GlassPanel label={t('panel.air')} className="h-full">
-          <p className="text-sm text-amber-200">{current.error}</p>
-        </GlassPanel>
-      </motion.div>
-    )
-  }
-  const r = current.data!
+  return state?.key === key ? state : null
+}
+
+export function AirErrorPanel({ error }: { error: string }) {
+  const { t } = useI18n()
+  return (
+    <motion.div variants={panelItem} className="h-full">
+    <GlassPanel label={t('panel.air')} className="h-full">
+      <p className="text-sm text-sev-watch">{error}</p>
+    </GlassPanel>
+    </motion.div>
+  )
+}
+
+export function AqiPanel({ report: r }: { report: AirQualityReport }) {
+  const { t, language } = useI18n()
   const aq = r.last_24h
   const cat = aq?.aqi_category ?? null
-  const uvCat = r.uv_category
-
   return (
-    <>
-      <motion.div variants={panelItem}>
+    <motion.div variants={panelItem} className="h-full">
         <GlassPanel label={t('panel.air')} className="h-full" aside={<Wind className="size-4 text-accent" />}>
           {aq?.aqi == null || !cat ? (
             <p className="text-sm text-hud-dim">—</p>
@@ -116,9 +124,15 @@ export function AirPanels({ latitude, longitude }: { latitude: number; longitude
             </>
           )}
         </GlassPanel>
-      </motion.div>
+    </motion.div>
+  )
+}
 
-      <motion.div variants={panelItem}>
+export function UvPanel({ report: r }: { report: AirQualityReport }) {
+  const { t, language } = useI18n()
+  const uvCat = r.uv_category
+  return (
+    <motion.div variants={panelItem} className="h-full">
         <GlassPanel label={t('panel.uv')} className="h-full" aside={<Sun className="size-4 text-accent" />}>
           {r.uv_index == null || !uvCat ? (
             <p className="text-sm text-hud-dim">—</p>
@@ -144,7 +158,6 @@ export function AirPanels({ latitude, longitude }: { latitude: number; longitude
             </div>
           )}
         </GlassPanel>
-      </motion.div>
-    </>
+    </motion.div>
   )
 }

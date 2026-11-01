@@ -13,15 +13,17 @@ import { useReducedMotion } from 'framer-motion'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 
+// Short enough to fit the console at 390 px (22 characters or fewer); longer
+// text would be ellipsised rather than cut mid-word. e2e/home-layout checks it.
 const EXAMPLES = [
-  'Pune mein kal baarish hogi kya?',
-  'What is the temperature in Delhi right now?',
-  'मुंबई में आज बारिश होगी क्या?',
-  'Will it be windy in Chennai tonight?',
-  'Jaipur mein aaj garmi kitni hai?',
-  'बेंगलुरु में अभी मौसम कैसा है?',
-  'पुण्यात उद्या पाऊस पडेल का?',
-  'What is the AQI in Delhi today?',
+  'Pune mein kal baarish?',
+  'Delhi temperature now?',
+  'मुंबई में आज बारिश?',
+  'Chennai windy tonight?',
+  'Jaipur mein garmi?',
+  'बेंगलुरु का मौसम?',
+  'पुण्यात उद्या पाऊस?',
+  'AQI in Delhi today?',
 ]
 
 const CHIPS = [
@@ -123,7 +125,7 @@ export function AskConsole({
     <div className="w-full">
       <form onSubmit={submit} className="sky-console">
         <div className="flex items-center gap-3 rounded-[19px] bg-[#040811]/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
-          <span className="font-readout text-sm text-accent select-none" aria-hidden="true">
+          <span className="hidden font-readout text-sm text-accent select-none sm:inline" aria-hidden="true">
             ~/sky&nbsp;›
           </span>
           <div className="relative min-w-0 flex-1">
@@ -156,8 +158,8 @@ export function AskConsole({
                   DEVANAGARI.test(placeholder) && 'deva'
                 )}
               >
-                {placeholder}
-                {!focused && <span className="sky-caret" />}
+                <span className="min-w-0 truncate">{placeholder}</span>
+                {!focused && <span className="sky-caret shrink-0" />}
               </span>
             )}
           </div>
@@ -226,6 +228,8 @@ export function AskConsole({
       <div
         className={cn(
           'mt-4 -mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:justify-center sm:overflow-visible sm:px-0',
+          // phones: fade the right edge so the row reads as swipeable, not cut off
+          'max-sm:[mask-image:linear-gradient(90deg,#000_85%,transparent)]',
           docked && 'max-sm:hidden'
         )}
       >
