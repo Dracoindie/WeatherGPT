@@ -14,6 +14,7 @@ from typing import Optional
 
 from advisory import localized_advisory, should_mention_advisory
 from models.chat import WEEKDAYS, ChatIntent, ResponseLanguage, WeatherFacts, AdvisoryResult
+from llm.weather_codes import localized_description
 
 logger = logging.getLogger(__name__)
 
@@ -317,7 +318,7 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
     )
     wind = _fmt(facts.wind_speed_10m)
     humidity = _fmt(facts.relative_humidity_2m)
-    desc = facts.weather_description
+    desc = localized_description(facts.weather_code, facts.weather_description, language)
 
     if param == "air_quality":
         return air_quality_sentence(loc, when_phrase, facts, language)
@@ -528,6 +529,14 @@ def geocoder_unavailable(intent: ChatIntent, place: str) -> str:
     return f"I couldn't look up '{place}' right now. Please try again in a moment, or share your location."
 
 
+def _description_hint(intent: ChatIntent, facts: WeatherFacts) -> str:
+    """Give the model the description in the reply language so it does not echo English."""
+    local = localized_description(facts.weather_code, facts.weather_description, intent.language)
+    if not local or local == facts.weather_description:
+        return ""
+    return f"Use this wording for weather_description: {local}\n"
+
+
 async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: Optional[AdvisoryResult] = None) -> str:
     templated = template_response(intent, facts)
     if advisory and should_mention_advisory(advisory, intent.weather_parameter):
@@ -551,6 +560,7 @@ async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: O
         f"Parameter: {intent.weather_parameter}\n"
         f"Date reference: {intent.date_reference}\n"
         f"Verified facts JSON:\n{facts.model_dump_json()}\n"
+        f"{_description_hint(intent, facts)}"
         f"Intelligence Advisory JSON:\n{advisory_json}\n"
         "Write the user-facing answer using ONLY these facts and the advisory. Do not invent warnings or reasons."
     )

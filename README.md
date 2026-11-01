@@ -244,8 +244,9 @@ hourly humidity, peak wind and its direction, total precipitation and the peak p
 evaluates the full period, so heavy rain is still flagged on a temperature question.
 
 **Advisory in the reply:** the reply includes the advisory only when a threshold check fired or the
-user asked for advisories. Reply text is localised for `hi` and `hinglish`; the `advisory` object
-stays in English.
+user asked for advisories. Reply text is localised for `hi`, `hinglish` and `mr`, including the WMO
+weather descriptions ("Dense drizzle" → "तेज़ बूँदाबाँदी" / "tez boondabaandi" / "जोरदार रिमझिम",
+`backend/llm/weather_codes.py`). The `advisory` object and `weather.weather_description` stay in English.
 
 **Location priority** (see `backend/api/chat.py`)
 
