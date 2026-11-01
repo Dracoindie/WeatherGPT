@@ -17,6 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from models.weather import CurrentWeather, HourlyWeather, WeatherResponse
 from weather.open_meteo import fetch_weather
 from api.chat import router as chat_router
+from api.forecast import router as forecast_router
+from api.nwp import router as nwp_router
+from api.alerts import router as alerts_router
+from api.climate import router as climate_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +37,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,6 +48,10 @@ app.add_middleware(
 
 # Register routers
 app.include_router(chat_router)
+app.include_router(forecast_router)
+app.include_router(nwp_router)
+app.include_router(alerts_router)
+app.include_router(climate_router)
 
 
 # ---------------------------------------------------------------------------

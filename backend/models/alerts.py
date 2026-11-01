@@ -1,0 +1,38 @@
+"""
+Pydantic models for WeatherGPT weather alerts and early warning system.
+"""
+
+from datetime import datetime
+from typing import List, Literal, Optional
+from pydantic import BaseModel, Field
+
+AlertSeverity = Literal["advisory", "watch", "warning"]
+AlertCategory = Literal["rain", "heat", "wind", "cold", "storm"]
+
+class WeatherAlert(BaseModel):
+    """A structured, deterministic weather alert derived from verified observations and forecasts."""
+
+    id: str = Field(..., description="Unique alert identifier")
+    alert_type: AlertCategory = Field(..., description="Category of the alert")
+    severity: AlertSeverity = Field(..., description="Severity level: advisory, watch, or warning")
+    condition: str = Field(..., description="Human-readable condition title, e.g. 'Extreme Rain / Flood Risk'")
+    headline: str = Field(..., description="Brief headline summary")
+    description: str = Field(..., description="Detailed explanation of the meteorological condition")
+    recommended_action: str = Field(..., description="Safety or preparedness guidance")
+    relevant_parameter: str = Field(..., description="Parameter name, e.g., 'precipitation', 'temperature'")
+    relevant_value: float = Field(..., description="Observed or forecasted numerical value triggering the alert")
+    threshold_value: float = Field(..., description="Defined threshold value for this alert level")
+    unit: str = Field(..., description="Measurement unit, e.g., 'mm', '°C', 'km/h'")
+    time_window: str = Field(..., description="Time window when this alert is active (e.g. 'Current' or 'Next 24h')")
+    source: str = Field(default="open-meteo", description="Data source identifier")
+    created_at: datetime = Field(..., description="UTC timestamp when alert was generated")
+
+class AlertsResponse(BaseModel):
+    """Response model for GET /api/alerts."""
+
+    latitude: float = Field(..., description="Resolved latitude")
+    longitude: float = Field(..., description="Resolved longitude")
+    timezone: str = Field(..., description="IANA timezone")
+    retrieved_at: datetime = Field(..., description="UTC timestamp when alerts were evaluated")
+    active_alerts_count: int = Field(..., description="Number of active alerts")
+    alerts: List[WeatherAlert] = Field(default_factory=list, description="List of active weather alerts")
