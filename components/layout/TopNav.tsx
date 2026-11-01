@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useI18n, type Language } from '@/context/I18nContext'
+import { LANGUAGE_LABELS, LANGUAGES, useI18n } from '@/context/I18nContext'
 import { useAuthContext } from '@/context/AuthContext'
 import { useDemoContext } from '@/context/DemoContext'
 
@@ -82,7 +82,7 @@ export function TopNav() {
             role="group"
             aria-label="Language"
           >
-            {(['en', 'hi'] as Language[]).map((code) => (
+            {LANGUAGES.map((code) => (
               <button
                 key={code}
                 type="button"
@@ -93,7 +93,7 @@ export function TopNav() {
                   language === code ? 'bg-ink text-panel' : 'text-ink-soft hover:text-ink'
                 )}
               >
-                {code === 'en' ? 'EN' : 'हिं'}
+                {LANGUAGE_LABELS[code]}
               </button>
             ))}
           </div>
@@ -160,7 +160,7 @@ export function TopNav() {
             </button>
           )}
           <div className="mt-2 flex gap-1 border-t border-line pt-2">
-            {(['en', 'hi'] as Language[]).map((code) => (
+            {LANGUAGES.map((code) => (
               <button
                 key={code}
                 type="button"
@@ -171,7 +171,7 @@ export function TopNav() {
                   language === code ? 'bg-ink text-panel' : 'text-ink-soft'
                 )}
               >
-                {code === 'en' ? 'EN' : 'हिं'}
+                {LANGUAGE_LABELS[code]}
               </button>
             ))}
           </div>

@@ -2,7 +2,7 @@
 
 /**
  * i18n context — adapted from Lovable's src/lib/i18n.tsx.
- * Supports English and Hindi. Hinglish falls back to English.
+ * Supports English, Hindi and Hinglish (partial; missing keys fall back to English).
  * TanStack dependency removed; uses React context only.
  */
 
@@ -184,8 +184,81 @@ const dict = {
   },
 } as const
 
-export type Language = 'en' | 'hi'
+export type Language = 'en' | 'hi' | 'hinglish'
 export type TranslationKey = keyof typeof dict.en
+
+export const LANGUAGES: readonly Language[] = ['en', 'hi', 'hinglish']
+/** Short label for language toggles. */
+export const LANGUAGE_LABELS: Record<Language, string> = { en: 'EN', hi: 'हिं', hinglish: 'Hing' }
+
+/**
+ * Hinglish (romanised Hindi + English) UI labels. Partial on purpose: any key
+ * missing here falls back to English, which is what Hinglish speakers read anyway.
+ */
+const hinglish: Partial<Record<TranslationKey, string>> = {
+  'brand.tag': 'Weather Intelligence',
+  'nav.menu': 'Menu kholo',
+  'nav.home': 'Living Sky',
+  'nav.signin': 'Sign in karo',
+  'current.title': 'Abhi ka mausam',
+  'current.error': 'Weather data load nahi hua.',
+  'current.empty': 'Mausam dekhne ke liye location chuno.',
+  'forecast.title': '7 din ka forecast',
+  'forecast.empty': 'Forecast ke liye location chuno.',
+  'intel.empty': 'Is location ke liye koi active advisory nahi hai.',
+  'intel.why': 'Kyun',
+  'intel.action': 'Kya karein',
+  'field.precipitation': 'Baarish',
+  'field.wind': 'Hawa',
+  'field.condition': 'Mausam',
+  'field.updated': 'Update hua',
+  'chat.ask': 'Poocho',
+  'chat.label': 'Mausam ke baare mein poocho',
+  'chat.hint': 'Sawaal mein city ka naam likho, ya pehle location chuno.',
+  'location.button': 'Meri current location use karo',
+  'location.detecting': 'Location dhoondh rahe hain…',
+  'location.denied': 'Location permission nahi mili',
+  'location.error': 'Location detect nahi hui',
+  'location.manual': 'City ka naam likho',
+  'severity.low': 'Kam',
+  'severity.moderate': 'Madhyam',
+  'severity.high': 'Zyada',
+  'alerts.title': 'Mausam alerts',
+  'alerts.none': 'Is location ke liye koi active alert nahi hai.',
+  'alerts.routine': 'Abhi conditions normal aur safe range mein hain.',
+  'alerts.action': 'Kya karein',
+  'voice.listening': 'Sun rahe hain… apna sawaal bolo',
+  'voice.speaking': 'Jawab bol rahe hain…',
+  'voice.start': 'Bol ke poocho',
+  'voice.stop': 'Sunna band karo',
+  'voice.stopSpeaking': 'Bolna band karo',
+  'voice.denied': 'Mic permission nahi mili',
+  'voice.unsupported': 'Is browser mein voice support nahi hai',
+  'sky.title': 'Aasmaan se poocho',
+  'sky.send': 'Bhejo',
+  'sky.useLocation': 'Meri location',
+  'sky.locating': 'Location dhoondh rahe hain…',
+  'sky.scanning': 'Atmosphere scan ho raha hai',
+  'sky.thread': 'Sawaal-jawab log',
+  'sky.threadEmpty': 'Abhi koi sawaal nahi. Kisi bhi city ke baare mein poocho.',
+  'sky.error': 'Connection fail ho gaya',
+  'sky.needLocation': 'Location chahiye',
+  'sky.signedIn': 'Saved location on hai',
+  'panel.temperature': 'Temperature',
+  'panel.rain': 'Baarish',
+  'panel.wind': 'Hawa',
+  'panel.humidity': 'Nami (humidity)',
+  'panel.location': 'Location lock',
+  'panel.condition': 'Aasmaan ka haal',
+  'panel.timeline': 'Forecast timeline · 7 din',
+  'panel.advisory': 'Advisory',
+  'source.explicit_query': 'Sawaal',
+  'source.request_coordinates': 'GPS',
+  'source.trusted_user_default': 'Saved',
+  'sky.verified': 'Source: Open-Meteo · verified',
+  'sky.preview': 'Preview',
+  'sky.unavailable': 'Forecast window mein nahi',
+}
 
 interface I18nValue {
   language: Language
@@ -203,7 +276,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     () => ({
       language,
       setLanguage,
-      t: (key) => (dict[language][key] as string | undefined) ?? dict.en[key],
+      t: (key) =>
+        (language === 'hinglish' ? hinglish[key] : (dict[language][key] as string | undefined)) ??
+        dict.en[key],
     }),
     [language, setLanguage]
   )

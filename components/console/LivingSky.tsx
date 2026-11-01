@@ -15,7 +15,7 @@ import { postChat, ChatApiError } from '@/lib/api/chat'
 import { getWeather, type WeatherResponse } from '@/lib/api/weather'
 import { useAuthContext } from '@/context/AuthContext'
 import { useDemoContext } from '@/context/DemoContext'
-import { useI18n } from '@/context/I18nContext'
+import { useI18n, type Language } from '@/context/I18nContext'
 import { useGeolocation } from '@/lib/location/useGeolocation'
 import { sky } from '@/lib/skyStore'
 import { sceneFromFacts } from '@/lib/weatherScene'
@@ -50,7 +50,11 @@ interface ForecastState {
   error?: string
 }
 
-const HERE_QUERY = { en: "What's the weather here right now?", hi: 'अभी यहाँ मौसम कैसा है?' } as const
+const HERE_QUERY: Record<Language, string> = {
+  en: "What's the weather here right now?",
+  hi: 'अभी यहाँ मौसम कैसा है?',
+  hinglish: 'Yahan abhi mausam kaisa hai?',
+}
 
 export default function LivingSky() {
   const { t, language } = useI18n()

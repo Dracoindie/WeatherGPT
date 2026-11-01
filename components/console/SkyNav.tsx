@@ -9,7 +9,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useI18n, type Language, type TranslationKey } from '@/context/I18nContext'
+import { LANGUAGE_LABELS, LANGUAGES, useI18n, type TranslationKey } from '@/context/I18nContext'
 import { useAuthContext } from '@/context/AuthContext'
 
 const links: { href: string; label: TranslationKey }[] = [
@@ -27,7 +27,7 @@ export function SkyNav() {
 
   const langToggle = (
     <div className="flex items-center rounded-full border border-white/10 bg-black/30 p-0.5" role="group" aria-label="Language">
-      {(['en', 'hi'] as Language[]).map((code) => (
+      {LANGUAGES.map((code) => (
         <button
           key={code}
           type="button"
@@ -38,7 +38,7 @@ export function SkyNav() {
             language === code ? 'bg-accent text-black' : 'text-hud-dim hover:text-hud'
           )}
         >
-          {code === 'en' ? 'EN' : 'हिं'}
+          {LANGUAGE_LABELS[code]}
         </button>
       ))}
     </div>

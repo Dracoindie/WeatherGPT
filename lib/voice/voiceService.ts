@@ -178,7 +178,7 @@ export class VoiceService {
     };
   }
 
-  public startListening(language: 'en' | 'hi' = 'en') {
+  public startListening(language: 'en' | 'hi' | 'hinglish' = 'en') {
     if (typeof window === 'undefined') return;
 
     // Stop any ongoing speech synthesis first
@@ -191,7 +191,7 @@ export class VoiceService {
     }
 
     try {
-      // Set language: English defaults to Indian English / UK English, Hindi uses hi-IN
+      // Set language: English and romanised Hinglish use Indian English, Hindi uses hi-IN
       // Chrome supports Hinglish recognition well under either en-IN or hi-IN
       this.recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
       this.recognition.start();
@@ -227,7 +227,7 @@ export class VoiceService {
     }
   }
 
-  public speak(text: string, language: 'en' | 'hi' = 'en') {
+  public speak(text: string, language: 'en' | 'hi' | 'hinglish' = 'en') {
     if (typeof window === 'undefined') return;
 
     const support = getBrowserVoiceSupport();
