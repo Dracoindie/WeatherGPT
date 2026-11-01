@@ -97,7 +97,7 @@ Full-page captures show the fixed sky, the docked console and the bottom nav at 
 | `9e8335d` | **Geocoder down in chat.** No more bare 502. The reply is in the user's language: "I couldn't look up 'Pune' right now. Please try again in a moment, or share your location." The ask-for-a-city flow is unchanged. A failed reverse lookup of GPS coordinates still answers, for "selected location". |
 | `56cfc71` | **WMO descriptions translated.** All 28 codes in Hindi, Hinglish and Marathi (for example "Dense drizzle" → तेज़ बूँदाबाँदी / tez boondabaandi / जोरदार रिमझिम), so replies are fully in the user's language. The API's `weather_description` field stays English. |
 | `ad79a9a` | **`supabase/migrations_6_7.sql`.** Only migrations 6 and 7, for a database that already has 1–5. It is idempotent and runs in one transaction. Tested twice on Postgres 16 with a stubbed `auth` schema. |
-| — | This report is committed to the repo. |
+| — | This report is committed to the repo, and a root `CLAUDE.md` (architecture, data sources, rules, roles, how to run the tests) gives future sessions full context. |
 
 ## Needs your input
 
