@@ -37,3 +37,9 @@ Thumbs.db
 /WeatherGPT-Resources/Herbie/
 /agents/
 /IndicTrans2/
+
+# Local-only files (kept on disk, not tracked)
+/lovable_ui_extracted/
+/weathergpt-frontend-ui.zip
+/opencode.json
+/SESSION_REPORT.md
