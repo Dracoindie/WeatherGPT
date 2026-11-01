@@ -64,8 +64,22 @@ def test_api_starts_without_nwp_dependencies(blocked, error):
     # RuntimeError is what cfgrib raises when the eccodes library is missing.
     result = _run(PATHS, blocked=blocked, error=error)
     assert result["nwp"] is False
-    assert "/api/nwp" not in result["paths"]
     assert {"/api/chat", "/api/weather", "/health"} <= set(result["paths"])
+
+
+def test_nwp_returns_clean_503_when_unavailable():
+    result = _run(
+        """
+        import json
+        from fastapi.testclient import TestClient
+        import main
+        resp = TestClient(main.app).get("/api/nwp?latitude=18.5&longitude=73.8&hours=24")
+        print(json.dumps({"status": resp.status_code, "body": resp.json()}))
+        """,
+        blocked="cfgrib",
+        error="RuntimeError",
+    )
+    assert result == {"status": 503, "body": {"detail": "NWP unavailable", "available": False}}
 
 
 def test_default_cors_origins(monkeypatch):

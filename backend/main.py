@@ -19,6 +19,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 from fastapi import FastAPI, HTTPException, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 
 from models.weather import WeatherResponse  # noqa: E402
 from query_service import fetch_validated_weather  # noqa: E402
@@ -71,6 +72,15 @@ app.include_router(chat_router)
 app.include_router(forecast_router)
 if nwp_router is not None:
     app.include_router(nwp_router)
+else:
+
+    @app.get("/api/nwp", tags=["NWP"], status_code=503)
+    async def nwp_unavailable() -> JSONResponse:
+        """Stand-in when xarray/cfgrib/eccodes are missing: a clear 503 instead of a 404."""
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "NWP unavailable", "available": False},
+        )
 app.include_router(alerts_router)
 app.include_router(climate_router)
 
