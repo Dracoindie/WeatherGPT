@@ -130,6 +130,25 @@ export default function LivingSky() {
     [accessToken, context, role]
   )
 
+  // Questions handed over from other pages: /?q=…&lat=…&lon=… (see AskCard).
+  const urlAsked = useRef(false)
+  useEffect(() => {
+    if (urlAsked.current) return
+    urlAsked.current = true
+    const p = new URLSearchParams(window.location.search)
+    const q = p.get('q')?.trim()
+    if (!q) return
+    const lat = Number(p.get('lat'))
+    const lon = Number(p.get('lon'))
+    const coords =
+      p.has('lat') && p.has('lon') && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+        ? { latitude: lat, longitude: lon }
+        : undefined
+    window.history.replaceState(null, '', '/')
+    // Not cleared on re-run: urlAsked guarantees it is scheduled exactly once.
+    window.setTimeout(() => void ask(q.slice(0, 500), coords), 0)
+  }, [ask])
+
   // Voice: mic questions go straight to ask(); their answers are spoken unless muted.
   const voice = useVoice((text) => void ask(text, undefined, true))
   const [voiceLangChoice, setVoiceLang] = useState<VoiceLanguage | null>(null)

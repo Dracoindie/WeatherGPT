@@ -1,77 +1,108 @@
-import { useEffect, useState } from 'react';
-import { fetchNwp, NwpUnavailableError } from '@/lib/api/nwp';
-import type { NwpResponse } from '@/types/nwp';
+'use client'
+
+/**
+ * NOAA GFS (GET /api/nwp) for the next 12 hours. The API returns wind in m/s;
+ * the UI shows km/h everywhere, so it is converted here (msToKmh).
+ */
+
+import { useEffect, useState } from 'react'
+import { fetchNwp, NwpUnavailableError } from '@/lib/api/nwp'
+import type { NwpResponse } from '@/types/nwp'
+import { GlassPanel } from '@/components/panels/GlassPanel'
+import { fill, useI18n } from '@/context/I18nContext'
+import { formatLocalTime, msToKmh } from '@/lib/format'
 
 interface NwpPanelProps {
-  latitude: number | undefined;
-  longitude: number | undefined;
+  latitude: number | undefined
+  longitude: number | undefined
+  hours?: number
 }
 
-export function NwpPanel({ latitude, longitude }: NwpPanelProps) {
-  const [data, setData] = useState<NwpResponse | null>(null);
-  const [error, setError] = useState<string>('');
-  const [unavailable, setUnavailable] = useState(false);
+export function NwpPanel({ latitude, longitude, hours = 12 }: NwpPanelProps) {
+  const { t, language } = useI18n()
+  const [data, setData] = useState<NwpResponse | null>(null)
+  const [error, setError] = useState('')
+  const [unavailable, setUnavailable] = useState(false)
 
   useEffect(() => {
-    if (latitude === undefined || longitude === undefined) return;
+    if (latitude === undefined || longitude === undefined) return
     fetchNwp(latitude, longitude)
       .then((resp) => setData(resp))
       .catch((e) => {
-        if (e instanceof NwpUnavailableError) setUnavailable(true);
-        else setError(e.message);
-      });
-  }, [latitude, longitude]);
+        if (e instanceof NwpUnavailableError) setUnavailable(true)
+        else setError(e.message)
+      })
+  }, [latitude, longitude])
 
-  const loading = !data && !error && !unavailable;
-
-
-  if (loading) {
-    return <div className="rounded border border-line p-4">Loading NWP data...</div>;
-  }
-  if (unavailable) {
-    return (
-      <div className="rounded border border-line p-4 text-sm text-muted-foreground">
-        NWP (GFS) model data is unavailable on this server.
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <div className="rounded border border-line p-4 text-sm text-muted-foreground">
-        NWP (GFS) data temporarily unavailable. Please try again later.
-      </div>
-    );
-  }
-  if (!data) {
-    return null;
+  let body: React.ReactNode
+  if (unavailable) body = <p className="text-sm text-hud-dim">{t('gfs.unavailable')}</p>
+  else if (error) body = <p className="text-sm text-hud-dim">{t('gfs.error')}</p>
+  else if (!data) body = <p className="text-sm text-hud-dim">{t('gfs.loading')}</p>
+  else {
+    const run = data.metadata.generationTime.replace(/\+00:00$|Z$/, '')
+    const shown = data.forecasts.slice(0, hours)
+    body = (
+      <>
+        <p className="text-xs text-hud-dim">{fill(t('gfs.run'), { time: formatLocalTime(run, language) })}</p>
+        {/* Phones: one row per hour. Wider screens: hours run left to right. */}
+        <table className="mt-3 w-full text-sm md:hidden" aria-label={t('gfs.title')}>
+          <thead>
+            <tr className="sky-label text-left">
+              <th className="pb-2 font-normal">{t('gfs.hour')}</th>
+              <th className="pb-2 text-right font-normal">°C</th>
+              <th className="pb-2 text-right font-normal">mm</th>
+              <th className="pb-2 text-right font-normal">km/h</th>
+            </tr>
+          </thead>
+          <tbody className="font-readout tabular-nums text-hud">
+            {shown.map((f) => (
+              <tr key={f.hour} className="border-t border-white/5">
+                <td className="py-1.5 text-hud-dim">+{f.hour} h</td>
+                <td className="py-1.5 text-right">{f.temperatureC.toFixed(1)}</td>
+                <td className="py-1.5 text-right">{f.precipitationMm.toFixed(1)}</td>
+                <td className="py-1.5 text-right">{msToKmh(f.windMs).toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3 hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[720px] text-sm" aria-label={t('gfs.title')}>
+            <tbody className="font-readout tabular-nums">
+              <tr>
+                <th scope="row" className="sky-label w-28 py-1.5 pr-3 text-left font-normal">{t('gfs.hour')}</th>
+                {shown.map((f) => (
+                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud-dim">+{f.hour} h</td>
+                ))}
+              </tr>
+              <tr className="border-t border-white/5">
+                <th scope="row" className="sky-label py-1.5 pr-3 text-left font-normal">{t('gfs.temp')} (°C)</th>
+                {shown.map((f) => (
+                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud">{f.temperatureC.toFixed(1)}</td>
+                ))}
+              </tr>
+              <tr className="border-t border-white/5">
+                <th scope="row" className="sky-label py-1.5 pr-3 text-left font-normal">{t('gfs.rain')} (mm)</th>
+                {shown.map((f) => (
+                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud">{f.precipitationMm.toFixed(1)}</td>
+                ))}
+              </tr>
+              <tr className="border-t border-white/5">
+                <th scope="row" className="sky-label py-1.5 pr-3 text-left font-normal">{t('gfs.wind')} (km/h)</th>
+                {shown.map((f) => (
+                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud">{msToKmh(f.windMs).toFixed(1)}</td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-[11px] text-hud-dim">{t('gfs.note')}</p>
+      </>
+    )
   }
 
   return (
-    <div className="rounded border border-line p-4">
-      <h2 className="font-display text-sm font-semibold mb-2">NWP Model: {data.metadata.model}</h2>
-      <p className="text-xs mb-2">Generated at: {data.metadata.generationTime}</p>
-      <div className="max-h-80 overflow-y-auto">
-      <table className="w-full text-xs border-collapse">
-        <thead>
-          <tr className="border-b border-line">
-            <th className="text-left py-1">Hour</th>
-            <th className="text-right py-1">Temp (°C)</th>
-            <th className="text-right py-1">Precip (mm)</th>
-            <th className="text-right py-1">Wind (m/s)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.forecasts.map((f) => (
-            <tr key={f.hour} className="border-b border-line/30">
-              <td className="py-1">+{f.hour}h</td>
-              <td className="text-right py-1">{f.temperatureC.toFixed(1)}</td>
-              <td className="text-right py-1">{f.precipitationMm.toFixed(1)}</td>
-              <td className="text-right py-1">{f.windMs.toFixed(1)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </div>
-  );
+    <GlassPanel label={t('gfs.title')} wet={false} className="h-full">
+      {body}
+    </GlassPanel>
+  )
 }

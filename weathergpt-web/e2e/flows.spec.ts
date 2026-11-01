@@ -122,6 +122,23 @@ test.describe('Signed-out demo session', () => {
     await expect.poll(() => log.paths.filter((p) => p === '/api/alerts').length).toBe(before + 1)
   })
 
+  test('dashboard questions open in the Living Sky console with the picked place', async ({ page, context }) => {
+    await context.grantPermissions(['geolocation'])
+    await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+    const log = await mockBackend(page)
+    await enterDemo(page)
+    await page.getByRole('button', { name: /use my current location/i }).first().click()
+    // no second chat box on the dashboard
+    await expect(page.getByRole('textbox', { name: /ask about the weather/i })).toHaveCount(0)
+    await page.getByRole('link', { name: 'Will it rain tomorrow?' }).click()
+    await page.waitForURL((u) => u.pathname === '/')
+    await expect.poll(() => log.chat.length).toBe(1)
+    expect(log.chat[0].message).toBe('Will it rain tomorrow?')
+    expect(log.chat[0].latitude).toBeCloseTo(PUNE.latitude, 3)
+    expect(log.chat[0].longitude).toBeCloseTo(PUNE.longitude, 3)
+    await expect(page.getByText(/12\.4 mm/).first()).toBeVisible({ timeout: 20_000 })
+  })
+
   test('protected pages redirect to login without a session', async ({ page }) => {
     await mockBackend(page)
     await page.goto('/alerts')
