@@ -7,7 +7,9 @@
 
 import { API_BASE } from '@/lib/api/base'
 
-export type ChatIntentType = 'current_weather' | 'forecast' | 'unknown'
+/** climate: past-years comparison (archive). nwp: raw GFS model output. */
+export type ChatIntentType = 'current_weather' | 'forecast' | 'climate' | 'nwp' | 'unknown'
+export type ClimatePeriod = 'last_30_days' | 'this_month' | 'this_year'
 export type DateReference =
   | 'now'
   | 'today'
@@ -38,6 +40,7 @@ export type ResponseLanguage = 'en' | 'hi' | 'hinglish'
 export type LocationSource =
   | 'explicit_query'
   | 'request_coordinates'
+  | 'conversation_context'
   | 'trusted_user_default'
 
 export interface ChatIntent {
@@ -46,6 +49,7 @@ export interface ChatIntent {
   date_reference: DateReference
   weather_parameter: WeatherParameter
   language: ResponseLanguage
+  climate_period?: ClimatePeriod | null
 }
 
 export interface WeatherFacts {
@@ -67,6 +71,47 @@ export interface WeatherFacts {
   period_available: boolean
 }
 
+/** Recent period vs the same dates in earlier years (Open-Meteo archive). */
+export interface ClimateFacts {
+  source: string
+  location: string
+  timezone: string
+  period: ClimatePeriod
+  period_start: string
+  period_end: string
+  baseline_start_year: number
+  baseline_end_year: number
+  baseline_years: number
+  days_with_data: number
+  mean_temperature_max: number | null
+  mean_temperature_min: number | null
+  total_precipitation: number | null
+  baseline_mean_temperature_max: number | null
+  baseline_mean_temperature_min: number | null
+  baseline_total_precipitation: number | null
+  temperature_max_anomaly: number | null
+  temperature_min_anomaly: number | null
+  precipitation_anomaly_percent: number | null
+  available: boolean
+}
+
+/** GFS output summarised over the requested window. */
+export interface NwpFacts {
+  source: string
+  model: string
+  run: string
+  location: string
+  requested_time: string
+  timezone: string
+  hours: number
+  temperature_min: number | null
+  temperature_max: number | null
+  precipitation: number | null
+  /** km/h */
+  wind_speed_max: number | null
+  period_available: boolean
+}
+
 export interface ResolvedLocation {
   name: string
   latitude: number
@@ -81,10 +126,22 @@ export interface AdvisoryResult {
   reasons: string[]
 }
 
+/** Slots of the previous answer, so follow-ups ("aur parso?") can fill gaps. */
+export interface ChatContext {
+  intent?: ChatIntentType
+  location_name?: string
+  latitude?: number
+  longitude?: number
+  date_reference?: DateReference
+  weather_parameter?: WeatherParameter
+  climate_period?: ClimatePeriod | null
+}
+
 export interface ChatRequest {
   message: string
   latitude?: number
   longitude?: number
+  context?: ChatContext
 }
 
 export interface ChatResponse {
@@ -92,8 +149,24 @@ export interface ChatResponse {
   intent: ChatIntent
   location: ResolvedLocation | null
   weather: WeatherFacts | null
+  climate?: ClimateFacts | null
+  nwp?: NwpFacts | null
   advisory: AdvisoryResult | null
   source: string
+}
+
+/** Follow-up context from an answered question (only answers with a location). */
+export function contextFrom(res: ChatResponse | null | undefined): ChatContext | undefined {
+  if (!res?.location) return undefined
+  return {
+    intent: res.intent.intent,
+    location_name: res.location.name,
+    latitude: res.location.latitude,
+    longitude: res.location.longitude,
+    date_reference: res.intent.date_reference,
+    weather_parameter: res.intent.weather_parameter,
+    climate_period: res.intent.climate_period ?? null,
+  }
 }
 
 

@@ -10,7 +10,9 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
-IntentType = Literal["current_weather", "forecast", "unknown"]
+# climate: historical comparison (Open-Meteo archive). nwp: raw GFS model output.
+IntentType = Literal["current_weather", "forecast", "climate", "nwp", "unknown"]
+ClimatePeriod = Literal["last_30_days", "this_month", "this_year"]
 DateReference = Literal[
     "now",
     "today",
@@ -52,6 +54,7 @@ ResponseLanguage = Literal["en", "hi", "hinglish"]
 LocationSource = Literal[
     "explicit_query",
     "request_coordinates",
+    "conversation_context",
     "trusted_user_default",
 ]
 
@@ -66,6 +69,9 @@ class ChatIntent(BaseModel):
     date_reference: DateReference = "now"
     weather_parameter: WeatherParameter = "general"
     language: ResponseLanguage = "en"
+    climate_period: Optional[ClimatePeriod] = Field(
+        None, description="Window compared with past years (climate intent only)"
+    )
 
 
 class AdvisoryResult(BaseModel):
@@ -103,6 +109,51 @@ class WeatherFacts(BaseModel):
     period_available: bool = True
 
 
+class ClimateFacts(BaseModel):
+    """
+    Recent period vs the same calendar window in earlier years (Open-Meteo
+    archive). Every number is computed from archive daily values.
+    """
+
+    source: str = Field(default="open-meteo-archive")
+    location: str
+    timezone: str
+    period: ClimatePeriod
+    period_start: str
+    period_end: str
+    baseline_start_year: int
+    baseline_end_year: int
+    baseline_years: int = Field(..., description="Years with data in the baseline")
+    days_with_data: int
+    mean_temperature_max: Optional[float] = None
+    mean_temperature_min: Optional[float] = None
+    total_precipitation: Optional[float] = None
+    baseline_mean_temperature_max: Optional[float] = None
+    baseline_mean_temperature_min: Optional[float] = None
+    baseline_total_precipitation: Optional[float] = None
+    temperature_max_anomaly: Optional[float] = Field(None, description="°C, recent minus baseline")
+    temperature_min_anomaly: Optional[float] = None
+    precipitation_anomaly_percent: Optional[int] = None
+    available: bool = True
+
+
+class NwpFacts(BaseModel):
+    """GFS model output summarised over the requested window (NOAA NOMADS)."""
+
+    source: str = Field(default="gfs-nomads")
+    model: str = "GFS"
+    run: str = Field(..., description="Model run (cycle) time, UTC ISO")
+    location: str
+    requested_time: str
+    timezone: str
+    hours: int = Field(..., description="Forecast hours inside the window")
+    temperature_min: Optional[float] = None
+    temperature_max: Optional[float] = None
+    precipitation: Optional[float] = Field(None, description="Total over the window, mm")
+    wind_speed_max: Optional[float] = Field(None, description="km/h, converted from m/s")
+    period_available: bool = True
+
+
 class ResolvedLocation(BaseModel):
     """Coordinates actually used for the weather lookup."""
 
@@ -110,6 +161,24 @@ class ResolvedLocation(BaseModel):
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
     source: LocationSource
+
+
+class ChatContext(BaseModel):
+    """
+    Slots from the previous answer, sent back by the client so follow-ups
+    ("aur parso?", "what about Mumbai?") can fill what they leave out.
+    Coordinates here are ones the server itself resolved and returned.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    intent: Optional[IntentType] = None
+    location_name: Optional[str] = Field(None, max_length=200)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    date_reference: Optional[DateReference] = None
+    weather_parameter: Optional[WeatherParameter] = None
+    climate_period: Optional[ClimatePeriod] = None
 
 
 class ChatRequest(BaseModel):
@@ -126,6 +195,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
+    context: Optional[ChatContext] = None
 
 
 class ChatResponse(BaseModel):
@@ -135,5 +205,7 @@ class ChatResponse(BaseModel):
     intent: ChatIntent
     location: Optional[ResolvedLocation] = None
     weather: Optional[WeatherFacts] = None
+    climate: Optional[ClimateFacts] = None
+    nwp: Optional[NwpFacts] = None
     advisory: Optional[AdvisoryResult] = None
     source: str = Field(default="open-meteo")

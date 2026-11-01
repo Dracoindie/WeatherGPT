@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { ShieldCheck } from 'lucide-react'
-import { postChat, ChatApiError } from '@/lib/api/chat'
+import { contextFrom, postChat, ChatApiError } from '@/lib/api/chat'
 import { getWeather, type WeatherResponse } from '@/lib/api/weather'
 import { useAuthContext } from '@/context/AuthContext'
 import { useDemoContext } from '@/context/DemoContext'
@@ -36,6 +36,7 @@ import {
   WindPanel,
 } from '@/components/panels/WeatherPanels'
 import { RainGlass } from '@/components/panels/RainGlass'
+import { ClimateComparePanel, GfsPanel } from '@/components/panels/SourcePanels'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { ForecastTimeline } from '@/components/panels/ForecastTimeline'
 import type { ThreadEntry } from './types'
@@ -98,6 +99,10 @@ export default function LivingSky() {
   // Same rule as the dashboard: no token while in (auth) demo mode.
   const accessToken = isDemo ? undefined : session?.access_token
 
+  // Follow-up context: the latest answer that resolved a location.
+  const lastAnswered = [...entries].reverse().find((e) => e.status === 'done' && e.response?.location)
+  const context = contextFrom(lastAnswered?.response)
+
   const ask = useCallback(
     async (message: string, coords?: { latitude: number; longitude: number }) => {
       const id = nextId.current++
@@ -107,7 +112,7 @@ export default function LivingSky() {
       ])
       setActiveId(id)
       try {
-        const response = await postChat({ message, ...coords }, accessToken)
+        const response = await postChat({ message, ...coords, context }, accessToken)
         setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'done', response } : e)))
       } catch (err: unknown) {
         const error =
@@ -115,7 +120,7 @@ export default function LivingSky() {
         setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'error', error } : e)))
       }
     },
-    [accessToken]
+    [accessToken, context]
   )
 
   // Remember the latest grounded answer for offline viewing.
@@ -288,6 +293,8 @@ export default function LivingSky() {
                     <HumidityPanel facts={res.weather} />
                   </>
                 )}
+                {res.climate && <ClimateComparePanel facts={res.climate} />}
+                {res.nwp && <GfsPanel facts={res.nwp} />}
                 {res.advisory && <AdvisoryPanel advisory={res.advisory} />}
               </motion.section>
             )}

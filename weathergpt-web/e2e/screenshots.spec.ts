@@ -1,6 +1,6 @@
 import { test, type Page } from '@playwright/test'
 import { DEMO_PRESETS } from '../lib/weatherScene'
-import { enterDemo, mockBackend, PUNE } from './support/mockApi'
+import { chatResponse, CLIMATE_FACTS, enterDemo, GFS_FACTS, mockBackend, PUNE } from './support/mockApi'
 
 /**
  * Screenshot pass: every sky scene and every page, at desktop (1440) and
@@ -54,6 +54,31 @@ test('@screens home', async ({ page }, info) => {
   await page.getByText(/12\.4 mm/).first().waitFor({ timeout: 20_000 })
   await page.waitForTimeout(4000)
   await shot(page, info.project.name, 'home-answered')
+})
+
+test('@screens climate and GFS answers', async ({ page }, info) => {
+  await mockBackend(page, {
+    chat: (body) =>
+      String(body.message).includes('GFS')
+        ? chatResponse({
+            message: 'GFS model (run 2026-11-01 06:00 UTC) for Pune tomorrow: 21.6–28.1°C, 13.2 mm of precipitation, winds up to 11.8 km/h.',
+            intent: { intent: 'nwp', date_reference: 'tomorrow' },
+            extra: { weather: null, advisory: null, nwp: GFS_FACTS, source: 'gfs-nomads' },
+          })
+        : chatResponse({
+            message: 'In Pune so far this year, the average daily high was 32.1°C against a 2016–2025 average of 31.2°C — 0.9°C warmer than usual.',
+            intent: { intent: 'climate', climate_period: 'this_year', weather_parameter: 'general', date_reference: 'now' },
+            extra: { weather: null, advisory: null, climate: CLIMATE_FACTS, source: 'open-meteo-archive' },
+          }),
+  })
+  await page.goto('/')
+  const input = page.getByRole('textbox', { name: /ask about the weather/i })
+  for (const [q, name] of [['Is this year hotter than usual in Pune?', 'answer-climate'], ['What does GFS say for tomorrow?', 'answer-gfs']]) {
+    await input.fill(q)
+    await input.press('Enter')
+    await page.waitForTimeout(5000)
+    await shot(page, info.project.name, name)
+  }
 })
 
 test('@screens auth pages', async ({ page }, info) => {

@@ -17,6 +17,7 @@ from typing import Optional, get_args
 from models.chat import (
     WEEKDAYS,
     ChatIntent,
+    ClimatePeriod,
     DateReference,
     IntentType,
     ResponseLanguage,
@@ -131,9 +132,24 @@ _WEEKDAY_PATTERNS: dict[DateReference, tuple[str, str]] = {
 _WEEKDAY_WORDS = "|".join(roman for roman, _ in _WEEKDAY_PATTERNS.values())
 _DAY_AFTER_TOMORROW = r"day after tomorrow|parso|parson"
 
+# Raw numerical model output (only GFS is wired up; WRF/ECMWF questions get GFS).
+_NWP = re.compile(
+    r"\b(gfs|nwp|wrf|ecmwf|numerical (?:weather )?(?:model|prediction)|weather models?|"
+    r"model (?:forecast|run|output|data)|global forecast system)\b"
+)
+_NWP_DEVANAGARI = ("मॉडल", "जीएफएस")
+# Comparison with past years (Open-Meteo archive).
+_CLIMATE = re.compile(
+    r"\b(than usual|than normal|than average|usual|normal for|above normal|below normal|average|historical|history|"
+    r"climate|trend|trends|anomal\w*|record|last year|this year|past years|previous years|compared to|"
+    r"pichle saal|pichhle saal|is saal|har saal|normal se|aam taur)\b"
+)
+_CLIMATE_DEVANAGARI = ("सामान्य", "पिछले साल", "पिछले वर्ष", "इस साल", "इस वर्ष", "जलवायु", "औसत")
+
 _PARSE_SYSTEM = """You extract weather-query slots. Reply with JSON only:
 {
-  "intent": "current_weather" | "forecast" | "unknown",
+  "intent": "current_weather" | "forecast" | "climate" | "nwp" | "unknown",
+  "climate_period": "last_30_days" | "this_month" | "this_year" | null,
   "location_name": string or null,
   "date_reference": "now" | "today" | "tomorrow" | "day_after_tomorrow" | "tonight" | "this_afternoon" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday",
   "weather_parameter": "temperature" | "high_temperature" | "precipitation" | "heavy_rain" | "rain_likelihood" | "wind" | "strong_wind" | "storm" | "humidity" | "advisory" | "general",
@@ -147,6 +163,9 @@ Rules:
 - Weekday names in English, Hindi (सोमवार…) or Hinglish (somvar…) → that weekday in lowercase English.
 - "baarish" / "rain" → precipitation. temperature words → temperature.
 - Hindi in Devanagari → language "hi". Mixed Hindi roman + English → "hinglish".
+- Comparisons with past years / usual / normal / climate trends → intent "climate"; set climate_period
+  ("this year" → this_year, "this month" → this_month, otherwise last_30_days).
+- Questions about GFS, NWP, WRF or "the model" → intent "nwp".
 """
 
 
@@ -205,6 +224,9 @@ def _extract_location(message: str) -> Optional[str]:
         r"\bin\s+([A-Za-z][A-Za-z ]{1,40})\??$",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+(?:mein|me|ka|ki|ke)\b",
         r"\b([A-Za-z][A-Za-z]{2,40})\s+weather\b",
+        # follow-ups: "what about Shirdi?", "and in Alibag?"
+        r"\b(?:what|how)\s+about\s+([A-Za-z][A-Za-z ]{1,40}?)\s*\??$",
+        r"^\s*(?:and|aur)\s+(?:in\s+)?([A-Za-z][A-Za-z ]{1,40}?)\s*(?:mein|me)?\s*\??$",
     ]
     stop = {
         "will",
@@ -275,6 +297,13 @@ def _extract_date(message: str) -> DateReference:
 
 def _extract_parameter(message: str) -> WeatherParameter:
     lower = _normalize(message)
+    # comparative words (climate questions): "hotter than usual", "a wetter year"
+    if re.search(r"\b(hotter|warmer|garam)\b", lower) or "गर्म" in message:
+        return "high_temperature"
+    if re.search(r"\b(colder|cooler|thanda)\b", lower) or "ठंड" in message:
+        return "temperature"
+    if re.search(r"\b(wetter|drier|dryer|rainier|rainfall)\b", lower):
+        return "precipitation"
     if re.search(r"\b(storm|toofan|cyclone|hurricane)\b", lower) or "तूफान" in message:
         return "storm"
     if re.search(r"\b(strong wind|tej hawa|high wind|gale)\b", lower) or "तेज हवा" in message:
@@ -292,7 +321,7 @@ def _extract_parameter(message: str) -> WeatherParameter:
         or "वर्षा" in message
     ):
         return "precipitation"
-    if re.search(r"\b(heat|heatwave|high temp|hot)\b", lower) or "गर्मी" in message:
+    if re.search(r"\b(heat|heatwave|high temp|hot|garmi)\b", lower) or "गर्मी" in message:
         return "high_temperature"
     if re.search(r"\b(temp|temperature|thand|tapman|tapmaan)\b", lower) or "तापमान" in message:
         return "temperature"
@@ -305,8 +334,29 @@ def _extract_parameter(message: str) -> WeatherParameter:
     return "general"
 
 
+def is_nwp_query(message: str) -> bool:
+    return bool(_NWP.search(_normalize(message))) or any(w in message for w in _NWP_DEVANAGARI)
+
+
+def is_climate_query(message: str) -> bool:
+    return bool(_CLIMATE.search(_normalize(message))) or any(w in message for w in _CLIMATE_DEVANAGARI)
+
+
+def _extract_climate_period(message: str) -> ClimatePeriod:
+    lower = _normalize(message)
+    if re.search(r"\b(this year|is saal|is varsh)\b", lower) or "इस साल" in message or "इस वर्ष" in message:
+        return "this_year"
+    if re.search(r"\b(this month|is mahine|is mahina)\b", lower) or "इस महीने" in message:
+        return "this_month"
+    return "last_30_days"
+
+
 def _extract_intent(message: str, date_ref: DateReference, param: WeatherParameter) -> IntentType:
     lower = _normalize(message)
+    if is_nwp_query(message):
+        return "nwp"
+    if is_climate_query(message):
+        return "climate"
     if date_ref in {"tomorrow", "day_after_tomorrow", "tonight", "this_afternoon", *WEEKDAYS}:
         return "forecast"
     if date_ref == "today" and param == "precipitation":
@@ -329,7 +379,7 @@ def parse_query_fallback(message: str) -> ChatIntent:
     weather_parameter = _extract_parameter(message)
     location_name = _extract_location(message)
     intent = _extract_intent(message, date_reference, weather_parameter)
-    if weather_parameter == "precipitation" and date_reference == "now":
+    if intent not in {"climate", "nwp"} and weather_parameter == "precipitation" and date_reference == "now":
         if re.search(r"\b(will|hogi|hoga|kal|tomorrow)\b", _normalize(message)):
             intent = "forecast"
     return ChatIntent(
@@ -338,11 +388,12 @@ def parse_query_fallback(message: str) -> ChatIntent:
         date_reference=date_reference,
         weather_parameter=weather_parameter,
         language=language,
+        climate_period=_extract_climate_period(message) if intent == "climate" else None,
     )
 
 
 def _intent_from_llm_dict(data: dict, fallback: ChatIntent) -> ChatIntent:
-    allowed_intent: set[str] = {"current_weather", "forecast", "unknown"}
+    allowed_intent: set[str] = set(get_args(IntentType))
     allowed_date: set[str] = set(get_args(DateReference))
     allowed_param: set[str] = {
         "temperature",
@@ -376,12 +427,21 @@ def _intent_from_llm_dict(data: dict, fallback: ChatIntent) -> ChatIntent:
         location_name = fallback.location_name
     else:
         location_name = str(raw_loc).strip()
+    climate_period = None
+    if intent == "climate":
+        raw_period = data.get("climate_period")
+        climate_period = (
+            raw_period
+            if raw_period in set(get_args(ClimatePeriod))
+            else fallback.climate_period or "last_30_days"
+        )
     return ChatIntent(
         intent=intent,  # type: ignore[arg-type]
         location_name=location_name,
         date_reference=date_reference,  # type: ignore[arg-type]
         weather_parameter=weather_parameter,  # type: ignore[arg-type]
         language=language,  # type: ignore[arg-type]
+        climate_period=climate_period,  # type: ignore[arg-type]
     )
 
 

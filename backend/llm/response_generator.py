@@ -86,6 +86,11 @@ def is_grounded(
         # Reasons quote verified period values (e.g. rain on a temperature question).
         for reason in advisory.reasons:
             allowed.update(re.findall(r"\d+(?:\.\d+)?", reason))
+    return numbers_grounded(text, allowed)
+
+
+def numbers_grounded(text: str, allowed: set[str]) -> bool:
+    """True when every number in ``text`` is an allowed token (or a clock/date fragment of one)."""
     if not allowed:
         return not re.search(r"\d", text)
     for match in re.finditer(r"\d+(?:\.\d+)?", text):
@@ -110,32 +115,36 @@ def is_grounded(
     return True
 
 
+WHEN: dict[str, dict[str, str]] = {
+    "now": {"en": "right now", "hi": "अभी", "hinglish": "abhi"},
+    "today": {"en": "today", "hi": "आज", "hinglish": "aaj"},
+    "tomorrow": {"en": "tomorrow", "hi": "कल", "hinglish": "kal"},
+    "day_after_tomorrow": {
+        "en": "the day after tomorrow",
+        "hi": "परसों",
+        "hinglish": "parso",
+    },
+    "tonight": {"en": "tonight", "hi": "आज रात", "hinglish": "aaj raat"},
+    "this_afternoon": {
+        "en": "this afternoon",
+        "hi": "आज दोपहर",
+        "hinglish": "aaj dopahar",
+    },
+    **{
+        day: {"en": f"on {day.capitalize()}", "hi": f"{hi} को", "hinglish": f"{day.capitalize()} ko"}
+        for day, hi in zip(WEEKDAYS, _HINDI_WEEKDAYS)
+    },
+}
+
+
+def when_phrase_for(date_reference: str, language: ResponseLanguage) -> str:
+    return WHEN[date_reference][language]
+
+
 def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
     language: ResponseLanguage = intent.language
     loc = facts.location
-    when = {
-        "now": {"en": "right now", "hi": "अभी", "hinglish": "abhi"},
-        "today": {"en": "today", "hi": "आज", "hinglish": "aaj"},
-        "tomorrow": {"en": "tomorrow", "hi": "कल", "hinglish": "kal"},
-        "day_after_tomorrow": {
-            "en": "the day after tomorrow",
-            "hi": "परसों",
-            "hinglish": "parso",
-        },
-        "tonight": {"en": "tonight", "hi": "आज रात", "hinglish": "aaj raat"},
-        "this_afternoon": {
-            "en": "this afternoon",
-            "hi": "आज दोपहर",
-            "hinglish": "aaj dopahar",
-        },
-        **{
-            day: {"en": f"on {day.capitalize()}", "hi": f"{hi} को", "hinglish": f"{day.capitalize()} ko"}
-            for day, hi in zip(WEEKDAYS, _HINDI_WEEKDAYS)
-        },
-    }
-    # requested_time begins with the date_reference label
-    key = intent.date_reference
-    when_phrase = when[key][language]
+    when_phrase = when_phrase_for(intent.date_reference, language)
 
     if not facts.period_available:
         if language == "hi":

@@ -65,6 +65,44 @@ export function hourlyWeather(code = 61) {
   }
 }
 
+export const CLIMATE_FACTS = {
+  source: 'open-meteo-archive',
+  location: PUNE.name,
+  timezone: 'Asia/Kolkata',
+  period: 'this_year',
+  period_start: '2026-01-01',
+  period_end: '2026-10-26',
+  baseline_start_year: 2016,
+  baseline_end_year: 2025,
+  baseline_years: 10,
+  days_with_data: 299,
+  mean_temperature_max: 32.1,
+  mean_temperature_min: 21.4,
+  total_precipitation: 812.5,
+  baseline_mean_temperature_max: 31.2,
+  baseline_mean_temperature_min: 20.9,
+  baseline_total_precipitation: 701.3,
+  temperature_max_anomaly: 0.9,
+  temperature_min_anomaly: 0.5,
+  precipitation_anomaly_percent: 16,
+  available: true,
+}
+
+export const GFS_FACTS = {
+  source: 'gfs-nomads',
+  model: 'GFS',
+  run: '2026-11-01T06:00:00+00:00',
+  location: PUNE.name,
+  requested_time: 'tomorrow (2026-11-02T00:30 to 2026-11-02T23:30)',
+  timezone: 'Asia/Kolkata',
+  hours: 24,
+  temperature_min: 21.6,
+  temperature_max: 28.1,
+  precipitation: 13.2,
+  wind_speed_max: 11.8,
+  period_available: true,
+}
+
 export interface ChatOverrides {
   message?: string
   language?: 'en' | 'hi' | 'hinglish' | 'mr'
