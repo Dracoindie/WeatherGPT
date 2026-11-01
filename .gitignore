@@ -3,12 +3,17 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
-.env
+
+# Env files (secrets): ignore all, keep the templates
+.env*
+!.env.example
 
 # Node
 node_modules/
 .next/
 out/
+weathergpt-web/node_modules/
+weathergpt-web/.next/
 
 # OS
 .DS_Store
@@ -25,3 +30,4 @@ Thumbs.db
 
 # Logs
 *.log
+.aider*
