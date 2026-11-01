@@ -6,6 +6,7 @@
  */
 
 import { API_BASE } from '@/lib/api/base'
+import type { UserRole } from '@/lib/role'
 
 /** climate: past-years comparison (archive). nwp: raw GFS model output. */
 export type ChatIntentType = 'current_weather' | 'forecast' | 'climate' | 'nwp' | 'unknown'
@@ -142,6 +143,8 @@ export interface ChatRequest {
   latitude?: number
   longitude?: number
   context?: ChatContext
+  /** what the reply emphasises; never changes the numbers */
+  role?: UserRole
 }
 
 export interface ChatResponse {

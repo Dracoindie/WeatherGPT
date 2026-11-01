@@ -141,3 +141,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles         TO authenticated
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_preferences TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.saved_locations  TO authenticated;
 -- anon gets no grants — signup/login is handled by auth.users, not these tables
+
+-- ---------------------------------------------------------------------------
+-- 6. Migration 2026-11: role mode on profiles
+--    Changes what WeatherGPT replies emphasise; never the numbers.
+--    Covered by the existing profiles RLS policies (own row only).
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.profiles
+    ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'citizen';
+
+ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE public.profiles
+    ADD CONSTRAINT profiles_role_check
+    CHECK (role IN ('citizen', 'farmer', 'aviation', 'disaster_manager', 'researcher'));

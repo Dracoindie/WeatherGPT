@@ -10,6 +10,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
+import { RoleSelector } from '@/components/common/RoleSelector'
 import { cn } from '@/lib/utils'
 import { LANGUAGE_LABELS, LANGUAGES, useI18n } from '@/context/I18nContext'
 import { useAuthContext } from '@/context/AuthContext'
@@ -20,6 +21,7 @@ const links: { href: string; label: string }[] = [
   { href: '/map', label: 'nav.map' },
   { href: '/alerts', label: 'nav.alerts' },
   { href: '/climate', label: 'nav.climate' },
+  { href: '/disaster', label: 'nav.disaster' },
   { href: '#settings', label: 'nav.settings' },
 ]
 
@@ -75,6 +77,8 @@ export function TopNav() {
               Demo Mode
             </span>
           )}
+
+          <RoleSelector tone="light" className="hidden md:flex" />
 
           {/* Language toggle */}
           <div
@@ -150,6 +154,7 @@ export function TopNav() {
               {t(l.label as Parameters<typeof t>[0])}
             </Link>
           ))}
+          <RoleSelector tone="light" className="mt-2 md:hidden" />
           {user && (
             <button
               type="button"

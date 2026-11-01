@@ -20,6 +20,8 @@ import { useGeolocation } from '@/lib/location/useGeolocation'
 import { sky } from '@/lib/skyStore'
 import { sceneFromFacts } from '@/lib/weatherScene'
 import { cn } from '@/lib/utils'
+import { useRole } from '@/lib/role'
+import { RolePanel } from '@/components/panels/RolePanels'
 import { SkyEngine } from '@/components/sky/SkyEngine'
 import { DemoPanel } from '@/components/sky/DemoPanel'
 import { AskConsole } from './AskConsole'
@@ -83,6 +85,7 @@ export default function LivingSky() {
   const { session, user } = useAuthContext()
   const { isDemo } = useDemoContext()
   const geo = useGeolocation()
+  const { role } = useRole()
 
   const [entries, setEntries] = useState<ThreadEntry[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
@@ -112,7 +115,7 @@ export default function LivingSky() {
       ])
       setActiveId(id)
       try {
-        const response = await postChat({ message, ...coords, context }, accessToken)
+        const response = await postChat({ message, ...coords, context, role }, accessToken)
         setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'done', response } : e)))
       } catch (err: unknown) {
         const error =
@@ -120,7 +123,7 @@ export default function LivingSky() {
         setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, status: 'error', error } : e)))
       }
     },
-    [accessToken, context]
+    [accessToken, context, role]
   )
 
   // Remember the latest grounded answer for offline viewing.
@@ -299,6 +302,10 @@ export default function LivingSky() {
               </motion.section>
             )}
           </AnimatePresence>
+
+          {loc && typedId === active?.id && (
+            <RolePanel role={role} latitude={loc.latitude} longitude={loc.longitude} />
+          )}
 
           {loc && typedId === active?.id && (
             <section className="mt-4 grid gap-4 xl:grid-cols-5">

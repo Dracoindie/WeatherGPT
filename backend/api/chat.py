@@ -40,6 +40,7 @@ from llm.response_generator import ask_for_location, generate_response, unknown_
 from llm.source_replies import climate_template, grounded_reply, nwp_template, nwp_unavailable
 from models.chat import ChatIntent, ChatRequest, ChatResponse, ResolvedLocation
 from query_service import fetch_validated_weather, focus_facts, select_period_facts
+from roles.notes import role_note
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,11 @@ async def chat(
     except Exception as exc:
         logger.error("Failed to generate response: %s", exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="Failed to generate response") from exc
+
+    # Role focus: one deterministic sentence from the same verified period values.
+    note = role_note(body.role, period_facts, advisory, intent.language)
+    if note:
+        message = f"{message} {note}"
 
     return ChatResponse(
         message=message,

@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { contextFrom, postChat, ChatApiError, type ChatResponse } from '@/lib/api/chat'
+import { useRole } from '@/lib/role'
 import { Panel } from '@/components/common/Panel'
 import { WeatherIntelligence } from '@/components/weather/WeatherIntelligence'
 import { TrustStrip } from '@/components/common/TrustStrip'
@@ -34,6 +35,7 @@ const suggestedPrompts = [
 
 export function ChatPanel({ latitude, longitude, accessToken, onAdvisoryChange }: ChatPanelProps) {
   const { t, language } = useI18n()
+  const { role } = useRole()
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -64,6 +66,7 @@ export function ChatPanel({ latitude, longitude, accessToken, onAdvisoryChange }
       const payload: Parameters<typeof postChat>[0] = {
         message: text,
         context: contextFrom(result),
+        role,
       }
       if (hasCoords) {
         payload.latitude = latitude
@@ -91,7 +94,7 @@ export function ChatPanel({ latitude, longitude, accessToken, onAdvisoryChange }
     } finally {
       setLoading(false)
     }
-  }, [hasCoords, latitude, longitude, accessToken, onAdvisoryChange, language, result])
+  }, [hasCoords, latitude, longitude, accessToken, onAdvisoryChange, language, result, role])
 
   useEffect(() => {
     // Avoid synchronous setState during render cycle

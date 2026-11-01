@@ -9,6 +9,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { LiteToggle } from '@/components/common/LiteToggle'
+import { RoleSelector } from '@/components/common/RoleSelector'
 import { cn } from '@/lib/utils'
 import { LANGUAGE_LABELS, LANGUAGES, useI18n, type TranslationKey } from '@/context/I18nContext'
 import { useAuthContext } from '@/context/AuthContext'
@@ -18,6 +19,7 @@ const links: { href: string; label: TranslationKey }[] = [
   { href: '/map', label: 'nav.map' },
   { href: '/alerts', label: 'nav.alerts' },
   { href: '/climate', label: 'nav.climate' },
+  { href: '/disaster', label: 'nav.disaster' },
   { href: '/classic', label: 'nav.classic' },
 ]
 
@@ -77,6 +79,7 @@ export function SkyNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
+          <RoleSelector className="hidden xl:flex" />
           <LiteToggle className="hidden sm:flex" />
           <div className="hidden sm:block">{langToggle}</div>
           {user ? (
@@ -122,6 +125,7 @@ export function SkyNav() {
           <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-3 pt-3">
             {langToggle}
             <LiteToggle />
+            <RoleSelector />
             {user ? (
               <button type="button" onClick={() => { signOut(); setOpen(false) }} className="font-readout text-xs text-hud-dim">
                 Sign out

@@ -45,6 +45,9 @@ class CurrentWeather(BaseModel):
         ..., description="WMO Weather Interpretation Code (WW code)"
     )
     time: str = Field(..., description="ISO 8601 timestamp of this observation")
+    visibility: Optional[float] = Field(None, description="Visibility (m)")
+    cloud_cover: Optional[float] = Field(None, description="Total cloud cover (%)")
+    wind_gusts_10m: Optional[float] = Field(None, description="Wind gusts at 10 m (km/h)")
 
 
 class HourlyWeather(BaseModel):
@@ -65,6 +68,11 @@ class HourlyWeather(BaseModel):
     )
     wind_direction_10m: list[Optional[float]] = Field(
         ..., description="Hourly wind direction at 10 m (degrees the wind blows from)"
+    )
+    visibility: Optional[list[Optional[float]]] = Field(None, description="Hourly visibility (m)")
+    cloud_cover: Optional[list[Optional[float]]] = Field(None, description="Hourly cloud cover (%)")
+    wind_gusts_10m: Optional[list[Optional[float]]] = Field(
+        None, description="Hourly wind gusts at 10 m (km/h)"
     )
 
 

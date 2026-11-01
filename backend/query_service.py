@@ -132,6 +132,16 @@ async def fetch_validated_weather(latitude: float, longitude: float) -> WeatherR
     )
 
 
+def _km(metres: Optional[float]) -> Optional[float]:
+    return None if metres is None else round(metres / 1000, 1)
+
+
+def _optional_series(values: Optional[list], indexes: list[int]) -> list[float]:
+    if not values:
+        return []
+    return [values[i] for i in indexes if i < len(values) and values[i] is not None]
+
+
 def select_period_facts(
     weather: WeatherResponse,
     intent: ChatIntent,
@@ -154,6 +164,9 @@ def select_period_facts(
             wind_speed_10m=current.wind_speed_10m,
             wind_direction_10m=current.wind_direction_10m,
             relative_humidity_2m=current.relative_humidity_2m,
+            wind_gusts_10m=current.wind_gusts_10m,
+            visibility=_km(current.visibility),
+            cloud_cover=current.cloud_cover,
             weather_code=current.weather_code,
             weather_description=weather_code_description(current.weather_code),
             period_available=True,
@@ -207,6 +220,9 @@ def select_period_facts(
             (i for i in indexes if winds[i] is not None), key=lambda i: winds[i], default=None
         )
         direction = dirs[peak_wind] if peak_wind is not None else None
+        gusts = _optional_series(weather.hourly.wind_gusts_10m, indexes)
+        visibility = _optional_series(weather.hourly.visibility, indexes)
+        clouds = _optional_series(weather.hourly.cloud_cover, indexes)
 
         facts = WeatherFacts(
             source="open-meteo",
@@ -221,6 +237,9 @@ def select_period_facts(
             wind_speed_10m=round(max(sel_winds), 1) if sel_winds else None,
             wind_direction_10m=round(direction) if direction is not None else None,
             relative_humidity_2m=round(sum(sel_hums) / len(sel_hums), 1) if sel_hums else None,
+            wind_gusts_10m=round(max(gusts), 1) if gusts else None,
+            visibility=_km(min(visibility)) if visibility else None,
+            cloud_cover=round(sum(clouds) / len(clouds)) if clouds else None,
             weather_code=code,
             weather_description=weather_code_description(code),
             period_available=True,

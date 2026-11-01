@@ -1,6 +1,7 @@
 import { test, type Page } from '@playwright/test'
 import { DEMO_PRESETS } from '../lib/weatherScene'
 import { chatResponse, CLIMATE_FACTS, enterDemo, GFS_FACTS, mockBackend, PUNE } from './support/mockApi'
+import { AVIATION, BOARD, COMPARE, FARM } from './support/roleFixtures'
 
 /**
  * Screenshot pass: every sky scene and every page, at desktop (1440) and
@@ -79,6 +80,28 @@ test('@screens climate and GFS answers', async ({ page }, info) => {
     await page.waitForTimeout(5000)
     await shot(page, info.project.name, name)
   }
+})
+
+test('@screens role panels', async ({ page }, info) => {
+  await mockBackend(page, { routes: { '/api/farm': FARM, '/api/aviation': AVIATION, '/api/compare': COMPARE } })
+  for (const role of ['farmer', 'aviation', 'researcher'] as const) {
+    await page.addInitScript((r) => localStorage.setItem('wgpt:role', r), role)
+    await page.goto('/')
+    const input = page.getByRole('textbox', { name: /ask about the weather/i })
+    await input.fill('Will it rain in Pune tomorrow?')
+    await input.press('Enter')
+    await page.getByText(/12\.4 mm/).first().waitFor({ timeout: 20_000 })
+    await page.waitForTimeout(4500)
+    await shot(page, info.project.name, `role-${role}`)
+  }
+})
+
+test('@screens disaster board', async ({ page }, info) => {
+  await mockBackend(page, { routes: { '/api/risk': BOARD } })
+  await page.goto('/disaster')
+  await page.getByText('Ratnagiri').first().waitFor()
+  await page.waitForTimeout(1500)
+  await shot(page, info.project.name, 'disaster')
 })
 
 test('@screens auth pages', async ({ page }, info) => {

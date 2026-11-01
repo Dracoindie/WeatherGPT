@@ -13,6 +13,7 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
+import type { UserRole } from '@/lib/role'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,6 +28,8 @@ export interface Profile {
   default_longitude: number | null
   default_location_name: string | null
   location_permission: boolean
+  /** role mode (supabase/schema.sql migration 6); absent on older databases */
+  role?: UserRole
   created_at: string
   updated_at: string
 }
@@ -40,6 +43,7 @@ export type ProfileUpdate = Partial<
     | 'default_longitude'
     | 'default_location_name'
     | 'location_permission'
+    | 'role'
   >
 >
 

@@ -42,6 +42,14 @@ HOURLY_VARIABLES = [
     "wind_direction_10m",
 ]
 
+# Requested for the aviation briefing and role notes, but not required: an
+# answer missing them still validates (the fields are simply null).
+OPTIONAL_VARIABLES = [
+    "visibility",
+    "cloud_cover",
+    "wind_gusts_10m",
+]
+
 # 7-day hourly forecast (today + 6 days), enough for every weekday name.
 FORECAST_DAYS = 7
 
@@ -91,8 +99,8 @@ async def fetch_weather(latitude: float, longitude: float) -> dict[str, Any]:
     params: dict[str, Any] = {
         "latitude": latitude,
         "longitude": longitude,
-        "current": ",".join(CURRENT_VARIABLES),
-        "hourly": ",".join(HOURLY_VARIABLES),
+        "current": ",".join(CURRENT_VARIABLES + OPTIONAL_VARIABLES),
+        "hourly": ",".join(HOURLY_VARIABLES + OPTIONAL_VARIABLES),
         "forecast_days": FORECAST_DAYS,
         "timezone": "auto",
     }

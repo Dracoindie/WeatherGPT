@@ -51,6 +51,8 @@ WeatherParameter = Literal[
     "general",
 ]
 ResponseLanguage = Literal["en", "hi", "hinglish"]
+# Who is asking: changes what the reply emphasises, never the numbers.
+UserRole = Literal["citizen", "farmer", "aviation", "disaster_manager", "researcher"]
 LocationSource = Literal[
     "explicit_query",
     "request_coordinates",
@@ -104,6 +106,9 @@ class WeatherFacts(BaseModel):
         None, description="Degrees the wind blows from (0 = north), at the peak-wind hour"
     )
     relative_humidity_2m: Optional[float] = None
+    wind_gusts_10m: Optional[float] = Field(None, description="km/h; peak gust over the period")
+    visibility: Optional[float] = Field(None, description="km; lowest over the period")
+    cloud_cover: Optional[float] = Field(None, description="%; mean over the period")
     weather_code: Optional[int] = None
     weather_description: Optional[str] = None
     period_available: bool = True
@@ -196,6 +201,7 @@ class ChatRequest(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)
     context: Optional[ChatContext] = None
+    role: UserRole = "citizen"
 
 
 class ChatResponse(BaseModel):
