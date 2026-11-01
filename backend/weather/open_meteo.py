@@ -48,6 +48,7 @@ OPTIONAL_VARIABLES = [
     "visibility",
     "cloud_cover",
     "wind_gusts_10m",
+    "uv_index",
 ]
 
 # 7-day hourly forecast (today + 6 days), enough for every weekday name.

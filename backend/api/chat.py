@@ -39,7 +39,8 @@ from llm.query_parser import parse_query
 from llm.response_generator import ask_for_location, generate_response, unknown_location
 from llm.source_replies import climate_template, grounded_reply, nwp_template, nwp_unavailable
 from models.chat import ChatIntent, ChatRequest, ChatResponse, ResolvedLocation
-from query_service import fetch_validated_weather, focus_facts, select_period_facts
+from air.service import fetch_air_quality, summarise, trailing_24h
+from query_service import _zone, fetch_validated_weather, focus_facts, period_bounds, select_period_facts, with_air_quality
 from roles.notes import role_note
 
 logger = logging.getLogger(__name__)
@@ -195,6 +196,17 @@ async def chat(
     except Exception as exc:
         logger.error("Failed to select weather facts: %s", exc, exc_info=exc)
         raise HTTPException(status_code=500, detail="Failed to process weather data") from exc
+
+    if intent.weather_parameter == "air_quality":
+        # Separate API; a failure leaves the AQI fields empty and the reply says so.
+        try:
+            aq = await fetch_air_quality(location.latitude, location.longitude)
+            bounds = period_bounds(weather, intent)
+            summary = summarise(aq, *bounds) if bounds else trailing_24h(aq, datetime.now(_zone(aq.timezone)))
+            period_facts = with_air_quality(period_facts, summary)
+            facts = with_air_quality(facts, summary)
+        except RuntimeError as exc:
+            logger.warning("Air quality unavailable for chat: %s", exc)
 
     try:
         # The advisory sees every value for the period, so heavy rain is still

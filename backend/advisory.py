@@ -32,38 +32,47 @@ _ADVISORY_TRANSLATIONS: dict[str, dict[str, str]] = {
     "Severe precipitation expected. Avoid unnecessary travel and stay clear of waterlogged areas.": {
         "hi": "भारी वर्षा की संभावना है। अनावश्यक यात्रा से बचें और जलभराव वाले क्षेत्रों से दूर रहें।",
         "hinglish": "Bahut tez baarish expected hai. Bina zaroorat travel na karein aur paani bhare areas se door rahein.",
+        "mr": "अतिवृष्टीची शक्यता आहे. अनावश्यक प्रवास टाळा आणि पाणी साचलेल्या भागांपासून दूर राहा.",
     },
     "Heavy rain expected. Carry an umbrella and expect minor travel delays.": {
         "hi": "तेज़ बारिश की संभावना है। छाता साथ रखें और यात्रा में थोड़ी देरी की उम्मीद रखें।",
         "hinglish": "Tez baarish expected hai. Chhata saath rakhein aur travel mein thodi der ho sakti hai.",
+        "mr": "मुसळधार पावसाची शक्यता आहे. छत्री सोबत ठेवा; प्रवासाला थोडा उशीर होऊ शकतो.",
     },
     "Some rain is expected, but conditions remain largely manageable.": {
         "hi": "कुछ बारिश की संभावना है, लेकिन हालात सामान्यतः ठीक रहेंगे।",
         "hinglish": "Thodi baarish expected hai, lekin conditions mostly manageable rahengi.",
+        "mr": "थोडा पाऊस अपेक्षित आहे, पण परिस्थिती बहुतांशी नियंत्रणात राहील.",
     },
     "Dangerous heat levels. Stay indoors, stay hydrated, and avoid direct sun exposure.": {
         "hi": "खतरनाक गर्मी। घर के अंदर रहें, पानी पीते रहें और सीधी धूप से बचें।",
         "hinglish": "Khatarnak garmi hai. Ghar ke andar rahein, paani peete rahein aur seedhi dhoop se bachein.",
+        "mr": "धोकादायक उष्णता. घरात राहा, भरपूर पाणी प्या आणि थेट उन्हापासून दूर राहा.",
     },
     "Hot conditions expected. Keep hydrated if spending time outdoors.": {
         "hi": "गर्मी रहेगी। बाहर जाएँ तो पानी पीते रहें।",
         "hinglish": "Garmi rahegi. Bahar time bitayein toh paani peete rahein.",
+        "mr": "उष्ण हवामान अपेक्षित आहे. बाहेर असाल तर पाणी पित राहा.",
     },
     "Cold temperatures expected. Dress warmly.": {
         "hi": "ठंड रहेगी। गर्म कपड़े पहनें।",
         "hinglish": "Thand rahegi. Garam kapde pehnein.",
+        "mr": "थंडी अपेक्षित आहे. उबदार कपडे घाला.",
     },
     "Dangerous wind speeds. Secure loose objects and avoid outdoor activities.": {
         "hi": "खतरनाक तेज़ हवाएँ। ढीली चीज़ें सुरक्षित करें और बाहरी गतिविधियों से बचें।",
         "hinglish": "Khatarnak tez hawa hai. Dheeli cheezein secure karein aur outdoor activities avoid karein.",
+        "mr": "धोकादायक वेगाचा वारा. सैल वस्तू सुरक्षित करा आणि बाहेरची कामे टाळा.",
     },
     "Breezy to strong winds expected. Exercise caution if driving high-profile vehicles.": {
         "hi": "तेज़ हवाएँ चलेंगी। ऊँचे वाहन चलाते समय सावधानी रखें।",
         "hinglish": "Tez hawa chalegi. Oonchi gaadiyan chalate waqt dhyan rakhein.",
+        "mr": "जोरदार वारा अपेक्षित आहे. उंच वाहने चालवताना काळजी घ्या.",
     },
     "Weather conditions are currently normal with no significant risks.": {
         "hi": "मौसम अभी सामान्य है, कोई खास खतरा नहीं है।",
         "hinglish": "Mausam abhi normal hai, koi khaas risk nahi hai.",
+        "mr": "सध्या हवामान सामान्य आहे; विशेष धोका नाही.",
     },
 }
 

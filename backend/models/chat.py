@@ -48,9 +48,11 @@ WeatherParameter = Literal[
     "storm",
     "humidity",
     "advisory",
+    "air_quality",
+    "uv",
     "general",
 ]
-ResponseLanguage = Literal["en", "hi", "hinglish"]
+ResponseLanguage = Literal["en", "hi", "hinglish", "mr"]
 # Who is asking: changes what the reply emphasises, never the numbers.
 UserRole = Literal["citizen", "farmer", "aviation", "disaster_manager", "researcher"]
 LocationSource = Literal[
@@ -109,6 +111,12 @@ class WeatherFacts(BaseModel):
     wind_gusts_10m: Optional[float] = Field(None, description="km/h; peak gust over the period")
     visibility: Optional[float] = Field(None, description="km; lowest over the period")
     cloud_cover: Optional[float] = Field(None, description="%; mean over the period")
+    uv_index: Optional[float] = Field(None, description="UV index; current or peak over the period")
+    pm2_5: Optional[float] = Field(None, description="µg/m³ mean (trailing 24 h for now)")
+    pm10: Optional[float] = Field(None, description="µg/m³ mean (trailing 24 h for now)")
+    aqi: Optional[int] = Field(None, description="Indian AQI (CPCB method) computed from modelled PM")
+    aqi_category: Optional[str] = None
+    aqi_dominant: Optional[str] = None
     weather_code: Optional[int] = None
     weather_description: Optional[str] = None
     period_available: bool = True

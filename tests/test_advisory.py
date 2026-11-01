@@ -166,4 +166,4 @@ class TestAdvisoryInReply:
         ]
         for facts in cases:
             result = evaluate_advisory(facts, "heavy_rain")
-            assert set(_ADVISORY_TRANSLATIONS[result.advisory]) == {"hi", "hinglish"}
+            assert set(_ADVISORY_TRANSLATIONS[result.advisory]) == {"hi", "hinglish", "mr"}

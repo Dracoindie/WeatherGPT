@@ -16,12 +16,12 @@ export type UserRole = 'citizen' | 'farmer' | 'aviation' | 'disaster_manager' | 
 
 export const ROLES: readonly UserRole[] = ['citizen', 'farmer', 'aviation', 'disaster_manager', 'researcher']
 
-export const ROLE_LABELS: Record<UserRole, { en: string; hi: string; hinglish: string }> = {
-  citizen: { en: 'Citizen', hi: 'नागरिक', hinglish: 'Citizen' },
-  farmer: { en: 'Farmer', hi: 'किसान', hinglish: 'Kisan' },
-  aviation: { en: 'Aviation', hi: 'विमानन', hinglish: 'Aviation' },
-  disaster_manager: { en: 'Disaster manager', hi: 'आपदा प्रबंधक', hinglish: 'Disaster manager' },
-  researcher: { en: 'Researcher', hi: 'शोधकर्ता', hinglish: 'Researcher' },
+export const ROLE_LABELS: Record<UserRole, Record<'en' | 'hi' | 'hinglish' | 'mr', string>> = {
+  citizen: { en: 'Citizen', hi: 'नागरिक', hinglish: 'Citizen', mr: 'नागरिक' },
+  farmer: { en: 'Farmer', hi: 'किसान', hinglish: 'Kisan', mr: 'शेतकरी' },
+  aviation: { en: 'Aviation', hi: 'विमानन', hinglish: 'Aviation', mr: 'विमानवाहतूक' },
+  disaster_manager: { en: 'Disaster manager', hi: 'आपदा प्रबंधक', hinglish: 'Disaster manager', mr: 'आपत्ती व्यवस्थापक' },
+  researcher: { en: 'Researcher', hi: 'शोधकर्ता', hinglish: 'Researcher', mr: 'संशोधक' },
 }
 
 const STORAGE_KEY = 'wgpt:role'

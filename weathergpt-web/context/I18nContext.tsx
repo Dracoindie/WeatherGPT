@@ -98,6 +98,8 @@ const dict = {
     'nav.disaster': 'Risk board',
     'panel.climate': 'Climate · vs past years',
     'panel.gfs': 'GFS model',
+    'panel.air': 'Air quality · India AQI',
+    'panel.uv': 'UV index',
     'sky.verified': 'Source: Open-Meteo · verified',
     'sky.live': 'Live',
     'sky.preview': 'Preview',
@@ -185,6 +187,8 @@ const dict = {
     'nav.disaster': 'जोखिम बोर्ड',
     'panel.climate': 'जलवायु · पिछले वर्षों से तुलना',
     'panel.gfs': 'GFS मॉडल',
+    'panel.air': 'वायु गुणवत्ता · AQI',
+    'panel.uv': 'UV इंडेक्स',
     'sky.verified': 'स्रोत: Open-Meteo · सत्यापित',
     'sky.live': 'लाइव',
     'sky.preview': 'पूर्वावलोकन',
@@ -192,17 +196,104 @@ const dict = {
   },
 } as const
 
-export type Language = 'en' | 'hi' | 'hinglish'
+export type Language = 'en' | 'hi' | 'hinglish' | 'mr'
 export type TranslationKey = keyof typeof dict.en
 
-export const LANGUAGES: readonly Language[] = ['en', 'hi', 'hinglish']
+export const LANGUAGES: readonly Language[] = ['en', 'hi', 'hinglish', 'mr']
 /** Short label for language toggles. */
-export const LANGUAGE_LABELS: Record<Language, string> = { en: 'EN', hi: 'हिं', hinglish: 'Hing' }
+export const LANGUAGE_LABELS: Record<Language, string> = { en: 'EN', hi: 'हिं', hinglish: 'Hing', mr: 'मरा' }
 
 /**
  * Hinglish (romanised Hindi + English) UI labels. Partial on purpose: any key
  * missing here falls back to English, which is what Hinglish speakers read anyway.
  */
+
+/** Marathi UI labels. Partial: missing keys fall back to English. */
+const marathi: Partial<Record<TranslationKey, string>> = {
+  'brand.tag': 'हवामान माहिती',
+  'nav.primary': 'मुख्य नेव्हिगेशन',
+  'nav.menu': 'मेनू उघडा',
+  'nav.dashboard': 'डॅशबोर्ड',
+  'nav.map': 'नकाशा',
+  'nav.alerts': 'इशारे',
+  'nav.climate': 'हवामान इतिहास',
+  'nav.settings': 'सेटिंग्ज',
+  'nav.home': 'जिवंत आकाश',
+  'nav.classic': 'क्लासिक',
+  'nav.signin': 'साइन इन',
+  'nav.disaster': 'धोका फलक',
+  'current.title': 'सध्याचे हवामान',
+  'current.error': 'हवामान माहिती लोड झाली नाही.',
+  'current.empty': 'हवामान पाहण्यासाठी ठिकाण निवडा.',
+  'forecast.title': '7 दिवसांचा अंदाज',
+  'forecast.empty': 'अंदाज पाहण्यासाठी ठिकाण निवडा.',
+  'intel.empty': 'या ठिकाणासाठी सध्या कोणतीही सूचना नाही.',
+  'intel.why': 'का',
+  'intel.action': 'काय करावे',
+  'field.precipitation': 'पाऊस',
+  'field.wind': 'वारा',
+  'field.condition': 'स्थिती',
+  'field.updated': 'अद्यतनित',
+  'chat.placeholder': 'पुण्यात उद्या पाऊस पडेल का?',
+  'chat.ask': 'विचारा',
+  'chat.label': 'हवामानाबद्दल विचारा',
+  'chat.hint': 'प्रश्नात शहराचे नाव लिहा किंवा आधी ठिकाण निवडा.',
+  'location.button': 'माझे सध्याचे ठिकाण वापरा',
+  'location.detecting': 'ठिकाण शोधत आहे…',
+  'location.denied': 'ठिकाणाची परवानगी नाकारली',
+  'location.error': 'ठिकाण सापडले नाही',
+  'location.manual': 'शहराचे नाव लिहा',
+  'severity.low': 'कमी',
+  'severity.moderate': 'मध्यम',
+  'severity.high': 'जास्त',
+  'severity.advisory': 'सूचना',
+  'severity.watch': 'सावधान',
+  'severity.warning': 'इशारा',
+  'alerts.title': 'हवामान इशारे',
+  'alerts.none': 'या ठिकाणासाठी सध्या कोणताही इशारा नाही.',
+  'alerts.routine': 'सध्या परिस्थिती सामान्य आणि सुरक्षित आहे.',
+  'alerts.action': 'काय करावे',
+  'alerts.threshold': 'ओलांडलेली मर्यादा',
+  'voice.listening': 'ऐकत आहे… तुमचा प्रश्न बोला',
+  'voice.speaking': 'उत्तर बोलत आहे…',
+  'voice.start': 'बोलून प्रश्न विचारा',
+  'voice.stop': 'ऐकणे थांबवा',
+  'voice.stopSpeaking': 'बोलणे थांबवा',
+  'voice.denied': 'मायक्रोफोनची परवानगी नाकारली',
+  'voice.unsupported': 'या ब्राउझरमध्ये आवाज सुविधा नाही',
+  'sky.title': 'आकाशाला विचारा',
+  'sky.subtitle': 'थेट वातावरण कन्सोल · English · हिंदी · मराठी',
+  'sky.send': 'पाठवा',
+  'sky.useLocation': 'माझे ठिकाण',
+  'sky.locating': 'ठिकाण शोधत आहे…',
+  'sky.scanning': 'वातावरण तपासत आहे',
+  'sky.thread': 'प्रश्नोत्तरे',
+  'sky.threadEmpty': 'अजून प्रश्न नाहीत. कोणत्याही शहराबद्दल विचारा.',
+  'sky.error': 'जोडणी अयशस्वी',
+  'sky.needLocation': 'ठिकाण आवश्यक',
+  'sky.signedIn': 'जतन केलेले ठिकाण सुरू',
+  'panel.temperature': 'तापमान',
+  'panel.rain': 'पाऊस',
+  'panel.wind': 'वारा',
+  'panel.humidity': 'आर्द्रता',
+  'panel.location': 'ठिकाण',
+  'panel.condition': 'आकाशाची स्थिती',
+  'panel.timeline': 'अंदाज वेळरेषा · 7 दिवस',
+  'panel.map': 'नकाशा',
+  'panel.advisory': 'सूचना',
+  'panel.climate': 'हवामान · मागील वर्षांशी तुलना',
+  'panel.gfs': 'GFS मॉडेल',
+  'panel.air': 'हवेची गुणवत्ता · AQI',
+  'panel.uv': 'UV निर्देशांक',
+  'source.explicit_query': 'प्रश्न',
+  'source.request_coordinates': 'GPS',
+  'source.trusted_user_default': 'जतन',
+  'source.conversation_context': 'मागील प्रश्न',
+  'sky.verified': 'स्रोत: Open-Meteo · पडताळलेले',
+  'sky.preview': 'पूर्वावलोकन',
+  'sky.unavailable': 'अंदाज कालावधीत नाही',
+}
+
 const hinglish: Partial<Record<TranslationKey, string>> = {
   'brand.tag': 'Weather Intelligence',
   'nav.menu': 'Menu kholo',
@@ -267,6 +358,8 @@ const hinglish: Partial<Record<TranslationKey, string>> = {
   'nav.disaster': 'Risk board',
   'panel.climate': 'Climate · pichhle saalon se',
   'panel.gfs': 'GFS model',
+  'panel.air': 'Air quality · AQI',
+  'panel.uv': 'UV index',
   'sky.verified': 'Source: Open-Meteo · verified',
   'sky.preview': 'Preview',
   'sky.unavailable': 'Forecast window mein nahi',
@@ -289,8 +382,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       language,
       setLanguage,
       t: (key) =>
-        (language === 'hinglish' ? hinglish[key] : (dict[language][key] as string | undefined)) ??
-        dict.en[key],
+        (language === 'hinglish'
+          ? hinglish[key]
+          : language === 'mr'
+            ? marathi[key]
+            : (dict[language][key] as string | undefined)) ?? dict.en[key],
     }),
     [language, setLanguage]
   )

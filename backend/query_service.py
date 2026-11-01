@@ -167,6 +167,7 @@ def select_period_facts(
             wind_gusts_10m=current.wind_gusts_10m,
             visibility=_km(current.visibility),
             cloud_cover=current.cloud_cover,
+            uv_index=current.uv_index,
             weather_code=current.weather_code,
             weather_description=weather_code_description(current.weather_code),
             period_available=True,
@@ -223,6 +224,7 @@ def select_period_facts(
         gusts = _optional_series(weather.hourly.wind_gusts_10m, indexes)
         visibility = _optional_series(weather.hourly.visibility, indexes)
         clouds = _optional_series(weather.hourly.cloud_cover, indexes)
+        uvs = _optional_series(weather.hourly.uv_index, indexes)
 
         facts = WeatherFacts(
             source="open-meteo",
@@ -240,6 +242,7 @@ def select_period_facts(
             wind_gusts_10m=round(max(gusts), 1) if gusts else None,
             visibility=_km(min(visibility)) if visibility else None,
             cloud_cover=round(sum(clouds) / len(clouds)) if clouds else None,
+            uv_index=round(max(uvs), 1) if uvs else None,
             weather_code=code,
             weather_description=weather_code_description(code),
             period_available=True,
@@ -264,8 +267,46 @@ _FOCUS_DROPS: dict[WeatherParameter, tuple[str, ...]] = {
     "storm": ("relative_humidity_2m",),
     "humidity": ("precipitation", "wind_speed_10m", "wind_direction_10m"),
     "advisory": (),
+    "air_quality": (
+        "temperature_2m", "temperature_min", "temperature_max", "precipitation",
+        "precipitation_probability", "wind_speed_10m", "wind_direction_10m", "relative_humidity_2m",
+    ),
+    "uv": (
+        "precipitation", "precipitation_probability", "wind_speed_10m", "wind_direction_10m",
+        "relative_humidity_2m",
+    ),
     "general": (),
 }
+
+
+def period_bounds(weather: WeatherResponse, intent: ChatIntent) -> Optional[tuple[datetime, datetime]]:
+    """Naive local (start, end) hours of the requested window; None for "now"."""
+    if intent.date_reference == "now" or _use_current(intent):
+        return None
+    tz = _zone(weather.timezone)
+    now = datetime.now(tz)
+    hours = [
+        _parse_local(ts, tz) for ts in weather.hourly.time
+    ]
+    inside = [h for h in hours if _hour_in_window(h, now, intent.date_reference)]
+    if not inside:
+        return None
+    return inside[0].replace(tzinfo=None), inside[-1].replace(tzinfo=None)
+
+
+def with_air_quality(facts: WeatherFacts, summary) -> WeatherFacts:
+    """Copy of *facts* with the PM means and AQI of an air.service.AirQualitySummary."""
+    if summary is None:
+        return facts
+    return facts.model_copy(
+        update={
+            "pm2_5": summary.pm2_5,
+            "pm10": summary.pm10,
+            "aqi": summary.aqi,
+            "aqi_category": summary.aqi_category,
+            "aqi_dominant": summary.aqi_dominant,
+        }
+    )
 
 
 def focus_facts(facts: WeatherFacts, parameter: WeatherParameter) -> WeatherFacts:

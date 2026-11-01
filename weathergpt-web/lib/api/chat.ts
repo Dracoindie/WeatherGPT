@@ -36,8 +36,10 @@ export type WeatherParameter =
   | 'storm'
   | 'humidity'
   | 'advisory'
+  | 'air_quality'
+  | 'uv'
   | 'general'
-export type ResponseLanguage = 'en' | 'hi' | 'hinglish'
+export type ResponseLanguage = 'en' | 'hi' | 'hinglish' | 'mr'
 export type LocationSource =
   | 'explicit_query'
   | 'request_coordinates'
@@ -67,6 +69,19 @@ export interface WeatherFacts {
   /** degrees the wind blows from, at the period's peak-wind hour */
   wind_direction_10m: number | null
   relative_humidity_2m: number | null
+  /** km/h, peak gust over the period */
+  wind_gusts_10m?: number | null
+  /** km, lowest over the period */
+  visibility?: number | null
+  cloud_cover?: number | null
+  /** current, or peak over the period */
+  uv_index?: number | null
+  /** µg/m³ means and the Indian AQI (CPCB method) computed from them */
+  pm2_5?: number | null
+  pm10?: number | null
+  aqi?: number | null
+  aqi_category?: string | null
+  aqi_dominant?: string | null
   weather_code: number | null
   weather_description: string | null
   period_available: boolean

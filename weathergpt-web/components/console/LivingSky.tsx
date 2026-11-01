@@ -41,6 +41,7 @@ import {
 } from '@/components/panels/WeatherPanels'
 import { RainGlass } from '@/components/panels/RainGlass'
 import { ClimateComparePanel, GfsPanel } from '@/components/panels/SourcePanels'
+import { AirPanels } from '@/components/panels/AirPanels'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { ForecastTimeline } from '@/components/panels/ForecastTimeline'
 import type { ThreadEntry } from './types'
@@ -80,6 +81,7 @@ const HERE_QUERY: Record<Language, string> = {
   en: "What's the weather here right now?",
   hi: 'अभी यहाँ मौसम कैसा है?',
   hinglish: 'Yahan abhi mausam kaisa hai?',
+  mr: 'इथे आत्ता हवामान कसे आहे?',
 }
 
 export default function LivingSky() {
@@ -131,7 +133,7 @@ export default function LivingSky() {
   // Voice: mic questions go straight to ask(); their answers are spoken unless muted.
   const voice = useVoice((text) => void ask(text, undefined, true))
   const [voiceLangChoice, setVoiceLang] = useState<VoiceLanguage | null>(null)
-  const voiceLang: VoiceLanguage = voiceLangChoice ?? (language === 'hi' ? 'hi' : 'en')
+  const voiceLang: VoiceLanguage = voiceLangChoice ?? (language === 'hi' || language === 'mr' ? language : 'en')
   const spoken = useRef(new Set<number>())
   const { muted, speak } = voice
   useEffect(() => {
@@ -324,6 +326,7 @@ export default function LivingSky() {
                 {res.climate && <ClimateComparePanel facts={res.climate} />}
                 {res.nwp && <GfsPanel facts={res.nwp} />}
                 {res.advisory && <AdvisoryPanel advisory={res.advisory} />}
+                <AirPanels latitude={res.location.latitude} longitude={res.location.longitude} />
               </motion.section>
             )}
           </AnimatePresence>

@@ -27,7 +27,7 @@ Rules:
 - Never claim an alert exists unless it is in the Intelligence Advisory JSON.
 - If period_available is false, say the requested time window is not in the forecast.
 - Use only the numbers and place name in the facts JSON.
-- Reply in the requested language (en, hi, or hinglish).
+- Reply in the requested language (en, hi, hinglish, or mr = Marathi in Devanagari).
 - Be concise (1–3 sentences).
 - You are not a meteorological data source; Open-Meteo is.
 """
@@ -57,6 +57,10 @@ def allowed_numbers(facts: WeatherFacts) -> set[str]:
         facts.wind_gusts_10m,
         facts.visibility,
         facts.cloud_cover,
+        facts.uv_index,
+        facts.pm2_5,
+        facts.pm10,
+        facts.aqi,
     ]
     tokens: set[str] = set()
     for value in values:
@@ -100,6 +104,9 @@ def numbers_grounded(text: str, allowed: set[str]) -> bool:
         token = match.group(0)
         if token in allowed:
             continue
+        # "PM2.5" / "PM10" name a pollutant; the digits are not a value
+        if text[max(0, match.start() - 2) : match.start()].upper() == "PM":
+            continue
         # Allow trailing .0 variants
         try:
             as_float = float(token)
@@ -140,8 +147,136 @@ WHEN: dict[str, dict[str, str]] = {
 }
 
 
+_MARATHI_WEEKDAYS = ("सोमवारी", "मंगळवारी", "बुधवारी", "गुरुवारी", "शुक्रवारी", "शनिवारी", "रविवारी")
+_MARATHI_WHEN = {
+    "now": "आत्ता",
+    "today": "आज",
+    "tomorrow": "उद्या",
+    "day_after_tomorrow": "परवा",
+    "tonight": "आज रात्री",
+    "this_afternoon": "आज दुपारी",
+    **dict(zip(WEEKDAYS, _MARATHI_WEEKDAYS)),
+}
+for _key, _phrase in _MARATHI_WHEN.items():
+    WHEN[_key]["mr"] = _phrase
+
+
 def when_phrase_for(date_reference: str, language: ResponseLanguage) -> str:
     return WHEN[date_reference][language]
+
+
+AQI_LABELS: dict[str, dict[str, str]] = {
+    "good": {"en": "Good", "hi": "अच्छा", "hinglish": "good", "mr": "चांगली"},
+    "satisfactory": {"en": "Satisfactory", "hi": "संतोषजनक", "hinglish": "satisfactory", "mr": "समाधानकारक"},
+    "moderate": {"en": "Moderately polluted", "hi": "मध्यम प्रदूषित", "hinglish": "moderate", "mr": "मध्यम प्रदूषित"},
+    "poor": {"en": "Poor", "hi": "खराब", "hinglish": "poor", "mr": "वाईट"},
+    "very_poor": {"en": "Very poor", "hi": "बहुत खराब", "hinglish": "very poor", "mr": "अतिशय वाईट"},
+    "severe": {"en": "Severe", "hi": "गंभीर", "hinglish": "severe", "mr": "गंभीर"},
+}
+UV_LABELS: dict[str, dict[str, str]] = {
+    "low": {"en": "Low", "hi": "कम", "hinglish": "low", "mr": "कमी"},
+    "moderate": {"en": "Moderate", "hi": "मध्यम", "hinglish": "moderate", "mr": "मध्यम"},
+    "high": {"en": "High", "hi": "उच्च", "hinglish": "high", "mr": "जास्त"},
+    "very_high": {"en": "Very high", "hi": "बहुत उच्च", "hinglish": "very high", "mr": "खूप जास्त"},
+    "extreme": {"en": "Extreme", "hi": "अत्यधिक", "hinglish": "extreme", "mr": "अतिजास्त"},
+}
+
+
+def air_quality_sentence(loc: str, when: str, facts: WeatherFacts, lang: ResponseLanguage) -> str:
+    if facts.aqi is None or facts.aqi_category is None:
+        return {
+            "en": f"Air quality data for {loc} is not available right now.",
+            "hi": f"{loc} के लिए वायु गुणवत्ता डेटा अभी उपलब्ध नहीं है।",
+            "hinglish": f"{loc} ke liye air quality data abhi available nahi hai.",
+            "mr": f"{loc} साठी हवेच्या गुणवत्तेची माहिती सध्या उपलब्ध नाही.",
+        }[lang]
+    cat = AQI_LABELS[facts.aqi_category][lang]
+    pm = ", ".join(
+        part
+        for part in (
+            f"PM2.5 {_fmt(facts.pm2_5)} µg/m³" if facts.pm2_5 is not None else None,
+            f"PM10 {_fmt(facts.pm10)} µg/m³" if facts.pm10 is not None else None,
+        )
+        if part
+    )
+    return {
+        "en": f"Air quality in {loc} {when}: AQI {facts.aqi} ({cat}, India CPCB scale), {pm} — computed from Open-Meteo (CAMS) model data, not a CPCB station.",
+        "hi": f"{loc} में {when} वायु गुणवत्ता: AQI {facts.aqi} ({cat}), {pm} — Open-Meteo (CAMS) मॉडल डेटा से गणना, CPCB स्टेशन रीडिंग नहीं।",
+        "hinglish": f"{loc} mein {when} air quality: AQI {facts.aqi} ({cat}), {pm} — Open-Meteo (CAMS) model data se calculate, CPCB station reading nahi.",
+        "mr": f"{loc} मध्ये {when} हवेची गुणवत्ता: AQI {facts.aqi} ({cat}), {pm} — Open-Meteo (CAMS) मॉडेल माहितीवरून गणना, CPCB स्टेशन वाचन नाही.",
+    }[lang]
+
+
+def uv_sentence(loc: str, when: str, facts: WeatherFacts, lang: ResponseLanguage) -> str:
+    from air.aqi import uv_category
+
+    if facts.uv_index is None:
+        return {
+            "en": f"UV index data for {loc} is not available right now.",
+            "hi": f"{loc} के लिए UV इंडेक्स डेटा अभी उपलब्ध नहीं है।",
+            "hinglish": f"{loc} ke liye UV index data abhi available nahi hai.",
+            "mr": f"{loc} साठी UV निर्देशांकाची माहिती सध्या उपलब्ध नाही.",
+        }[lang]
+    uv = _fmt(facts.uv_index)
+    category = uv_category(facts.uv_index) or "low"
+    cat = UV_LABELS[category][lang]
+    protect = category in {"high", "very_high", "extreme"}
+    return {
+        "en": f"The UV index in {loc} {when} is {uv} ({cat}) (Open-Meteo)." + (" Use sun protection around midday." if protect else ""),
+        "hi": f"{loc} में {when} UV इंडेक्स {uv} ({cat}) है (Open-Meteo)।" + (" दोपहर में धूप से बचाव करें।" if protect else ""),
+        "hinglish": f"{loc} mein {when} UV index {uv} ({cat}) hai (Open-Meteo)." + (" Dopahar mein dhoop se bachav karo." if protect else ""),
+        "mr": f"{loc} मध्ये {when} UV निर्देशांक {uv} ({cat}) आहे (Open-Meteo)." + (" दुपारी उन्हापासून संरक्षण घ्या." if protect else ""),
+    }[lang]
+
+
+def _template_mr(param, loc, when, temp, tmin, tmax, precip, prob, wind, humidity, desc) -> str:
+    """Marathi weather reply; same facts and branches as the other languages."""
+    if param == "precipitation":
+        if precip is not None and prob is not None:
+            return f"{loc} मध्ये {when} एकूण पाऊस {precip} मिमी आणि पावसाची कमाल शक्यता {prob}% आहे (Open-Meteo)."
+        if precip is not None:
+            return f"{loc} मध्ये {when} पाऊस {precip} मिमी आहे (Open-Meteo)."
+    if param == "heavy_rain" and precip is not None:
+        chance = f", कमाल शक्यता {prob}%" if prob is not None else ""
+        return f"{loc} मध्ये {when} मुसळधार पावसाची तपासणी: एकूण पाऊस {precip} मिमी{chance} (Open-Meteo)."
+    if param == "rain_likelihood" and prob is not None:
+        amount = f", अंदाजे पाऊस {precip} मिमी" if precip is not None else ""
+        return f"{loc} मध्ये {when} पावसाची शक्यता कमाल {prob}% आहे{amount} (Open-Meteo)."
+    if param in ("heavy_rain", "rain_likelihood") and precip is not None:
+        return f"{loc} मध्ये {when} पाऊस {precip} मिमी आहे (Open-Meteo)."
+    if param == "storm" and (wind or precip is not None or desc):
+        parts = []
+        if desc:
+            parts.append(desc)
+        if wind:
+            parts.append(f"वारा {wind} किमी/तास पर्यंत")
+        if precip is not None:
+            parts.append(f"पाऊस {precip} मिमी")
+        return f"{loc} मध्ये {when} वादळाची तपासणी: {', '.join(parts)} (Open-Meteo)."
+    if param == "high_temperature" and tmax:
+        return f"{loc} मध्ये {when} कमाल तापमान {tmax}°C असेल (Open-Meteo)."
+    if param == "high_temperature" and temp:
+        return f"{loc} मध्ये {when} तापमान {temp}°C आहे (Open-Meteo)."
+    if param == "temperature" and tmin and tmax:
+        return f"{loc} मध्ये {when} तापमान सुमारे {tmin}°C ते {tmax}°C असेल (Open-Meteo)."
+    if param == "temperature" and temp:
+        return f"{loc} मध्ये {when} तापमान {temp}°C आहे (Open-Meteo)."
+    if param == "wind" and wind:
+        return f"{loc} मध्ये {when} वाऱ्याचा वेग {wind} किमी/तास आहे (Open-Meteo)."
+    if param == "strong_wind" and wind:
+        return f"{loc} मध्ये {when} वाऱ्याचा वेग {wind} किमी/तास पर्यंत आहे (Open-Meteo)."
+    if param == "humidity" and humidity:
+        return f"{loc} मध्ये {when} आर्द्रता {humidity}% आहे (Open-Meteo)."
+    parts = []
+    if temp:
+        parts.append(f"तापमान {temp}°C")
+    if desc:
+        parts.append(desc)
+    if precip:
+        parts.append(f"पाऊस {precip} मिमी")
+    if not parts:
+        return f"{loc} साठी Open-Meteo कडून हवामान माहिती मिळाली, पण निवडलेली मूल्ये उपलब्ध नाहीत."
+    return f"{loc} मध्ये {when} {', '.join(parts)} (Open-Meteo)."
 
 
 def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
@@ -150,6 +285,11 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
     when_phrase = when_phrase_for(intent.date_reference, language)
 
     if not facts.period_available:
+        if language == "mr":
+            return (
+                f"{loc} साठी {when_phrase} चा अंदाज या स्रोतात उपलब्ध नाही. "
+                "आज, उद्या किंवा सध्याचे हवामान विचारा."
+            )
         if language == "hi":
             return (
                 f"{loc} के लिए {when_phrase} का पूर्वानुमान इस स्रोत में उपलब्ध नहीं है। "
@@ -178,6 +318,13 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
     wind = _fmt(facts.wind_speed_10m)
     humidity = _fmt(facts.relative_humidity_2m)
     desc = facts.weather_description
+
+    if param == "air_quality":
+        return air_quality_sentence(loc, when_phrase, facts, language)
+    if param == "uv":
+        return uv_sentence(loc, when_phrase, facts, language)
+    if language == "mr":
+        return _template_mr(param, loc, when_phrase, temp, tmin, tmax, precip, prob, wind, humidity, desc)
 
     if language == "hi":
         if param == "precipitation":
@@ -351,6 +498,8 @@ def template_response(intent: ChatIntent, facts: WeatherFacts) -> str:
 
 
 def ask_for_location(intent: ChatIntent) -> str:
+    if intent.language == "mr":
+        return "कृपया शहर किंवा ठिकाण सांगा. ठिकाणाशिवाय हवामान सांगता येत नाही."
     if intent.language == "hi":
         return "कृपया शहर या स्थान बताएँ। बिना स्थान के मौसम नहीं बताया जा सकता।"
     if intent.language == "hinglish":
@@ -359,6 +508,8 @@ def ask_for_location(intent: ChatIntent) -> str:
 
 
 def unknown_location(intent: ChatIntent, place: str) -> str:
+    if intent.language == "mr":
+        return f"'{place}' हे ठिकाण सापडले नाही. दुसरे शहर वापरून पाहा."
     if intent.language == "hi":
         return f"स्थान '{place}' नहीं मिला। कोई और शहर आज़माएँ।"
     if intent.language == "hinglish":
@@ -369,7 +520,7 @@ def unknown_location(intent: ChatIntent, place: str) -> str:
 async def generate_response(intent: ChatIntent, facts: WeatherFacts, advisory: Optional[AdvisoryResult] = None) -> str:
     templated = template_response(intent, facts)
     if advisory and should_mention_advisory(advisory, intent.weather_parameter):
-        label = "सलाह" if intent.language == "hi" else "Advisory"
+        label = {"hi": "सलाह", "mr": "सूचना"}.get(intent.language, "Advisory")
         templated += f" {label}: {localized_advisory(advisory, intent.language)}"
 
     try:

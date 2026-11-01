@@ -20,12 +20,15 @@ const EXAMPLES = [
   'Will it be windy in Chennai tonight?',
   'Jaipur mein aaj garmi kitni hai?',
   'बेंगलुरु में अभी मौसम कैसा है?',
+  'पुण्यात उद्या पाऊस पडेल का?',
+  'What is the AQI in Delhi today?',
 ]
 
 const CHIPS = [
   'Mumbai mein abhi mausam?',
   'Will it rain in Pune tomorrow?',
   'दिल्ली में आज तापमान?',
+  'पुण्यात उद्या पाऊस पडेल का?',
 ]
 
 const DEVANAGARI = /[ऀ-ॿ]/

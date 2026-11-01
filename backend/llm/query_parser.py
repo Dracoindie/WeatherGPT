@@ -102,6 +102,28 @@ _CITY_NAMES = (
     "हैदराबाद",
     "चेन्नई",
     "कोलकाता",
+    # Marathi spellings and locative forms
+    "पुण्यात",
+    "पुण्याला",
+    "मुंबईत",
+    "नागपूर",
+    "नागपुरात",
+    "कोल्हापूर",
+    "कोल्हापुरात",
+    "सोलापूर",
+    "सोलापुरात",
+    "ठाणे",
+    "ठाण्यात",
+    "सातारा",
+    "साताऱ्यात",
+    "रत्नागिरी",
+    "रत्नागिरीत",
+    "औरंगाबाद",
+    "छत्रपती संभाजीनगर",
+    "punyat",
+    "mumbait",
+    "nagpurat",
+    "nashikla",
 )
 
 _CITY_DEVANAGARI = {
@@ -114,12 +136,33 @@ _CITY_DEVANAGARI = {
     "हैदराबाद": "Hyderabad",
     "चेन्नई": "Chennai",
     "कोलकाता": "Kolkata",
+    "पुण्यात": "Pune",
+    "पुण्याला": "Pune",
+    "मुंबईत": "Mumbai",
+    "नागपूर": "Nagpur",
+    "नागपुरात": "Nagpur",
+    "कोल्हापूर": "Kolhapur",
+    "कोल्हापुरात": "Kolhapur",
+    "सोलापूर": "Solapur",
+    "सोलापुरात": "Solapur",
+    "ठाणे": "Thane",
+    "ठाण्यात": "Thane",
+    "सातारा": "Satara",
+    "साताऱ्यात": "Satara",
+    "रत्नागिरी": "Ratnagiri",
+    "रत्नागिरीत": "Ratnagiri",
+    "औरंगाबाद": "Chhatrapati Sambhajinagar",
+    "छत्रपती संभाजीनगर": "Chhatrapati Sambhajinagar",
+    "punyat": "Pune",
+    "mumbait": "Mumbai",
+    "nagpurat": "Nagpur",
+    "nashikla": "Nashik",
 }
 
 # Weekday names: English, romanised Hindi (Hinglish) and Devanagari.
 _WEEKDAY_PATTERNS: dict[DateReference, tuple[str, str]] = {
     "monday": (r"monday|som(?:v|w)aa?r", "सोमवार"),
-    "tuesday": (r"tuesday|mangal(?:v|w)aa?r", "मंगलवार"),
+    "tuesday": (r"tuesday|mangal(?:v|w)aa?r|mangalvar", "मंगलवार|मंगळवार"),
     "wednesday": (r"wednesday|budh(?:v|w)aa?r", "बुधवार"),
     "thursday": (
         r"thursday|guru(?:v|w)aa?r|brihaspati(?:v|w)aa?r|veer(?:v|w)aa?r",
@@ -130,7 +173,7 @@ _WEEKDAY_PATTERNS: dict[DateReference, tuple[str, str]] = {
     "sunday": (r"sunday|ravi(?:v|w)aa?r|it(?:v|w)aa?r", "रविवार|इतवार"),
 }
 _WEEKDAY_WORDS = "|".join(roman for roman, _ in _WEEKDAY_PATTERNS.values())
-_DAY_AFTER_TOMORROW = r"day after tomorrow|parso|parson"
+_DAY_AFTER_TOMORROW = r"day after tomorrow|parso|parson|parva"
 
 # Raw numerical model output (only GFS is wired up; WRF/ECMWF questions get GFS).
 _NWP = re.compile(
@@ -152,8 +195,8 @@ _PARSE_SYSTEM = """You extract weather-query slots. Reply with JSON only:
   "climate_period": "last_30_days" | "this_month" | "this_year" | null,
   "location_name": string or null,
   "date_reference": "now" | "today" | "tomorrow" | "day_after_tomorrow" | "tonight" | "this_afternoon" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday",
-  "weather_parameter": "temperature" | "high_temperature" | "precipitation" | "heavy_rain" | "rain_likelihood" | "wind" | "strong_wind" | "storm" | "humidity" | "advisory" | "general",
-  "language": "en" | "hi" | "hinglish"
+  "weather_parameter": "temperature" | "high_temperature" | "precipitation" | "heavy_rain" | "rain_likelihood" | "wind" | "strong_wind" | "storm" | "humidity" | "advisory" | "air_quality" | "uv" | "general",
+  "language": "en" | "hi" | "hinglish" | "mr"
 }
 Rules:
 - location_name is a place the user named. If none, null. Never invent a city.
@@ -163,15 +206,33 @@ Rules:
 - Weekday names in English, Hindi (सोमवार…) or Hinglish (somvar…) → that weekday in lowercase English.
 - "baarish" / "rain" → precipitation. temperature words → temperature.
 - Hindi in Devanagari → language "hi". Mixed Hindi roman + English → "hinglish".
+- Marathi (Devanagari or romanised: aahe, udya, paus, madhye…) → "mr". "उद्या" → tomorrow, "परवा" → day_after_tomorrow.
+- Air quality / AQI / pollution / PM2.5 → "air_quality". UV index → "uv".
 - Comparisons with past years / usual / normal / climate trends → intent "climate"; set climate_period
   ("this year" → this_year, "this month" → this_month, otherwise last_30_days).
 - Questions about GFS, NWP, WRF or "the model" → intent "nwp".
 """
 
 
+# Words that are Marathi, not Hindi (Devanagari), and romanised Marathi.
+_MARATHI_WORDS = (
+    "आहे", "आहेत", "होईल", "पडेल", "पाऊस", "पावसा", "उद्या", "परवा", "मध्ये", "काय", "किती",
+    "हवामान", "आत्ता", "सध्या", "रात्री", "दुपारी", "वारा", "वाऱ्या", "थंडी", "उकाडा", "उष्णता",
+    "गुणवत्ता", "हवेची", "पुण्यात", "मुंबईत", "नागपुरात", "ळ",
+)
+_MARATHI_ROMAN = re.compile(
+    r"\b(aahe|ahe|hoil|padel|paus|pavus|pavsachi|udya|parva|madhye|kiti|havaman|aatta|sadhya|"
+    r"thandi|ukada|vara|punyat|mumbait|nagpurat)\b"
+)
+_HINDI_ROMAN = re.compile(r"\b(hai|hoga|hogi|mein|kya|kal|baarish|barish|garmi|mausam)\b")
+
+
 def detect_language(message: str) -> ResponseLanguage:
     if re.search(r"[\u0900-\u097F]", message):
-        return "hi"
+        return "mr" if any(w in message for w in _MARATHI_WORDS) else "hi"
+    lower_text = _normalize(message)
+    if _MARATHI_ROMAN.search(lower_text) and not _HINDI_ROMAN.search(lower_text):
+        return "mr"
     hinglish_tokens = (
         "baarish",
         "barish",
@@ -282,13 +343,15 @@ def _extract_date(message: str) -> DateReference:
     for day, (roman, devanagari) in _WEEKDAY_PATTERNS.items():
         if re.search(rf"\b(?:{roman})\b", lower) or re.search(devanagari, message):
             return day
+    if "परवा" in message:
+        return "day_after_tomorrow"
     if re.search(r"[\u0900-\u097F]*कल\b", message) or re.search(
-        r"\b(kal|tomorrow)\b", lower
-    ):
+        r"\b(kal|tomorrow|udya)\b", lower
+    ) or "उद्या" in message:
         return "tomorrow"
-    if re.search(r"\b(tonight|raat|raat ko)\b", lower) or "रात" in message:
+    if re.search(r"\b(tonight|raat|raat ko|ratri)\b", lower) or "रात" in message:
         return "tonight"
-    if re.search(r"\b(this afternoon|afternoon|dopahar|dopahar ko)\b", lower) or "दोपहर" in message:
+    if re.search(r"\b(this afternoon|afternoon|dopahar|dopahar ko|dupari)\b", lower) or "दोपहर" in message or "दुपारी" in message:
         return "this_afternoon"
     if re.search(r"\b(aaj|today)\b", lower) or "आज" in message:
         return "today"
@@ -297,6 +360,33 @@ def _extract_date(message: str) -> DateReference:
 
 def _extract_parameter(message: str) -> WeatherParameter:
     lower = _normalize(message)
+    if re.search(r"\b(aqi|air quality|air pollution|pollution|pollutant|smog|pm2\.?5|pm10|pradushan|hawa ki quality)\b", lower) or any(
+        w in message for w in ("वायु गुणवत्ता", "प्रदूषण", "हवेची गुणवत्ता", "हवा की गुणवत्ता", "वायू गुणवत्ता")
+    ):
+        return "air_quality"
+    if re.search(r"\b(uv|uv index|ultraviolet|sunburn)\b", lower) or "यूवी" in message or "यूव्ही" in message or "पराबैंगनी" in message:
+        return "uv"
+    # Marathi "हवामान" (weather) contains Hindi "हवा" (wind); it names no parameter.
+    message = message.replace("हवामान", " ")
+    # Marathi
+    if "वादळ" in message or re.search(r"\bvadal\b", lower):
+        return "storm"
+    if "जोरदार वारा" in message or "वादळी वारा" in message:
+        return "strong_wind"
+    if "मुसळधार" in message or "अतिवृष्टी" in message or re.search(r"\bmusaldhar\b", lower):
+        return "heavy_rain"
+    if "पाऊस" in message or "पावसा" in message or re.search(r"\b(paus|pavus|pavsachi)\b", lower):
+        return "precipitation"
+    if "उष्णता" in message or "उकाडा" in message or "गरम" in message or re.search(r"\bukada\b", lower):
+        return "high_temperature"
+    if "थंडी" in message or re.search(r"\bthandi\b", lower):
+        return "temperature"
+    if "वारा" in message or "वाऱ्या" in message or re.search(r"\bvara\b", lower):
+        return "wind"
+    if "आर्द्रता" in message:
+        return "humidity"
+    if "इशारा" in message:
+        return "advisory"
     # comparative words (climate questions): "hotter than usual", "a wetter year"
     if re.search(r"\b(hotter|warmer|garam)\b", lower) or "गर्म" in message:
         return "high_temperature"
@@ -395,20 +485,8 @@ def parse_query_fallback(message: str) -> ChatIntent:
 def _intent_from_llm_dict(data: dict, fallback: ChatIntent) -> ChatIntent:
     allowed_intent: set[str] = set(get_args(IntentType))
     allowed_date: set[str] = set(get_args(DateReference))
-    allowed_param: set[str] = {
-        "temperature",
-        "high_temperature",
-        "precipitation",
-        "heavy_rain",
-        "rain_likelihood",
-        "wind",
-        "strong_wind",
-        "storm",
-        "humidity",
-        "advisory",
-        "general",
-    }
-    allowed_lang: set[str] = {"en", "hi", "hinglish"}
+    allowed_param: set[str] = set(get_args(WeatherParameter))
+    allowed_lang: set[str] = set(get_args(ResponseLanguage))
 
     intent = data.get("intent") if data.get("intent") in allowed_intent else fallback.intent
     date_reference = (

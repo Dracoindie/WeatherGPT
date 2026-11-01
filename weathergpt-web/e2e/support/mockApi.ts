@@ -103,6 +103,17 @@ export const GFS_FACTS = {
   period_available: true,
 }
 
+export const AIR_QUALITY = {
+  timezone: 'Asia/Kolkata',
+  last_24h: { window: '2026-11-01T00:00 to 2026-11-01T23:00', hours: 24, pm2_5: 48.2, pm10: 92.6, aqi: 81, aqi_category: 'satisfactory', aqi_dominant: 'pm2_5', note: 'Indian AQI computed by WeatherGPT (CPCB method) from modelled PM data; not a CPCB station reading.' },
+  next_24h: { window: '2026-11-02T00:00 to 2026-11-02T23:00', hours: 24, pm2_5: 70.4, pm10: 120.1, aqi: 135, aqi_category: 'moderate', aqi_dominant: 'pm2_5', note: '' },
+  uv_index: 7.4,
+  uv_max_today: 8.6,
+  uv_category: 'high',
+  uv_max_category: 'very_high',
+  note: 'AQI computed by WeatherGPT with the CPCB method from Open-Meteo (CAMS) modelled PM2.5/PM10; not a CPCB monitoring-station reading.',
+}
+
 export interface ChatOverrides {
   message?: string
   language?: 'en' | 'hi' | 'hinglish' | 'mr'
@@ -288,6 +299,8 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
         return json(route, climateResponse())
       case '/api/nwp':
         return json(route, nwpResponse())
+      case '/api/air-quality':
+        return json(route, AIR_QUALITY)
       default:
         return json(route, { detail: `Not mocked: ${pathname}` }, 404)
     }
