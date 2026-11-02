@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import math
 import os
 from dataclasses import asdict
 from typing import Optional
@@ -105,7 +106,8 @@ async def send_test_alert(authorization: Optional[str] = Header(default=None)):
 
     wait = demo_push.limiter.retry_after(user_id)
     if wait > 0:
-        seconds = int(wait) + 1
+        # ceil, not int()+1: a wait of exactly 60.0 (same clock tick) must say 60, not 61
+        seconds = max(1, math.ceil(wait))
         return JSONResponse(
             status_code=429,
             headers={"Retry-After": str(seconds)},

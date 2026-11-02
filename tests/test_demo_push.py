@@ -200,6 +200,17 @@ def test_one_test_per_minute_per_user(wire):
     assert len(sender.calls) == 2
 
 
+def test_retry_after_never_exceeds_the_window(wire, monkeypatch):
+    """Two requests in the same clock tick (Windows: ~15 ms) wait exactly 60 s, not 61."""
+    _, _ = wire([row("s1", USER_A, "https://push/a")])
+    monkeypatch.setattr(demo_push.limiter, "clock", lambda: 5000.0)
+    assert post("token-a").status_code == 200
+    second = post("token-a")
+    assert second.status_code == 429
+    assert second.headers["Retry-After"] == "60"
+    assert second.json()["retry_after"] == 60
+
+
 def test_rate_limiter_window():
     now = [1000.0]
     lim = demo_push.RateLimiter(window=60, clock=lambda: now[0])
