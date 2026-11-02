@@ -1,0 +1,6 @@
+# Deployment files are read by Linux tools: keep LF even with core.autocrlf on Windows.
+backend/Dockerfile text eol=lf
+backend/.dockerignore text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
