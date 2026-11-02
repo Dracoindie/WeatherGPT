@@ -179,10 +179,10 @@ npm run dev               # http://localhost:3000
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 663 passed. Everything is mocked, so no network is needed. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 664 passed. Everything is mocked, so no network is needed. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build` | succeeds. **Needed before Playwright**, which runs `next start` on port 3100. |
-| E2E | `npx playwright test --grep-invert @screens` | 102 passed, 20 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route). |
+| E2E | `npx playwright test --grep-invert @screens` | 104 passed, 22 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route) and `e2e/contrast.spec.ts`. |
 | Screenshots | `npx playwright test --grep @screens` | 14 passed. Output goes to `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored). |
 | Design audit | `AUDIT_DIR=screenshots/audit-after npx playwright test e2e/audit.spec.ts` | 6 passed. Every route signed out and in demo, 1440 and 390 px (`docs/DESIGN_AUDIT.md`). |
 | Parser benchmark | `backend/.venv/Scripts/python tests/eval/run_eval.py --quiet`; add `--queries tests/eval/heldout.jsonl` for the held-out set | **91.7% held-out (the headline)**, 99.2% tuning set |

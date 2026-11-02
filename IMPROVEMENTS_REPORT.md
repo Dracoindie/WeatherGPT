@@ -10,10 +10,10 @@ All eight tasks are done, with one focused commit per task (plus the alerts-502 
 - `demo-v3` (`a32582e`) is the state before the env, test-push, i18n and design work below.
 - `demo-v4` (`b2a9e93`) is the state before the deployment, geocoding and accessibility work below.
 
-**Checks** (run after the accessibility pass, `6023080`)
-- Backend: `pytest tests/` gives **663 passed** (645 at `demo-v4`; 600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
+**Checks** (run after the severity text shades, `e39674c`)
+- Backend: `pytest tests/` gives **664 passed** (645 at `demo-v4`; 600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
 - Frontend: eslint is clean and `npm run build` succeeds.
-- E2E: Playwright **102 passed** and 20 skipped across desktop and mobile, including 21 axe accessibility tests. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
+- E2E: Playwright **104 passed** and 22 skipped across desktop and mobile, including 21 axe tests and the token contrast check. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
 - Screenshots: **14 passed**. Design audit: **6 passed** (`screenshots/audit-{before,after}/`).
 
 ## What was done
@@ -145,7 +145,7 @@ Design rules for future work are in `CLAUDE.md` ("Design rules"). Before and aft
 | `084c650` | **No hard-coded district coordinates.**<br>- `/disaster` stores names only. `GET /api/geocode` resolves them through the shared Nominatim client (1 request/s for all users).<br>- Hits persist in `backend/data/geocode_cache.json`: git-ignored, 30 days, atomic writes, `GEOCODE_CACHE_PATH` to move or disable it. Tests never touch the real file.<br>- Each district appears as soon as it is located. "Finding Nagpur…", "Place not found" and "Location service unavailable" are shown in all four languages.<br>- User-added districts go through the backend too, not Nominatim from the browser.<br>- The per-process push-test rate limit is documented in `docs/EARLY_WARNING.md`. |
 | `02ceab0` | **Deployment files.**<br>- `backend/Dockerfile`: non-root, one uvicorn worker on `$PORT`, health check. Two variants: `WITH_NWP=1` (about 760 MB) and `WITH_NWP=0` (about 300 MB, `/api/nwp` answers 503). Both were built and smoke-tested locally, and GRIB decoding was verified in the full image.<br>- `render.yaml`, `backend/railway.json`.<br>- CI workflow (pytest, eslint, build, Playwright). Simulated locally with the placeholder env: 81 passed.<br>- Alert-job cron every 15 min. It skips itself until `ALERT_JOB_TOKEN` and `BACKEND_URL` exist, and logs counts only.<br>- `/health` reports `nwp`.<br>- `next.config` pins the tracing/turbopack root (a stray root `package-lock.json` confused Next).<br>- `docs/DEPLOYMENT.md`. |
 | `86498fb` | LF line endings for the Dockerfile and YAML, so Windows checkouts still build. |
-| `6023080` | **Accessibility.**<br>- axe-core (WCAG 2.1 AA) on every route, desktop and mobile.<br>- Fixed: the logo name, the icon-only send button, the keyboard-unreachable timeline scroller.<br>- One persistent live region announces each chat reply in full.<br>- A visible focus ring everywhere.<br>- Dim text raised to ≥4.5:1 on glass over a bright day sky.<br>- A keyboard-only test: Tab to the nav and console, Enter asks, the reply is announced. |
+| `6023080` | **Accessibility.**<br>- axe-core (WCAG 2.1 AA) on every route, desktop and mobile.<br>- Fixed: the logo name, the icon-only send button, the keyboard-unreachable timeline scroller.<br>- One persistent live region announces each chat reply in full.<br>- A visible focus ring everywhere.<br>- Dim text raised (0.78; later corrected to 0.88 in `e39674c`, see below).<br>- A keyboard-only test: Tab to the nav and console, Enter asks, the reply is announced. |
 | `91c0457` | **README "For SIH26068 judges"**: pitch, requirement table, 91.7% held-out accuracy, Mermaid diagram, 4 screenshots, run-it-in-5-minutes. |
 
 ### First-load JavaScript
@@ -165,16 +165,22 @@ Measured in Chromium against `next start`. Backend calls are blocked, so the num
 
 Before and after are identical. The 3D split was already right: `SkyCanvas` is a client-only dynamic import that loads only on `/`, only with WebGL, and not under reduced motion or lite mode. Inner pages load no three.js. The shared base of about 240 kB gzip is the next lever (Supabase client, framer-motion, the i18n dictionary); it was not changed here.
 
+### Follow-up: answers to the questions below
+
+| Commit | Change |
+|--------|--------|
+| `bdff4bc` | **`eccodes` pinned.** `eccodes==2.50.0` everywhere, `eccodeslib==2.50.0.33` on Linux only (no Windows wheel; the Windows eccodes wheel bundles the DLL). The local venv was upgraded from 2.48.0; GRIB decoding was verified on Windows and in the Docker image. The `WITH_NWP=0` image drops the new pins too (still 297 MB), and a test checks the filter. |
+| `4748027` | **Root `package.json` / `package-lock.json` removed.** Only leaflet/react-leaflet, which `weathergpt-web/package.json` declares itself; nothing referenced them. Build, lint and e2e pass without them. |
+| `e39674c` | **AA text shades for severity and accent.**<br>- Strong colours stay for fills, borders, dots, glows and markers. Text and icons use `--sev-*-text` (the -200 shades; warning `#fecdd3`), `text-sev-*-text` or `SEVERITY_TEXT_VAR`, plus `--sky-accent-text`, which turns amber or rose with the severity state. In a warning the red accent text had been about 2.2:1.<br>- `--sky-text-dim` alpha is now 0.88. The 0.78 from `6023080` was measured against a sky darker than the real day horizon; the true figure was 4.2:1, now 4.8:1.<br>- `e2e/contrast.spec.ts` computes every ratio from the live tokens over each sky phase's real colours (`PALETTES`), on glass and inside badge tints. It also fails on strong colours used as text in the source; on its first run it found a missed alert value in `AlertList`.<br>- CLAUDE.md design rule 3 updated. |
+
 ## Needs your input
 
 1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
-2. **Severity red as text by day.** `--sev-warning` (#f43f5e) used as *text* on a glass panel over a bright daytime sky is about 2.9:1, below AA. Badges and borders are fine. A lighter text shade (for example a `--sev-warning-text` token) would fix it, but it changes the severity palette, so it is your call.
-3. **`eccodes` is not pinned.** cfgrib pulls it in. Locally it is 2.48.0; the Docker build got 2.50.0 (plus `eccodeslib`). Pin both in `backend/requirements.txt` for reproducible images? (Ground rule 7: I didn't add pins without asking.)
-4. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
-5. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
-6. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session.
-7. **Root `package.json` / `package-lock.json`** (leaflet only, from the first commit) look unused. Delete them? Next is now pinned to `weathergpt-web/`, so they are harmless.
-8. **Still open from before:**
+2. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
+3. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
+4. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session.
+5. **Local leftovers (not in git).** The ignored root `node_modules/` (from the removed root `package.json`) and the stray `D:\ci_sim_build.log` can be deleted.
+6. **Still open from before:**
    - real-device speech recognition for mr-IN
    - no WRF source
    - AQI is modelled, not CPCB stations
