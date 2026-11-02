@@ -207,6 +207,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
 - `docs/EARLY_WARNING.md`: push, CAP, WhatsApp, VAPID setup, the job
 - `docs/ROLE_ADVISORIES.md`: farmer and aviation thresholds
 - `docs/AUTH_LOCATION_ARCHITECTURE.md`: trusted location and RLS
+- `docs/DEPLOYMENT.md`: Render/Railway (`backend/Dockerfile`, `render.yaml`), Vercel, Supabase auth URLs, GitHub secrets, smoke test
 
 **Not part of the repo:**
 - `Herbie/`, `agents/`, `IndicTrans2/`, `WeatherGPT-Resources/Herbie/` and `lovable_ui_extracted/` are git-ignored third-party clones or local files. Don't edit or commit them.

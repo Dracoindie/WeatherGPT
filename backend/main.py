@@ -113,9 +113,15 @@ def root():
 
 @app.get("/health")
 def health():
+    """Liveness probe for the host (Render/Railway health check).
+
+    ``nwp`` says whether GFS decoding is available in this build; it is false
+    in an image built with WITH_NWP=0, where /api/nwp returns a clean 503.
+    """
     return {
         "status": "ok",
         "service": "WeatherGPT API",
+        "nwp": nwp_router is not None,
     }
 
 

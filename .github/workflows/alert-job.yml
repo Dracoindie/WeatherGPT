@@ -1,0 +1,56 @@
+# Every 15 minutes, ask the backend to check every push subscription and send
+# a notification where severity has just become "warning".
+#
+# Off until configured: it does nothing (and passes) until both exist:
+#   Settings → Secrets and variables → Actions
+#     Secrets   → ALERT_JOB_TOKEN  (same value as the backend's ALERT_JOB_TOKEN)
+#     Variables → BACKEND_URL      (e.g. https://weathergpt-api.onrender.com, no trailing slash)
+#
+# GitHub may start scheduled runs a few minutes late, and pauses schedules in a
+# repository with no commits for 60 days (re-enable from the Actions tab).
+name: Alert job
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: alert-job
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ALERT_JOB_TOKEN: ${{ secrets.ALERT_JOB_TOKEN }}
+      BACKEND_URL: ${{ vars.BACKEND_URL }}
+    steps:
+      - name: Skip until configured
+        id: gate
+        run: |
+          if [ -z "$ALERT_JOB_TOKEN" ] || [ -z "$BACKEND_URL" ]; then
+            echo "::notice::Alert job not configured yet (needs secret ALERT_JOB_TOKEN and variable BACKEND_URL). Skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wake the backend
+        if: steps.gate.outputs.ready == 'true'
+        # Free hosts sleep when idle; the first request can take ~1 minute.
+        run: curl --silent --show-error --fail --retry 5 --retry-delay 10 --retry-all-errors --max-time 90 "$BACKEND_URL/health"
+
+      - name: POST /api/alerts/check
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          code=$(curl --silent --show-error --output report.json --write-out '%{http_code}' \
+            --max-time 180 --retry 2 --retry-delay 15 \
+            -X POST -H "X-Job-Token: $ALERT_JOB_TOKEN" "$BACKEND_URL/api/alerts/check")
+          echo "HTTP $code"
+          # Counts only: logs of a public repo are public, so never print subscription ids.
+          jq -c 'del(.details)' report.json 2>/dev/null || head -c 300 report.json; echo
+          test "$code" = "200"

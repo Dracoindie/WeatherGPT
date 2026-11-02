@@ -1,0 +1,17 @@
+# Keep the image small and secrets out of it.
+.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+data/
+*.grib
+*.grib2
+*.idx
+*.nc
+*.log
+requirements-future.txt
+gis/
+voice/
