@@ -257,6 +257,18 @@ export interface MockOptions {
   routes?: Record<string, unknown>
   /** Fail backend paths with an HTTP status, e.g. { '/api/alerts': 503 }. */
   fail?: Record<string, number>
+  /** /api/geocode: delay (ms) or HTTP status per district name (first part of q). */
+  geocodeDelay?: Record<string, number>
+  geocodeStatus?: Record<string, number>
+}
+
+interface BoardRow { name: string; latitude: number; longitude: number; [k: string]: unknown }
+
+/** Deterministic fake coordinates inside Maharashtra for any place name. */
+function fakeCoords(name: string) {
+  let h = 0
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return { latitude: 16 + (h % 500) / 100, longitude: 73 + ((h >> 9) % 600) / 100 }
 }
 
 /** Requests the app sent to the mocked backend, for assertions. */
@@ -277,6 +289,31 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
     log.paths.push(pathname)
     if (opts.fail && pathname in opts.fail) {
       return json(route, { detail: 'Alerts are temporarily unavailable.' }, opts.fail[pathname])
+    }
+    if (pathname === '/api/geocode') {
+      const q = new URL(req.url()).searchParams.get('q') ?? ''
+      const name = q.split(',')[0].trim()
+      const delay = opts.geocodeDelay?.[name]
+      if (delay) await new Promise((r) => setTimeout(r, delay))
+      const status = opts.geocodeStatus?.[name]
+      if (status) return json(route, { detail: 'mocked failure' }, status)
+      const board = opts.routes?.['/api/risk'] as { districts?: BoardRow[] } | undefined
+      const known = board?.districts?.find((d) => d.name.startsWith(name) || d.name.includes(`(${name})`))
+      const at = known ? { latitude: known.latitude, longitude: known.longitude } : fakeCoords(name)
+      return json(route, { query: q, name: `${name}, Maharashtra, India`, ...at })
+    }
+    if (pathname === '/api/risk' && opts.routes?.['/api/risk']) {
+      // Answer per requested district: the fixture row by name, else a calm row.
+      const board = opts.routes['/api/risk'] as { districts: BoardRow[]; [k: string]: unknown }
+      const asked = ((req.postDataJSON() ?? {}) as { districts?: BoardRow[] }).districts ?? []
+      const districts = asked.map(
+        (d) =>
+          board.districts.find((b) => b.name === d.name) ?? {
+            ...d, severity: 'none', alerts_count: 0, headline: null,
+            rain_24h_mm: 0, max_wind_24h_kmh: 10, max_temperature_24h_c: 30, error: null,
+          }
+      )
+      return json(route, { ...board, districts })
     }
     if (opts.routes && pathname in opts.routes) return json(route, opts.routes[pathname])
     switch (pathname) {

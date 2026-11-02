@@ -24,7 +24,13 @@ def disable_live_integrations(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def reset_geocoding_cache():
+def isolated_geocode_file(monkeypatch, tmp_path):
+    """Never read or write the real backend/data/geocode_cache.json in tests."""
+    monkeypatch.setenv("GEOCODE_CACHE_PATH", str(tmp_path / "geocode_cache.json"))
+
+
+@pytest.fixture(autouse=True)
+def reset_geocoding_cache(isolated_geocode_file):
     """Each test starts with an empty Nominatim cache and rate-limit clock."""
     import geocoding
 

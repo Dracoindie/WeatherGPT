@@ -153,6 +153,18 @@ export const getAviationBriefing = (lat: number, lon: number, signal?: AbortSign
 export const getModelComparison = (lat: number, lon: number, signal?: AbortSignal) =>
   call<ModelComparison>(`/api/compare?${q(lat, lon)}&hours=24`, { signal })
 
+export interface GeocodeResult {
+  query: string
+  name: string
+  latitude: number
+  longitude: number
+}
+
+/** A place name to coordinates through the backend's Nominatim client
+ * (1 request/s, persistent cache). 404: unknown place; 503: service down. */
+export const geocodePlace = (q: string, signal?: AbortSignal) =>
+  call<GeocodeResult>(`/api/geocode?q=${encodeURIComponent(q)}`, { signal })
+
 export const getRiskBoard = (districts: District[], signal?: AbortSignal) =>
   call<RiskBoard>('/api/risk', {
     method: 'POST',

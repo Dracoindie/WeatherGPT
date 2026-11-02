@@ -20,12 +20,23 @@ export const SEVERITY_COLOR: Record<RiskLevel, string> = {
   unknown: '#94a3b8',
 }
 
+/** Fit the map to the points when the set of points changes, and again when the
+ * panel resizes (districts arrive one by one and the list beside it grows). */
 function Fit({ points }: { points: [number, number][] }) {
   const map = useMap()
+  const key = points.map((p) => p.join(',')).join(';')
   useEffect(() => {
-    if (points.length === 1) map.setView(points[0], 8)
-    else if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [24, 24] })
-  }, [map, points])
+    const pts = key ? key.split(';').map((p) => p.split(',').map(Number) as [number, number]) : []
+    const fit = () => {
+      map.invalidateSize()
+      if (pts.length === 1) map.setView(pts[0], 8)
+      else if (pts.length > 1) map.fitBounds(L.latLngBounds(pts), { padding: [24, 24] })
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(map.getContainer())
+    return () => observer.disconnect()
+  }, [map, key])
   return null
 }
 

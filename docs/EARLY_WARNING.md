@@ -21,7 +21,20 @@ On a calm day the job never sends anything, so `/alerts` has a **Send test alert
 - **Auth:** the backend verifies the token with Supabase Auth (`GET /auth/v1/user`, which checks the signature) and takes the user id from that response.
 - **Own subscriptions only:** rows are read with the user's own JWT and the anon key (RLS applies), filtered by `user_id=eq.<id>`, and any row for another user is dropped. The service-role key is not used.
 - **Text:** title "WeatherGPT test alert", body "TEST: WeatherGPT demo alert, not an official IMD warning".
-- **Rate limit:** one test per user per minute (HTTP 429 with `Retry-After`). An attempt with no subscriptions does not use up the minute. The limit is in memory, per backend process.
+- **Rate limit:** one test per user per minute (HTTP 429 with `Retry-After`, in whole seconds, never more than 60). An attempt with no subscriptions does not use up the minute.
+
+#### The rate limit is per backend process
+
+The limiter (`dissemination/demo_push.py`, `RateLimiter`) is a dictionary in the backend's memory. That has three consequences:
+
+| Deployment | What happens |
+|------------|--------------|
+| One uvicorn process (`uvicorn main:app`, the default and what `docs/DEPLOYMENT.md` uses) | Exactly one test per user per minute. |
+| Several workers (`--workers 4`) or several instances behind a load balancer | Each process has its own memory, so a user can get up to one test per minute **per process**. |
+| A restart or redeploy | The limit resets; a user can send a test straight away. |
+
+This is acceptable for a demo button: the worst case is a few extra test notifications to the user's *own* devices (the endpoint never sends to anyone else). If you need a strict limit across processes, store the last send time in a shared place, for example a `push_test_log` row in Supabase or Redis, and check it before sending. Keep the production backend on a **single worker** until then (`--workers 1`).
+
 - **No effect on the real job:** nothing is written back. `last_severity` and `last_notified_at` stay as they were, so a real warning is still sent when it starts.
 - **Result:** `status` is `sent`, `failed`, `disabled` (push not configured) or `no_subscription`, with `sent` / `total` counts. The UI shows it under the button.
 

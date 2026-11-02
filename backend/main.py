@@ -30,6 +30,7 @@ from api.climate import router as climate_router  # noqa: E402
 from api.roles import router as roles_router  # noqa: E402
 from api.dissemination import router as dissemination_router  # noqa: E402
 from api.air import router as air_router  # noqa: E402
+from api.geocode import router as geocode_router  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ app.include_router(climate_router)
 app.include_router(roles_router)
 app.include_router(dissemination_router)
 app.include_router(air_router)
+app.include_router(geocode_router)
 
 
 # ---------------------------------------------------------------------------

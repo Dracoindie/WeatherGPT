@@ -8,12 +8,21 @@ City coordinates are NEVER hardcoded — Nominatim is the resolver.
 
 Usage policy (https://operations.osmfoundation.org/policies/nominatim/):
 at most 1 request per second, and results are cached in memory.
+
+Forward-search hits are also kept in a small JSON file
+(GEOCODE_CACHE_PATH, default backend/data/geocode_cache.json, git-ignored), so
+fixed lists such as the /disaster default districts survive a restart without
+re-querying Nominatim. Entries expire after PERSISTENT_TTL_S. Misses are not
+persisted (a place may be added to OSM later).
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
+import tempfile
 import time
 from typing import Any, Optional
 
@@ -31,17 +40,88 @@ CACHE_TTL_S = 24 * 60 * 60
 CACHE_MAX_ENTRIES = 1024
 MIN_REQUEST_INTERVAL_S = 1.0
 
+PERSISTENT_TTL_S = 30 * 24 * 60 * 60
+PERSISTENT_MAX_ENTRIES = 2000
+DEFAULT_PERSISTENT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "geocode_cache.json")
+
 _cache: dict[tuple, tuple[float, Any]] = {}
 _rate_lock = asyncio.Lock()
 _last_request_at: Optional[float] = None
+# key (casefolded query) -> {"lat", "lon", "name", "saved_at" (epoch seconds)}
+_persistent: Optional[dict[str, dict[str, Any]]] = None
+
+
+def persistent_cache_path() -> Optional[str]:
+    """File for the persistent cache; GEOCODE_CACHE_PATH="" turns it off."""
+    path = os.getenv("GEOCODE_CACHE_PATH")
+    if path is None:
+        return DEFAULT_PERSISTENT_PATH
+    return path or None
 
 
 def clear_cache() -> None:
-    """Drop cached results and the rate-limit state (used by tests)."""
-    global _last_request_at, _rate_lock
+    """Drop in-memory results and the rate-limit state (used by tests).
+
+    The persistent file is left alone; it is re-read on next use.
+    """
+    global _last_request_at, _rate_lock, _persistent
     _cache.clear()
     _last_request_at = None
     _rate_lock = asyncio.Lock()
+    _persistent = None
+
+
+def _load_persistent() -> dict[str, dict[str, Any]]:
+    global _persistent
+    if _persistent is not None:
+        return _persistent
+    _persistent = {}
+    path = persistent_cache_path()
+    if not path or not os.path.exists(path):
+        return _persistent
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            _persistent = {k: v for k, v in data.items() if isinstance(v, dict)}
+    except (OSError, ValueError) as exc:
+        logger.warning("Geocode cache file unreadable, starting empty: %s", exc)
+    return _persistent
+
+
+def _persistent_get(query_key: str) -> Optional["GeoResult"]:
+    if not persistent_cache_path():
+        return None
+    entry = _load_persistent().get(query_key)
+    if not entry:
+        return None
+    try:
+        if time.time() - float(entry["saved_at"]) > PERSISTENT_TTL_S:
+            return None
+        return GeoResult(latitude=float(entry["lat"]), longitude=float(entry["lon"]), name=str(entry["name"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _persistent_put(query_key: str, result: "GeoResult") -> None:
+    path = persistent_cache_path()
+    if not path:
+        return
+    store = _load_persistent()
+    store[query_key] = {"lat": result.latitude, "lon": result.longitude, "name": result.name, "saved_at": time.time()}
+    if len(store) > PERSISTENT_MAX_ENTRIES:
+        for old in sorted(store, key=lambda k: store[k].get("saved_at", 0))[: len(store) - PERSISTENT_MAX_ENTRIES]:
+            del store[old]
+    try:
+        directory = os.path.dirname(path) or "."
+        os.makedirs(directory, exist_ok=True)
+        # Write to a temp file, then rename: a crash never leaves half a file.
+        fd, tmp = tempfile.mkstemp(dir=directory, prefix=".geocode_cache.", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(store, fh, ensure_ascii=False, indent=0)
+        os.replace(tmp, path)
+    except OSError as exc:
+        logger.warning("Could not write geocode cache file: %s", exc)
 
 
 def _cache_get(key: tuple) -> tuple[bool, Any]:
@@ -97,12 +177,19 @@ async def geocode_place(place_name: str) -> Optional[GeoResult]:
     if not query:
         return None
 
-    key = ("search", query.casefold())
+    query_key = " ".join(query.casefold().split())
+    key = ("search", query_key)
     hit, cached = _cache_get(key)
     if hit:
         return cached
+    stored = _persistent_get(query_key)
+    if stored is not None:
+        _cache_put(key, stored)
+        return stored
     result = await _geocode_uncached(query)
     _cache_put(key, result)
+    if result is not None:
+        _persistent_put(query_key, result)
     return result
 
 

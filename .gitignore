@@ -29,6 +29,9 @@ Thumbs.db
 *.nc
 *.nc4
 
+# Persistent geocode cache (Nominatim results; rebuilt on demand)
+backend/data/geocode_cache.json
+
 # Logs
 *.log
 .aider*

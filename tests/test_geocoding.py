@@ -66,7 +66,8 @@ class TestCache:
         assert _run(geocoding.geocode_place("Pune")).name.startswith("Pune")
         assert http.await_count == 2
 
-    def test_entries_expire_after_ttl(self, http, sleeps):
+    def test_entries_expire_after_ttl(self, http, sleeps, monkeypatch):
+        monkeypatch.setenv("GEOCODE_CACHE_PATH", "")  # memory TTL only, no file layer
         http.return_value = _response(SEARCH_OK)
         with patch("geocoding.time.monotonic", return_value=1000.0):
             _run(geocoding.geocode_place("Pune"))
@@ -131,7 +132,8 @@ class TestRateLimit:
         with patch("geocoding.MIN_REQUEST_INTERVAL_S", 0.05):
             elapsed = asyncio.run(_timed(burst))
         assert http.await_count == 3
-        assert elapsed >= 0.1  # two enforced gaps
+        # two enforced gaps; 10 ms slack for the ~15 ms time.monotonic tick on Windows
+        assert elapsed >= 0.09
 
 
 async def _timed(fn):

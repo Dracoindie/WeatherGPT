@@ -268,6 +268,14 @@ fails, the answer uses the coordinates and calls the place "selected location".
 **Geocoding:** Nominatim results are cached in memory for 24 h and requests are spaced at least
 1 s apart, per the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/).
 
+### Geocoding
+
+`GET /api/geocode?q=<place>` returns `{query, name, latitude, longitude}` from Nominatim. It returns 404 for an unknown place and 503 when the location service is down.
+
+- Requests are spaced at least 1 s apart (Nominatim policy), across all users.
+- Results are cached in memory for 24 h. Hits are also saved to `backend/data/geocode_cache.json` (git-ignored, 30 days), so they survive a restart. Set `GEOCODE_CACHE_PATH` to move that file, or to an empty string to turn it off.
+- The `/disaster` board stores district **names** only and resolves them here. Each district appears as soon as it is located. The first run takes about 1 s per district; after that the lookups come from the cache.
+
 **LLM provider setup** (optional)
 
 Set on the FastAPI process (see `.env.example` and `backend/llm/provider.py`):
