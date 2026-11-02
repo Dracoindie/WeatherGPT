@@ -8,6 +8,10 @@ pywebpush==2.5.0
 # NWP (GRIB via cfgrib/eccodes). Optional at runtime: /api/nwp is skipped if missing.
 xarray==2026.7.0
 cfgrib==0.9.15.1
+# ecCodes, pulled in by cfgrib. Pinned for reproducible images: on Windows the eccodes
+# wheel bundles the C library; on Linux it comes from the eccodeslib wheel.
+eccodes==2.50.0
+eccodeslib==2.50.0.33; sys_platform == "linux"
 # dev / test
 pytest==9.1.1
 pytest-asyncio==1.4.0

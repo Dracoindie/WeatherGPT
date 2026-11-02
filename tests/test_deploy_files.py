@@ -26,6 +26,18 @@ def test_dockerfile_runs_one_uvicorn_worker_on_port_env():
     assert "USER app" in text
 
 
+def test_lite_image_drops_every_nwp_requirement():
+    """WITH_NWP=0 must filter out each NWP pin in requirements.txt, or the lite image grows."""
+    import re
+
+    text = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    pattern = re.search(r"grep -vE '(\^\([^']+\)==)' /tmp/req.txt", text).group(1)
+    reqs = (ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    nwp = [line for line in reqs if line.split("==")[0] in {"xarray", "cfgrib", "eccodes", "eccodeslib"}]
+    assert len(nwp) == 4
+    assert all(re.match(pattern, line) for line in nwp)
+
+
 def test_dockerignore_keeps_secrets_and_venv_out():
     lines = set((ROOT / "backend" / ".dockerignore").read_text(encoding="utf-8").split())
     assert {".env", ".env.*", ".venv/", "data/"} <= lines
