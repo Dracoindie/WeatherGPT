@@ -27,7 +27,7 @@ test('the same nav on every page, with the active page marked', async ({ page, i
     await expect(page.locator('.sky-root')).toHaveCount(1)
     await expect(page.locator('a[href="/classic"]')).toHaveCount(0)
     // logo always leads home
-    await expect(page.getByRole('link', { name: /WeatherGPT — Living Sky/ })).toHaveAttribute('href', '/')
+    await expect(page.getByRole('link', { name: /^WeatherGPT\s*SIH26068$/ })).toHaveAttribute('href', '/')
     const nav = isMobile ? page.getByRole('navigation', { name: 'Bottom navigation' }) : page.getByRole('navigation', { name: 'Primary navigation' })
     for (const l of LINKS) {
       await expect(nav.locator(`a[href="${l}"]`)).toHaveCount(1)

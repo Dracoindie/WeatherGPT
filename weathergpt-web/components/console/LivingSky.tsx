@@ -321,6 +321,10 @@ export default function LivingSky() {
           </section>
 
           <section className="mx-auto mt-8 max-w-3xl">
+            {/* Always mounted, so screen readers announce each new reply once, in full. */}
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="reply-announcer">
+              {active?.status === 'done' ? active.response?.message : active?.status === 'error' ? active.error : ''}
+            </div>
             <AnimatePresence mode="wait">
               {active?.status === 'pending' && (
                 <motion.div

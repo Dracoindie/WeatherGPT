@@ -52,7 +52,7 @@ export function Typewriter({ text, speed = 16, onDone, className }: TypewriterPr
   const visible = reduced ? parts.length : count
   const typing = visible < parts.length
   return (
-    <p className={className} aria-live="polite">
+    <p className={className}>
       <span className="sr-only">{text}</span>
       <span aria-hidden="true">
         {parts.slice(0, visible).join('')}

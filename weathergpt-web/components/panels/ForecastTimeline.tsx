@@ -150,7 +150,13 @@ export function ForecastTimeline({ weather }: Props) {
           </div>
         </div>
 
-        <div ref={scroller} className="sky-scroll -mx-1 overflow-x-auto px-1 pb-2">
+        <div
+          ref={scroller}
+          className="sky-scroll -mx-1 overflow-x-auto px-1 pb-2"
+          tabIndex={0}
+          role="region"
+          aria-label={t('panel.timeline')}
+        >
           <svg
             width={width}
             height={H}

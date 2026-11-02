@@ -115,8 +115,8 @@ export function SkyNav() {
     // Soft scrim keeps nav text readable over a bright clear-sky scene.
     <header className="relative z-40 bg-gradient-to-b from-black/45 via-black/15 to-transparent">
       <div className="mx-auto flex h-16 max-w-[1500px] items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="group flex shrink-0 items-center gap-3" aria-label="WeatherGPT — Living Sky">
-          <span className="relative grid size-9 place-items-center rounded-xl border border-accent/40 bg-black/40 shadow-[0_0_24px_-6px_var(--sky-accent)]">
+        <Link href="/" className="group flex shrink-0 items-center gap-3">
+          <span aria-hidden="true" className="relative grid size-9 place-items-center rounded-xl border border-accent/40 bg-black/40 shadow-[0_0_24px_-6px_var(--sky-accent)]">
             <span className="absolute inset-1.5 rounded-lg border border-accent/25" />
             <span className="font-hud text-sm font-bold text-accent">W</span>
           </span>

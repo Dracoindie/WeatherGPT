@@ -210,6 +210,7 @@ export function AskConsole({
           <button
             type="submit"
             disabled={busy || value.trim() === ''}
+            aria-label={t('sky.send')}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 font-hud text-xs font-bold uppercase tracking-[0.18em] text-black shadow-[0_0_24px_-4px_var(--sky-accent)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowUpRight className="size-4" />}
