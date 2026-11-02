@@ -73,7 +73,7 @@ export default function DashboardPage() {
             </div>
 
             <ForecastPanel state={w.forecast} />
-            <NwpPanel latitude={w.location.latitude} longitude={w.location.longitude} />
+            <NwpPanel latitude={w.location.latitude} longitude={w.location.longitude} timezone={w.weather?.timezone} />
             <TrustStrip />
           </div>
         )}

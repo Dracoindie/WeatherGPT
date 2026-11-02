@@ -10,15 +10,17 @@ import { fetchNwp, NwpUnavailableError } from '@/lib/api/nwp'
 import type { NwpResponse } from '@/types/nwp'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { fill, useI18n } from '@/context/I18nContext'
-import { formatLocalTime, msToKmh } from '@/lib/format'
+import { formatLocalTime, msToKmh, zonedClock } from '@/lib/format'
 
 interface NwpPanelProps {
   latitude: number | undefined
   longitude: number | undefined
   hours?: number
+  /** IANA zone of the location (Open-Meteo `timezone`); hours show as local clock times */
+  timezone?: string
 }
 
-export function NwpPanel({ latitude, longitude, hours = 12 }: NwpPanelProps) {
+export function NwpPanel({ latitude, longitude, hours = 12, timezone }: NwpPanelProps) {
   const { t, language } = useI18n()
   const [data, setData] = useState<NwpResponse | null>(null)
   const [error, setError] = useState('')
@@ -41,9 +43,18 @@ export function NwpPanel({ latitude, longitude, hours = 12 }: NwpPanelProps) {
   else {
     const run = data.metadata.generationTime.replace(/\+00:00$|Z$/, '')
     const shown = data.forecasts.slice(0, hours)
+    // Valid time = run + lead hour, shown as the location's clock ("17:00");
+    // "+3 h" only if the zone is unknown.
+    const when = (h: number) => {
+      const z = timezone ? zonedClock(data.metadata.generationTime, h, timezone) : null
+      return z ? { label: z.clock, title: `${z.full} (${timezone})` } : { label: `+${h} h`, title: undefined }
+    }
     body = (
       <>
-        <p className="text-xs text-hud-dim">{fill(t('gfs.run'), { time: formatLocalTime(run, language) })}</p>
+        <p className="text-xs text-hud-dim" data-testid="gfs-run">
+          {fill(t('gfs.run'), { time: formatLocalTime(run, language) })}
+          {timezone && <> · {fill(t('gfs.localTimes'), { tz: timezone })}</>}
+        </p>
         {/* Phones: one row per hour. Wider screens: hours run left to right. */}
         <table className="mt-3 w-full text-sm md:hidden" aria-label={t('gfs.title')}>
           <thead>
@@ -57,7 +68,7 @@ export function NwpPanel({ latitude, longitude, hours = 12 }: NwpPanelProps) {
           <tbody className="font-readout tabular-nums text-hud">
             {shown.map((f) => (
               <tr key={f.hour} className="border-t border-white/5">
-                <td className="py-1.5 text-hud-dim">+{f.hour} h</td>
+                <td className="py-1.5 text-hud-dim" title={when(f.hour).title}>{when(f.hour).label}</td>
                 <td className="py-1.5 text-right">{f.temperatureC.toFixed(1)}</td>
                 <td className="py-1.5 text-right">{f.precipitationMm.toFixed(1)}</td>
                 <td className="py-1.5 text-right">{msToKmh(f.windMs).toFixed(1)}</td>
@@ -71,7 +82,9 @@ export function NwpPanel({ latitude, longitude, hours = 12 }: NwpPanelProps) {
               <tr>
                 <th scope="row" className="sky-label w-28 py-1.5 pr-3 text-left font-normal">{t('gfs.hour')}</th>
                 {shown.map((f) => (
-                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud-dim">+{f.hour} h</td>
+                  <td key={f.hour} className="whitespace-nowrap px-1 py-1.5 text-center text-hud-dim" title={when(f.hour).title}>
+                    {when(f.hour).label}
+                  </td>
                 ))}
               </tr>
               <tr className="border-t border-white/5">

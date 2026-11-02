@@ -118,11 +118,18 @@ export function SubscribeAlerts({ location }: Props) {
       </p>
 
       {!user ? (
-        <p className="mt-3 text-sm text-hud">
-          <Link href="/login" className="text-accent-text underline-offset-2 hover:underline">
-            Sign in
-          </Link>{' '}
-          <span className="text-hud-dim">· {t('push.signin')}</span>
+        <p className="mt-3 text-sm text-hud" data-testid="push-signin">
+          {t('push.signin')
+            .split(/(\{link\})/)
+            .map((part, i) =>
+              part === '{link}' ? (
+                <Link key={i} href="/login" className="font-medium text-accent-text underline underline-offset-2">
+                  {t('push.signinLink')}
+                </Link>
+              ) : (
+                part
+              )
+            )}
         </p>
       ) : !supported ? (
         <p className="mt-3 text-sm text-hud-dim">{t('push.unsupported')}</p>

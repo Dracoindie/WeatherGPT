@@ -88,3 +88,30 @@ export function formatSource(source: string | null | undefined): string {
 export function msToKmh(ms: number): number {
   return Math.round(ms * 3.6 * 10) / 10
 }
+
+/**
+ * Wall-clock time in `timeZone` for a UTC instant plus `addHours`, e.g. the
+ * valid time of a GFS step: ("2026-11-01T00:00:00+00:00", 3, "Asia/Kolkata")
+ * gives { clock: "08:30", full: "2026-11-01 08:30" }. Returns null when the
+ * instant or the zone cannot be read.
+ */
+export function zonedClock(utcIso: string, addHours: number, timeZone: string): { clock: string; full: string } | null {
+  const base = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(utcIso) ? utcIso : `${utcIso}Z`)
+  if (Number.isNaN(base)) return null
+  try {
+    const f = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+    const p = Object.fromEntries(f.formatToParts(new Date(base + addHours * 3_600_000)).map((x) => [x.type, x.value]))
+    const clock = `${p.hour}:${p.minute}`
+    return { clock, full: `${p.year}-${p.month}-${p.day} ${clock}` }
+  } catch {
+    return null
+  }
+}

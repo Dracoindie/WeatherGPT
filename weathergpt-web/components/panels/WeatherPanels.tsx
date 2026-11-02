@@ -12,6 +12,7 @@ import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 import { useDescribeWeather } from '@/lib/i18n/weather'
 import { formatWindow } from '@/lib/format'
+import { useRole } from '@/lib/role'
 import { CountUp, formatValue } from './CountUp'
 import { GlassPanel } from './GlassPanel'
 
@@ -347,6 +348,7 @@ function coord(v: number, pos: string, neg: string) {
 export function LocationPanel({ location, facts }: { location: ResolvedLocation; facts: WeatherFacts | null }) {
   const { t, language } = useI18n()
   const describe = useDescribeWeather()
+  const { role } = useRole()
   const SourceIcon = location.source === 'request_coordinates' ? Crosshair : location.source === 'trusted_user_default' ? Navigation : MapPin
 
   return (
@@ -380,8 +382,13 @@ export function LocationPanel({ location, facts }: { location: ResolvedLocation;
         {facts?.weather_description && (
           <p className="mt-3 flex items-center gap-2 text-sm text-hud">
             <Satellite className="size-4 text-accent-text" />
-            <span data-testid="weather-description">{describe(facts.weather_code, facts.weather_description)}</span>
-            {facts.weather_code != null && <span className="font-readout text-[10px] text-hud-dim">WMO {facts.weather_code}</span>}
+            {/* The WMO code is for researchers; everyone else gets it only as a tooltip. */}
+            <span data-testid="weather-description" title={facts.weather_code != null ? `WMO ${facts.weather_code}` : undefined}>
+              {describe(facts.weather_code, facts.weather_description)}
+            </span>
+            {facts.weather_code != null && role === 'researcher' && (
+              <span className="font-readout text-[10px] text-hud-dim" data-testid="wmo-code">WMO {facts.weather_code}</span>
+            )}
           </p>
         )}
       </GlassPanel>

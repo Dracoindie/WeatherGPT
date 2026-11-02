@@ -13,8 +13,9 @@ import { useReducedMotion } from 'framer-motion'
 import { useI18n } from '@/context/I18nContext'
 import { cn } from '@/lib/utils'
 
-// Short enough to fit the console at 390 px (22 characters or fewer); longer
-// text would be ellipsised rather than cut mid-word. e2e/home-layout checks it.
+// Typed out a whole word at a time, so a frame never shows half a word.
+// Phones (< 640 px) get the SHORT list, which fits the docked console at
+// 390 px; anything that still overflows is ellipsised. e2e/home-layout checks it.
 const EXAMPLES = [
   'Pune mein kal baarish?',
   'Delhi temperature now?',
@@ -24,6 +25,17 @@ const EXAMPLES = [
   'बेंगलुरु का मौसम?',
   'पुण्यात उद्या पाऊस?',
   'AQI in Delhi today?',
+]
+
+const SHORT_EXAMPLES = [
+  'Pune rain kal?',
+  'Delhi temp now?',
+  'मुंबई में बारिश?',
+  'Chennai wind?',
+  'Jaipur garmi?',
+  'बेंगलुरु मौसम?',
+  'पुण्यात पाऊस?',
+  'Delhi AQI?',
 ]
 
 const CHIPS = [
@@ -54,46 +66,68 @@ const VOICE_LANGS: { value: VoiceLanguage; label: string }[] = [
   { value: 'mr', label: 'मराठी' },
 ]
 
-/** Types out each example, pauses, erases, moves to the next. */
-function useCyclingPlaceholder(active: boolean): string {
+const NARROW = '(max-width: 639px)'
+
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW)
+    const update = () => setNarrow(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return narrow
+}
+
+/** Types out each example word by word, pauses, erases, moves to the next. */
+function useCyclingPlaceholder(active: boolean): { text: string; full: string } {
   const reduced = useReducedMotion()
-  const [text, setText] = useState(EXAMPLES[0])
+  const examples = useNarrow() ? SHORT_EXAMPLES : EXAMPLES
+  const [state, setState] = useState({ text: EXAMPLES[0], full: EXAMPLES[0] })
 
   useEffect(() => {
-    if (!active || reduced) return
+    if (!active || reduced) {
+      const id = window.setTimeout(() => setState({ text: examples[0], full: examples[0] }), 0)
+      return () => window.clearTimeout(id)
+    }
     let example = 0
-    let chars = 0
+    let count = 0
     let deleting = false
     let timer = 0
+    const show = () => {
+      const words = examples[example].split(' ')
+      setState({ text: words.slice(0, count).join(' '), full: examples[example] })
+      return words.length
+    }
     const tick = () => {
-      const full = Array.from(EXAMPLES[example])
       if (!deleting) {
-        chars += 1
-        setText(full.slice(0, chars).join(''))
-        if (chars >= full.length) {
+        count += 1
+        const total = show()
+        if (count >= total) {
           deleting = true
           timer = window.setTimeout(tick, 1800)
           return
         }
-        timer = window.setTimeout(tick, 45)
+        timer = window.setTimeout(tick, 160)
       } else {
-        chars -= 2
-        setText(full.slice(0, Math.max(0, chars)).join(''))
-        if (chars <= 0) {
+        count -= 1
+        show()
+        if (count <= 0) {
           deleting = false
-          chars = 0
-          example = (example + 1) % EXAMPLES.length
+          count = 0
+          example = (example + 1) % examples.length
           timer = window.setTimeout(tick, 350)
           return
         }
-        timer = window.setTimeout(tick, 18)
+        timer = window.setTimeout(tick, 70)
       }
     }
     timer = window.setTimeout(tick, 400)
     return () => window.clearTimeout(timer)
-  }, [active, reduced])
+  }, [active, reduced, examples])
 
-  return text
+  return state
 }
 
 export function AskConsole({
@@ -111,7 +145,7 @@ export function AskConsole({
   const [focused, setFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const listening = voice?.status === 'listening'
-  const placeholder = useCyclingPlaceholder(value === '' && !listening)
+  const { text: placeholder, full: placeholderFull } = useCyclingPlaceholder(value === '' && !listening)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -158,7 +192,9 @@ export function AskConsole({
                   DEVANAGARI.test(placeholder) && 'deva'
                 )}
               >
-                <span className="min-w-0 truncate">{placeholder}</span>
+                <span className="min-w-0 truncate" data-full={placeholderFull}>
+                  {placeholder}
+                </span>
                 {!focused && <span className="sky-caret shrink-0" />}
               </span>
             )}
