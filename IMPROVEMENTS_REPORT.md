@@ -8,11 +8,12 @@ All eight tasks are done, with one focused commit per task (plus the alerts-502 
 - `demo-v1` (`1dffa1b`) is the state before this work, so `git log demo-v1..HEAD` shows everything below.
 - `demo-v2` (`e92a072`) is the state after task 8.
 - `demo-v3` (`a32582e`) is the state before the env, test-push, i18n and design work below.
+- `demo-v4` (`b2a9e93`) is the state before the deployment, geocoding and accessibility work below.
 
-**Checks** (run after the design overhaul, `76b490c`)
-- Backend: `pytest tests/` gives **645 passed** (600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
+**Checks** (run after the accessibility pass, `6023080`)
+- Backend: `pytest tests/` gives **663 passed** (645 at `demo-v4`; 600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
 - Frontend: eslint is clean and `npm run build` succeeds.
-- E2E: Playwright **79 passed** and 19 skipped across desktop and mobile. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
+- E2E: Playwright **102 passed** and 20 skipped across desktop and mobile, including 21 axe accessibility tests. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
 - Screenshots: **14 passed**. Design audit: **6 passed** (`screenshots/audit-{before,after}/`).
 
 ## What was done
@@ -134,15 +135,46 @@ Design rules for future work are in `CLAUDE.md` ("Design rules"). Before and aft
    - check that notifications for `localhost` are allowed in the browser and in Windows (Settings → System → Notifications);
    - then tap **Alert me** again.
 
+## Deployment readiness, geocoded districts, accessibility, judges' README
+
+`git log demo-v4..HEAD` shows these commits. Nothing was pushed, and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `617cc7f` | **Flaky push test fixed (root cause).** When two test-push requests landed in the same `time.monotonic` tick (about 15 ms on Windows), `Retry-After` was `int(60.0) + 1 = 61`. It is now `ceil`, so never more than 60. A regression test pins the clock. |
+| `084c650` | **No hard-coded district coordinates.**<br>- `/disaster` stores names only. `GET /api/geocode` resolves them through the shared Nominatim client (1 request/s for all users).<br>- Hits persist in `backend/data/geocode_cache.json`: git-ignored, 30 days, atomic writes, `GEOCODE_CACHE_PATH` to move or disable it. Tests never touch the real file.<br>- Each district appears as soon as it is located. "Finding Nagpur…", "Place not found" and "Location service unavailable" are shown in all four languages.<br>- User-added districts go through the backend too, not Nominatim from the browser.<br>- The per-process push-test rate limit is documented in `docs/EARLY_WARNING.md`. |
+| `02ceab0` | **Deployment files.**<br>- `backend/Dockerfile`: non-root, one uvicorn worker on `$PORT`, health check. Two variants: `WITH_NWP=1` (about 760 MB) and `WITH_NWP=0` (about 300 MB, `/api/nwp` answers 503). Both were built and smoke-tested locally, and GRIB decoding was verified in the full image.<br>- `render.yaml`, `backend/railway.json`.<br>- CI workflow (pytest, eslint, build, Playwright). Simulated locally with the placeholder env: 81 passed.<br>- Alert-job cron every 15 min. It skips itself until `ALERT_JOB_TOKEN` and `BACKEND_URL` exist, and logs counts only.<br>- `/health` reports `nwp`.<br>- `next.config` pins the tracing/turbopack root (a stray root `package-lock.json` confused Next).<br>- `docs/DEPLOYMENT.md`. |
+| `86498fb` | LF line endings for the Dockerfile and YAML, so Windows checkouts still build. |
+| `6023080` | **Accessibility.**<br>- axe-core (WCAG 2.1 AA) on every route, desktop and mobile.<br>- Fixed: the logo name, the icon-only send button, the keyboard-unreachable timeline scroller.<br>- One persistent live region announces each chat reply in full.<br>- A visible focus ring everywhere.<br>- Dim text raised to ≥4.5:1 on glass over a bright day sky.<br>- A keyboard-only test: Tab to the nav and console, Enter asks, the reply is announced. |
+| `91c0457` | **README "For SIH26068 judges"**: pitch, requirement table, 91.7% held-out accuracy, Mermaid diagram, 4 screenshots, run-it-in-5-minutes. |
+
+### First-load JavaScript
+
+Measured in Chromium against `next start`. Backend calls are blocked, so the numbers cover only the JS that loads.
+
+| Route | JS files | Raw | Gzip | of which three.js (raw) |
+|-------|---------:|----:|-----:|-----------------------:|
+| `/` (WebGL sky) | 10 | 2007 kB | 565 kB | 940 kB |
+| `/` with reduced motion or lite mode | 9 | 1067 kB | 316 kB | 0 |
+| `/dashboard` | 9 | 880 kB | 256 kB | 0 |
+| `/alerts` | 8 | 871 kB | 253 kB | 0 |
+| `/climate` | 8 | 868 kB | 252 kB | 0 |
+| `/map` | 9 | 879 kB | 256 kB | 0 |
+| `/disaster` | 10 | 994 kB | 287 kB | 0 |
+| `/login` | 7 | 834 kB | 240 kB | 0 |
+
+Before and after are identical. The 3D split was already right: `SkyCanvas` is a client-only dynamic import that loads only on `/`, only with WebGL, and not under reduced motion or lite mode. Inner pages load no three.js. The shared base of about 240 kB gzip is the next lever (Supabase client, framer-motion, the i18n dictionary); it was not changed here.
+
 ## Needs your input
 
-1. **See a real notification.** Follow "See a real test notification" above. This is the one step I could not do: it needs your Supabase account, a browser permission prompt and the OS notification centre.
-2. **Default districts on `/disaster` have hard-coded coordinates.** This breaks ground rule 3 and predates this work. To fix it, store names only and geocode them (1 request/s, cached). The first load would take about 15 s for 15 districts, unless the backend caches them. Should I make that change?
-3. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session, so the **Send test alert** button is checked only for "not shown in demo mode". The endpoint behind it has 13 backend tests.
-4. **Rate limit is per backend process.** The test-push limit (1 per minute per user) is in memory. With several backend workers or instances, use a shared store (for example a Supabase row) if that matters.
-5. **Flaky backend test.** One full pytest run had a single failure that did not reproduce in the next 11 runs. All runs now use `-rf`, so if it comes back the name will be printed.
-6. **`docs/DESIGN_AUDIT.md` commit.** It was committed after lint and the (skipped) audit spec only, not the full suite. It contains no code; every later commit ran the full suite.
-7. **Still open from before:**
+1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
+2. **Severity red as text by day.** `--sev-warning` (#f43f5e) used as *text* on a glass panel over a bright daytime sky is about 2.9:1, below AA. Badges and borders are fine. A lighter text shade (for example a `--sev-warning-text` token) would fix it, but it changes the severity palette, so it is your call.
+3. **`eccodes` is not pinned.** cfgrib pulls it in. Locally it is 2.48.0; the Docker build got 2.50.0 (plus `eccodeslib`). Pin both in `backend/requirements.txt` for reproducible images? (Ground rule 7: I didn't add pins without asking.)
+4. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
+5. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
+6. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session.
+7. **Root `package.json` / `package-lock.json`** (leaflet only, from the first commit) look unused. Delete them? Next is now pinned to `weathergpt-web/`, so they are harmless.
+8. **Still open from before:**
    - real-device speech recognition for mr-IN
    - no WRF source
    - AQI is modelled, not CPCB stations
