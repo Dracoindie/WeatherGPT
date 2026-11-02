@@ -48,8 +48,8 @@ export function InteractiveMap({ latitude, longitude, locationName, alertsCount,
 
     const title = locationName ? escapeHtml(locationName) : `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
     const alertHtml = (alertsCount && alertsCount > 0)
-      ? `<div style="color: var(--sev-warning); font-weight: 600; margin-top: 6px;">⚠ ${escapeHtml(alertsText ?? `${alertsCount} active alert(s)`)}</div>`
-      : `<div style="color: var(--sev-none); margin-top: 6px;">✓ ${escapeHtml(normalText ?? 'No active alerts')}</div>`;
+      ? `<div style="color: var(--sev-warning-text); font-weight: 600; margin-top: 6px;">⚠ ${escapeHtml(alertsText ?? `${alertsCount} active alert(s)`)}</div>`
+      : `<div style="color: var(--sev-none-text); margin-top: 6px;">✓ ${escapeHtml(normalText ?? 'No active alerts')}</div>`;
 
     marker.bindPopup(`
       <div style="font-size: 13px; line-height: 1.45;">

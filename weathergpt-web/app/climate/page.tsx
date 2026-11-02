@@ -59,7 +59,7 @@ export default function ClimatePage() {
         ) : (
           <div className="space-y-5">
             <ClimatePanel data={data} loading={loading} error={error} />
-            <GlassPanel wet={false} label={t('climate.about')} aside={<Info className="size-3.5 text-accent" />}>
+            <GlassPanel wet={false} label={t('climate.about')} aside={<Info className="size-3.5 text-accent-text" />}>
               <ul className="grid gap-2 text-sm text-hud-dim md:grid-cols-3">
                 <li>{t('climate.about1')}</li>
                 <li>{t('climate.about2')}</li>

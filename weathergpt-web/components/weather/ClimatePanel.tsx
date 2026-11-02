@@ -78,7 +78,7 @@ export function ClimatePanel({ data, loading, error }: ClimatePanelProps) {
   if (error) {
     return (
       <div role="alert" className="sky-glass border-sev-watch/40 p-5 text-sm">
-        <p className="font-medium text-sev-watch">{t('climate.failed')}</p>
+        <p className="font-medium text-sev-watch-text">{t('climate.failed')}</p>
         <p className="mt-1 text-xs text-hud-dim">{error}</p>
       </div>
     )

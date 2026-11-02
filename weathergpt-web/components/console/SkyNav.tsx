@@ -118,11 +118,11 @@ export function SkyNav() {
         <Link href="/" className="group flex shrink-0 items-center gap-3">
           <span aria-hidden="true" className="relative grid size-9 place-items-center rounded-xl border border-accent/40 bg-black/40 shadow-[0_0_24px_-6px_var(--sky-accent)]">
             <span className="absolute inset-1.5 rounded-lg border border-accent/25" />
-            <span className="font-hud text-sm font-bold text-accent">W</span>
+            <span className="font-hud text-sm font-bold text-accent-text">W</span>
           </span>
           <span className="leading-none">
             <span className="font-hud text-[17px] font-semibold tracking-tight text-hud">
-              Weather<span className="text-accent">GPT</span>
+              Weather<span className="text-accent-text">GPT</span>
             </span>
             <span className="mt-1 block font-readout text-[9px] uppercase tracking-[0.3em] text-hud-dim">SIH26068</span>
           </span>
@@ -138,7 +138,7 @@ export function SkyNav() {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'whitespace-nowrap rounded-full px-3 py-1.5 font-readout text-[11px] uppercase tracking-[0.14em] transition-colors',
-                  active ? 'bg-accent/15 text-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sky-accent)_40%,transparent)]' : 'text-hud-dim hover:bg-white/5 hover:text-hud'
+                  active ? 'bg-accent/15 text-accent-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sky-accent)_40%,transparent)]' : 'text-hud-dim hover:bg-white/5 hover:text-hud'
                 )}
               >
                 {t(l.label)}
@@ -149,7 +149,7 @@ export function SkyNav() {
 
         <div className="ml-auto flex items-center gap-2">
           {isDemo && (
-            <span className="rounded-full border border-sev-watch/50 bg-sev-watch/10 px-2 py-1 font-readout text-[10px] uppercase tracking-[0.16em] text-sev-watch">
+            <span className="rounded-full border border-sev-watch/50 bg-sev-watch/10 px-2 py-1 font-readout text-[10px] uppercase tracking-[0.16em] text-sev-watch-text">
               {t('nav.demo')}
             </span>
           )}
@@ -164,7 +164,7 @@ export function SkyNav() {
               aria-label={t('nav.settings')}
               className={cn(
                 'grid size-9 place-items-center rounded-full border border-white/10 bg-black/30 text-hud-dim hover:text-hud',
-                settings && 'border-accent/50 text-accent'
+                settings && 'border-accent/50 text-accent-text'
               )}
             >
               <Settings2 className="size-4" />
@@ -201,7 +201,7 @@ export function SkyNav() {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'block rounded-lg px-3 py-2.5 font-readout text-xs uppercase tracking-[0.16em]',
-                  active ? 'bg-accent/15 text-accent' : 'text-hud-dim hover:text-hud'
+                  active ? 'bg-accent/15 text-accent-text' : 'text-hud-dim hover:text-hud'
                 )}
               >
                 {t(l.label)}

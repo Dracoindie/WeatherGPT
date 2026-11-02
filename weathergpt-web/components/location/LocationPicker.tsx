@@ -114,7 +114,7 @@ export default function LocationPicker({
   return (
     <div className="sky-glass w-full p-3 sm:w-[360px]">
       <p className="sky-label mb-2 flex items-center gap-1.5">
-        <MapPin className="size-3 text-accent" aria-hidden="true" /> {t('location.context')}
+        <MapPin className="size-3 text-accent-text" aria-hidden="true" /> {t('location.context')}
       </p>
 
       {resolvedName && !showManual && (
@@ -125,7 +125,7 @@ export default function LocationPicker({
           <button
             type="button"
             onClick={() => setShowManual(true)}
-            className="shrink-0 font-readout text-[11px] uppercase tracking-[0.14em] text-accent hover:underline"
+            className="shrink-0 font-readout text-[11px] uppercase tracking-[0.14em] text-accent-text hover:underline"
           >
             {t('location.change')}
           </button>
@@ -151,7 +151,7 @@ export default function LocationPicker({
         </button>
       )}
 
-      {geoError && <p className="mt-2 text-xs text-sev-watch">{geoError}</p>}
+      {geoError && <p className="mt-2 text-xs text-sev-watch-text">{geoError}</p>}
 
       {(hasDenied || showManual) && !geocoding && (
         <>
@@ -173,7 +173,7 @@ export default function LocationPicker({
               <Search className="size-4" aria-hidden="true" />
             </button>
           </form>
-          {manualError && <p className="mt-1.5 text-xs text-sev-warning">{manualError}</p>}
+          {manualError && <p className="mt-1.5 text-xs text-sev-warning-text">{manualError}</p>}
           {!hasDenied && (
             <button
               type="button"

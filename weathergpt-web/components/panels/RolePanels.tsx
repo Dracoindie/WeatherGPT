@@ -241,7 +241,7 @@ function ResearchBody({ c }: { c: ModelComparison }) {
       <CompareChart rows={c.rows} />
       <p className="mt-2 font-readout text-[11px] text-hud-dim">
         GFS run {c.gfs_run.slice(0, 13).replace('T', ' ')}:00 UTC · bias = GFS − Open-Meteo ·{' '}
-        <Link href="/climate" className="text-accent underline-offset-2 hover:underline">
+        <Link href="/climate" className="text-accent-text underline-offset-2 hover:underline">
           climate trends →
         </Link>
       </p>
@@ -260,21 +260,21 @@ export function RolePanel({ role, latitude, longitude }: { role: UserRole; latit
   let panel: React.ReactNode = null
   if (role === 'farmer') {
     panel = (
-      <GlassPanel label="Farm guidance · next 3 days" aside={<Sprout className="size-4 text-accent" />}>
+      <GlassPanel label="Farm guidance · next 3 days" aside={<Sprout className="size-4 text-accent-text" />}>
         {farm?.data ? <FarmBody a={farm.data} /> : <Pending error={farm?.error} />}
         {farm?.data && <Note text={farm.data.note} />}
       </GlassPanel>
     )
   } else if (role === 'aviation') {
     panel = (
-      <GlassPanel label="Aviation briefing" aside={<Plane className="size-4 text-accent" />}>
+      <GlassPanel label="Aviation briefing" aside={<Plane className="size-4 text-accent-text" />}>
         {air?.data ? <AviationBody b={air.data} /> : <Pending error={air?.error} />}
         {air?.data && <Note text={air.data.note} />}
       </GlassPanel>
     )
   } else if (role === 'researcher') {
     panel = (
-      <GlassPanel label="GFS vs Open-Meteo · next 24 h" aside={<TestTubeDiagonal className="size-4 text-accent" />}>
+      <GlassPanel label="GFS vs Open-Meteo · next 24 h" aside={<TestTubeDiagonal className="size-4 text-accent-text" />}>
         {cmp?.data ? (
           <ResearchBody c={cmp.data} />
         ) : (
@@ -285,13 +285,13 @@ export function RolePanel({ role, latitude, longitude }: { role: UserRole; latit
     )
   } else if (role === 'disaster_manager') {
     panel = (
-      <GlassPanel label="Disaster management" aside={<ShieldAlert className="size-4 text-accent" />}>
+      <GlassPanel label="Disaster management" aside={<ShieldAlert className="size-4 text-accent-text" />}>
         <p className="text-sm text-hud">
           See current risk across your districts, sorted by severity, on the risk board.
         </p>
         <Link
           href="/disaster"
-          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent/50 bg-black/40 px-4 text-sm text-accent hover:bg-black/60"
+          className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-accent/50 bg-black/40 px-4 text-sm text-accent-text hover:bg-black/60"
         >
           Open district risk board <ArrowRight className="size-4" />
         </Link>

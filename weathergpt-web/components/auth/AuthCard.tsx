@@ -40,7 +40,7 @@ export function AuthCard({
 
 export function FormError({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="rounded-xl border border-sev-warning/40 bg-sev-warning/10 px-4 py-3 text-sm text-sev-warning">
+    <div role="alert" className="rounded-xl border border-sev-warning/40 bg-sev-warning/10 px-4 py-3 text-sm text-sev-warning-text">
       {children}
     </div>
   )
@@ -49,7 +49,7 @@ export function FormError({ children }: { children: ReactNode }) {
 export function FieldError({ id, children }: { id: string; children?: ReactNode }) {
   if (!children) return null
   return (
-    <p id={id} className="mt-1.5 text-xs text-sev-warning">
+    <p id={id} className="mt-1.5 text-xs text-sev-warning-text">
       {children}
     </p>
   )

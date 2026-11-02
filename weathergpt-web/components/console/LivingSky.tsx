@@ -315,7 +315,7 @@ export default function LivingSky() {
             {geo.error && <p className="mt-3 text-xs text-amber-200">{geo.error}</p>}
             {user && !isDemo && (
               <p className="mt-3 flex items-center justify-center gap-1.5 font-readout text-[10px] uppercase tracking-[0.2em] text-hud-dim">
-                <ShieldCheck className="size-3 text-accent" /> {t('sky.signedIn')}
+                <ShieldCheck className="size-3 text-accent-text" /> {t('sky.signedIn')}
               </p>
             )}
           </section>

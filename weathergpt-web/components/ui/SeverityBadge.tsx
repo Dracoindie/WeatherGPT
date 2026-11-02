@@ -23,6 +23,18 @@ export const SEVERITY_VAR: Record<SeverityLevel, string> = {
   high: 'var(--sev-warning)',
 }
 
+/** Lighter shade for TEXT and icons in a level's colour (AA on glass over any sky). */
+export const SEVERITY_TEXT_VAR: Record<SeverityLevel, string> = {
+  none: 'var(--sev-none-text)',
+  unknown: 'var(--sev-unknown-text)',
+  advisory: 'var(--sev-advisory-text)',
+  watch: 'var(--sev-watch-text)',
+  warning: 'var(--sev-warning-text)',
+  low: 'var(--sev-advisory-text)',
+  moderate: 'var(--sev-watch-text)',
+  high: 'var(--sev-warning-text)',
+}
+
 export function SeverityBadge({ level, className, label }: { level: SeverityLevel; className?: string; label?: string }) {
   const { t } = useI18n()
   const color = SEVERITY_VAR[level]
@@ -34,7 +46,7 @@ export function SeverityBadge({ level, className, label }: { level: SeverityLeve
         (level === 'warning' || level === 'high') && 'font-semibold',
         className
       )}
-      style={{ color, borderColor: `color-mix(in srgb, ${color} 55%, transparent)`, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
+      style={{ color: SEVERITY_TEXT_VAR[level], borderColor: `color-mix(in srgb, ${color} 55%, transparent)`, background: `color-mix(in srgb, ${color} 12%, transparent)` }}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: color }} />
       {label ?? t(`severity.${level}` as TranslationKey)}

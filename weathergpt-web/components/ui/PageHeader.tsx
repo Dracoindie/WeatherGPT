@@ -20,7 +20,7 @@ export function PageHeader({
     <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="sky-label flex items-center gap-2 text-accent">
+          <p className="sky-label flex items-center gap-2 text-accent-text">
             {icon}
             {eyebrow}
           </p>

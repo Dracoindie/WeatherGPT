@@ -385,7 +385,7 @@ export default function DisasterPage() {
               {adding ? <LoaderCircle className="size-4 animate-spin" /> : <Plus className="size-4" />} {t('risk.addBtn')}
             </SkyButton>
           </form>
-          {addError && <p className="mt-2 text-xs text-sev-warning">{addError}</p>}
+          {addError && <p className="mt-2 text-xs text-sev-warning-text">{addError}</p>}
           <button
             type="button"
             onClick={reset}

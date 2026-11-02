@@ -12,7 +12,7 @@ export default function OfflinePage() {
   return (
     <AppShell mainClassName="flex items-center justify-center py-10">
       <GlassPanel wet={false} className="w-full max-w-md p-8 text-center">
-        <WifiOff className="mx-auto size-10 text-sev-watch" aria-hidden="true" />
+        <WifiOff className="mx-auto size-10 text-sev-watch-text" aria-hidden="true" />
         <h1 className="mt-4 font-hud text-2xl font-bold text-hud">{t('offline.title')}</h1>
         <p className="mt-2 text-sm text-hud-dim">{t('offline.body')}</p>
         <SkyLinkButton href="/" variant="ghost" className="mt-6">

@@ -62,10 +62,10 @@ export function ConversationThread({ entries, activeId, onSelect }: Conversation
                         {e.usedGps && <Crosshair className="size-3" />}
                         {time(e.askedAt)}
                       </span>
-                      {e.status === 'pending' && <LoaderCircle className="size-3 animate-spin text-accent" />}
+                      {e.status === 'pending' && <LoaderCircle className="size-3 animate-spin text-accent-text" />}
                       {e.status === 'error' && <AlertTriangle className="size-3 text-rose-400" />}
                       {loc && (
-                        <span className="flex min-w-0 items-center gap-1 truncate text-accent/90">
+                        <span className="flex min-w-0 items-center gap-1 truncate text-accent-text/90">
                           <MapPin className="size-3 shrink-0" />
                           <span className="truncate">{loc.name.split(',')[0]}</span>
                         </span>

@@ -72,7 +72,7 @@ export default function AlertsPage() {
                 className="w-full"
                 aria-label="Download alerts (CAP 1.2 XML)"
               >
-                <FileDown className="size-4 text-accent" />
+                <FileDown className="size-4 text-accent-text" />
                 {t('alerts.cap')}
               </SkyLinkButton>
             )}

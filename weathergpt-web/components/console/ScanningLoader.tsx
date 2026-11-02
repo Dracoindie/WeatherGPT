@@ -28,14 +28,14 @@ export function ScanningLoader() {
         <span className="absolute left-1/2 top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow-[0_0_10px_var(--sky-accent)]" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-hud text-sm font-semibold uppercase tracking-[0.25em] text-accent">
+        <p className="font-hud text-sm font-semibold uppercase tracking-[0.25em] text-accent-text">
           {t('sky.scanning')}
           <span className="sky-caret" />
         </p>
         <ul className="mt-2 space-y-0.5 font-readout text-[11px] text-hud-dim">
           {STREAM.slice(0, Math.min(line, STREAM.length)).slice(-3).map((s) => (
             <li key={s} className="truncate">
-              <span className="text-accent/80">›</span> {s}
+              <span className="text-accent-text/80">›</span> {s}
             </li>
           ))}
         </ul>

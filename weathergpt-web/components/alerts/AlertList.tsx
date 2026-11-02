@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, Clock, MapPin, ShieldCheck } from 'lucide-react'
-import { SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
+import { SEVERITY_TEXT_VAR, SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
 import { ShareWhatsApp } from '@/components/common/ShareWhatsApp'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import type { WeatherAlert } from '@/types/alerts'
@@ -31,7 +31,7 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
   if (error) {
     return (
       <div role="alert" className="sky-glass border-sev-watch/40 p-5 text-sm">
-        <div className="flex items-center gap-2 font-medium text-sev-watch">
+        <div className="flex items-center gap-2 font-medium text-sev-watch-text">
           <AlertTriangle className="size-4 shrink-0" />
           <span>{t('alerts.failed')}</span>
         </div>
@@ -43,7 +43,7 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
   if (!alerts || alerts.length === 0) {
     return (
       <div className="sky-glass p-8 text-center">
-        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-sev-none/15 text-sev-none">
+        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-sev-none/15 text-sev-none-text">
           <ShieldCheck className="size-6" />
         </div>
         <h3 className="mt-4 font-hud text-lg font-semibold text-hud">{t('alerts.none')}</h3>
@@ -69,7 +69,7 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
               <div className="flex min-w-0 items-start gap-3">
                 <span
                   className="grid size-9 shrink-0 place-items-center rounded-xl"
-                  style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}
+                  style={{ color: SEVERITY_TEXT_VAR[alert.severity], background: `color-mix(in srgb, ${color} 15%, transparent)` }}
                 >
                   <AlertTriangle className="size-4" />
                 </span>
@@ -78,7 +78,7 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
                   <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-hud-dim">
                     {locationName && (
                       <span className="flex items-center gap-1">
-                        <MapPin className="size-3 text-accent" />
+                        <MapPin className="size-3 text-accent-text" />
                         {shortPlace(locationName)}
                       </span>
                     )}
@@ -99,7 +99,7 @@ export function AlertList({ alerts, locationName, loading, error }: AlertListPro
               <div className="rounded-xl border border-white/10 bg-black/25 p-3">
                 <span className="sky-label">{t('alerts.threshold')}</span>
                 <p className="mt-1 font-readout text-sm text-hud">
-                  {param}: <span style={{ color }}>{alert.relevant_value} {alert.unit}</span>{' '}
+                  {param}: <span style={{ color: SEVERITY_TEXT_VAR[alert.severity] }}>{alert.relevant_value} {alert.unit}</span>{' '}
                   <span className="text-hud-dim">(threshold: {alert.threshold_value} {alert.unit})</span>
                 </p>
               </div>

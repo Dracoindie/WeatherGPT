@@ -118,7 +118,7 @@ export function ForecastTimeline({ weather }: Props) {
             onClick={goLive}
             className={cn(
               'flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-readout text-[10px] uppercase tracking-[0.2em] transition',
-              previewing ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-accent/40 text-accent'
+              previewing ? 'border-fuchsia-300/60 bg-fuchsia-400/15 text-fuchsia-100' : 'border-accent/40 text-accent-text'
             )}
           >
             <Radio className={cn('size-3', !previewing && 'animate-pulse')} />

@@ -354,11 +354,11 @@ export function LocationPanel({ location, facts }: { location: ResolvedLocation;
       <GlassPanel label={t('panel.location')} className="h-full" aside={<VerifiedBadge />}>
         <div className="flex items-start gap-3">
           <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-accent/40 bg-accent/10">
-            <SourceIcon className="size-4 text-accent" />
+            <SourceIcon className="size-4 text-accent-text" />
           </span>
           <div className="min-w-0">
             <p className={cn('truncate font-hud text-lg font-semibold', DEVANAGARI.test(location.name) && 'deva')}>{location.name}</p>
-            <span className="mt-1 inline-block rounded-full border border-accent/40 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent">
+            <span className="mt-1 inline-block rounded-full border border-accent/40 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent-text">
               {t(`source.${location.source}`)}
             </span>
           </div>
@@ -379,7 +379,7 @@ export function LocationPanel({ location, facts }: { location: ResolvedLocation;
         </dl>
         {facts?.weather_description && (
           <p className="mt-3 flex items-center gap-2 text-sm text-hud">
-            <Satellite className="size-4 text-accent" />
+            <Satellite className="size-4 text-accent-text" />
             <span data-testid="weather-description">{describe(facts.weather_code, facts.weather_description)}</span>
             {facts.weather_code != null && <span className="font-readout text-[10px] text-hud-dim">WMO {facts.weather_code}</span>}
           </p>

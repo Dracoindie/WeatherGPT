@@ -30,7 +30,7 @@ export function ThresholdTable() {
   }, [])
 
   return (
-    <GlassPanel label={t('thresholds.title')} aside={<BellRing className="size-3.5 text-accent" />}>
+    <GlassPanel label={t('thresholds.title')} aside={<BellRing className="size-3.5 text-accent-text" />}>
       {failed ? (
         <p className="text-sm text-hud-dim">{t('thresholds.unavailable')}</p>
       ) : !rules ? (

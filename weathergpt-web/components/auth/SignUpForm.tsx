@@ -63,7 +63,7 @@ export default function SignUpForm({ onSuccess }: { onSuccess?: () => void }) {
   if (done) {
     return (
       <div role="status" className="flex items-start gap-3 rounded-xl border border-sev-none/40 bg-sev-none/10 p-4 text-sm text-hud">
-        <CircleCheck className="mt-0.5 size-5 shrink-0 text-sev-none" />
+        <CircleCheck className="mt-0.5 size-5 shrink-0 text-sev-none-text" />
         {t('auth.created')}
       </div>
     )

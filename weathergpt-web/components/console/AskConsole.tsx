@@ -125,7 +125,7 @@ export function AskConsole({
     <div className="w-full">
       <form onSubmit={submit} className="sky-console">
         <div className="flex items-center gap-3 rounded-[19px] bg-[#040811]/90 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4">
-          <span className="hidden font-readout text-sm text-accent select-none sm:inline" aria-hidden="true">
+          <span className="hidden font-readout text-sm text-accent-text select-none sm:inline" aria-hidden="true">
             ~/sky&nbsp;›
           </span>
           <div className="relative min-w-0 flex-1">
@@ -146,7 +146,7 @@ export function AskConsole({
               spellCheck={false}
             />
             {value === '' && listening && (
-              <span aria-live="polite" className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap text-base text-accent sm:text-lg">
+              <span aria-live="polite" className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-nowrap text-base text-accent-text sm:text-lg">
                 {voice?.interim || t('voice.listening')}
               </span>
             )}
@@ -252,7 +252,7 @@ export function AskConsole({
           type="button"
           disabled={busy || locating}
           onClick={onUseLocation}
-          className="flex min-h-11 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/50 bg-black/45 px-3.5 py-1.5 sm:min-h-0 text-[13px] text-accent backdrop-blur-md transition hover:bg-black/60 disabled:opacity-40"
+          className="flex min-h-11 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full border border-accent/50 bg-black/45 px-3.5 py-1.5 sm:min-h-0 text-[13px] text-accent-text backdrop-blur-md transition hover:bg-black/60 disabled:opacity-40"
         >
           {locating ? <LoaderCircle className="size-3.5 animate-spin" /> : <Crosshair className="size-3.5" />}
           {locating ? t('sky.locating') : t('sky.useLocation')}

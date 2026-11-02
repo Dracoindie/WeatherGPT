@@ -82,7 +82,7 @@ export function AirErrorPanel({ error }: { error: string }) {
   return (
     <motion.div variants={panelItem} className="h-full">
     <GlassPanel label={t('panel.air')} className="h-full">
-      <p className="text-sm text-sev-watch">{error}</p>
+      <p className="text-sm text-sev-watch-text">{error}</p>
     </GlassPanel>
     </motion.div>
   )
@@ -94,7 +94,7 @@ export function AqiPanel({ report: r }: { report: AirQualityReport }) {
   const cat = aq?.aqi_category ?? null
   return (
     <motion.div variants={panelItem} className="h-full">
-        <GlassPanel label={t('panel.air')} className="h-full" aside={<Wind className="size-4 text-accent" />}>
+        <GlassPanel label={t('panel.air')} className="h-full" aside={<Wind className="size-4 text-accent-text" />}>
           {aq?.aqi == null || !cat ? (
             <p className="text-sm text-hud-dim">—</p>
           ) : (
@@ -133,7 +133,7 @@ export function UvPanel({ report: r }: { report: AirQualityReport }) {
   const uvCat = r.uv_category
   return (
     <motion.div variants={panelItem} className="h-full">
-        <GlassPanel label={t('panel.uv')} className="h-full" aside={<Sun className="size-4 text-accent" />}>
+        <GlassPanel label={t('panel.uv')} className="h-full" aside={<Sun className="size-4 text-accent-text" />}>
           {r.uv_index == null || !uvCat ? (
             <p className="text-sm text-hud-dim">—</p>
           ) : (

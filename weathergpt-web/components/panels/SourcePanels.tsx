@@ -47,7 +47,7 @@ export function ClimateComparePanel({ facts }: { facts: ClimateFacts }) {
   const { t } = useI18n()
   return (
     <motion.div variants={panelItem} className="h-full">
-      <GlassPanel label={t('panel.climate')} className="h-full" aside={<History className="size-4 text-accent" />}>
+      <GlassPanel label={t('panel.climate')} className="h-full" aside={<History className="size-4 text-accent-text" />}>
         {!facts.available ? (
           <p className="text-sm text-hud-dim">Not enough archive data to compare with past years.</p>
         ) : (
@@ -85,7 +85,7 @@ export function GfsPanel({ facts }: { facts: NwpFacts }) {
   const run = new Date(facts.run)
   return (
     <motion.div variants={panelItem} className="h-full">
-      <GlassPanel label={t('panel.gfs')} className="h-full" aside={<Cpu className="size-4 text-accent" />}>
+      <GlassPanel label={t('panel.gfs')} className="h-full" aside={<Cpu className="size-4 text-accent-text" />}>
         {!facts.period_available ? (
           <p className="text-sm text-hud-dim">This window is beyond the 48-hour GFS output used here.</p>
         ) : (

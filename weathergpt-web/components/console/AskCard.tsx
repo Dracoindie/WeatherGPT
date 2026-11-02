@@ -26,14 +26,14 @@ export function AskCard({ place, coords }: { place?: string | null; coords?: { l
   const { t } = useI18n()
   const short = place ? place.split(',')[0] : null
   return (
-    <GlassPanel wet={false} className="h-full" label={short ? fill(t('ask.title'), { place: short }) : t('ask.titleAny')} aside={<MessageSquareText className="size-4 text-accent" />}>
+    <GlassPanel wet={false} className="h-full" label={short ? fill(t('ask.title'), { place: short }) : t('ask.titleAny')} aside={<MessageSquareText className="size-4 text-accent-text" />}>
       <p className="text-sm text-hud-dim">{t('ask.intro')}</p>
       <ul className="mt-4 flex flex-wrap gap-2">
         {QUESTIONS.map((key) => (
           <li key={key}>
             <Link
               href={askHref(t(key), coords)}
-              className="inline-flex min-h-9 items-center rounded-full border border-white/10 bg-black/30 px-3 text-sm text-hud transition-colors hover:border-accent/50 hover:text-accent"
+              className="inline-flex min-h-9 items-center rounded-full border border-white/10 bg-black/30 px-3 text-sm text-hud transition-colors hover:border-accent/50 hover:text-accent-text"
             >
               {t(key)}
             </Link>

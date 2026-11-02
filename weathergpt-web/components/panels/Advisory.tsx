@@ -34,13 +34,13 @@ export function AdvisoryPanel({ advisory, window }: { advisory: AdvisoryResult; 
         label={period ? `${t('panel.advisory')} · ${period}` : t('panel.advisory')}
         className={cn('h-full', advisory.severity !== 'low' && 'border-accent/40 shadow-[0_0_50px_-20px_var(--sky-accent)]')}
         aside={
-          <span className="rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent">
+          <span className="rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.2em] text-accent-text">
             {t(`severity.${advisory.severity}`)}
           </span>
         }
       >
         <div className="flex items-start gap-3">
-          <Icon className="mt-0.5 size-6 shrink-0 text-accent" />
+          <Icon className="mt-0.5 size-6 shrink-0 text-accent-text" />
           <div className="min-w-0">
             <p className="font-hud text-lg font-semibold">{advisory.condition}</p>
             <p className="mt-1 text-sm text-hud-dim">{advisory.advisory}</p>
@@ -48,7 +48,7 @@ export function AdvisoryPanel({ advisory, window }: { advisory: AdvisoryResult; 
               <ul className="mt-3 space-y-1 font-readout text-[11px] text-hud">
                 {advisory.reasons.map((r) => (
                   <li key={r} className="flex gap-2">
-                    <span className="text-accent">▸</span>
+                    <span className="text-accent-text">▸</span>
                     {r}
                   </li>
                 ))}

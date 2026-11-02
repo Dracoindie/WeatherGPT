@@ -56,7 +56,7 @@ export function ReplyCard({ entry, onTyped, onUseLocation, onListen }: ReplyCard
         {needsLocation ? (
           <MapPinOff className="size-4 text-amber-300" />
         ) : (
-          <RadioTower className="size-4 text-accent" />
+          <RadioTower className="size-4 text-accent-text" />
         )}
         <span className={cn('sky-label', needsLocation && '!text-amber-200')}>
           {needsLocation

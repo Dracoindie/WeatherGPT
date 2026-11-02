@@ -67,7 +67,7 @@ export function CurrentWeatherHero({ status, current, locationName, timezone, so
       label={t('current.title')}
       aside={
         loading ? (
-          <span className="rounded-full border border-sev-watch/40 bg-sev-watch/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.16em] text-sev-watch">
+          <span className="rounded-full border border-sev-watch/40 bg-sev-watch/10 px-2 py-0.5 font-readout text-[10px] uppercase tracking-[0.16em] text-sev-watch-text">
             {t('current.syncing')}
           </span>
         ) : undefined
@@ -90,7 +90,7 @@ export function CurrentWeatherHero({ status, current, locationName, timezone, so
           )}
           <p className="mt-1 text-xs text-hud-dim">{note}</p>
         </div>
-        <div className="grid size-20 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent sm:size-24" aria-hidden="true">
+        <div className="grid size-20 place-items-center rounded-2xl border border-accent/30 bg-accent/10 text-accent-text sm:size-24" aria-hidden="true">
           <CloudSun className="size-10 stroke-[1.35] sm:size-12" />
         </div>
       </div>

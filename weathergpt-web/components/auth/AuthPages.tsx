@@ -15,7 +15,7 @@ export function LoginView() {
       footer={
         <>
           {t('auth.noAccount')}{' '}
-          <Link href="/signup" className="font-medium text-accent hover:underline">
+          <Link href="/signup" className="font-medium text-accent-text hover:underline">
             {t('auth.signup')}
           </Link>
         </>
@@ -35,7 +35,7 @@ export function SignupView() {
       footer={
         <>
           {t('auth.haveAccount')}{' '}
-          <Link href="/login" className="font-medium text-accent hover:underline">
+          <Link href="/login" className="font-medium text-accent-text hover:underline">
             {t('auth.signin')}
           </Link>
         </>

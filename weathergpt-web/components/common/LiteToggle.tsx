@@ -31,7 +31,7 @@ export function LiteToggle({ className }: { className?: string }) {
       aria-label={`Lite mode${pref === 'auto' && reason ? ' (auto)' : ''}`}
       className={cn(
         'flex min-h-9 items-center gap-1.5 rounded-full border px-2.5 py-1 font-readout text-[11px] uppercase tracking-[0.14em] transition-colors',
-        lite ? 'border-accent/60 bg-accent/15 text-accent' : 'border-white/10 bg-black/30 text-hud-dim hover:text-hud',
+        lite ? 'border-accent/60 bg-accent/15 text-accent-text' : 'border-white/10 bg-black/30 text-hud-dim hover:text-hud',
         className
       )}
     >

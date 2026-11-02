@@ -362,7 +362,7 @@ export function demoScene(preset: DemoPreset, windKmh: number): SceneParams {
 // Sky palette (shared by the WebGL sky and the reduced-motion CSS fallback)
 // ---------------------------------------------------------------------------
 
-const PALETTES: Record<TimePhase, { top: RGB; bottom: RGB }> = {
+export const PALETTES: Record<TimePhase, { top: RGB; bottom: RGB }> = {
   dawn: { top: [0.16, 0.2, 0.42], bottom: [0.98, 0.58, 0.45] },
   day: { top: [0.1, 0.36, 0.78], bottom: [0.55, 0.8, 0.98] },
   golden: { top: [0.2, 0.17, 0.42], bottom: [1.0, 0.55, 0.22] },

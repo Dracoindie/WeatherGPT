@@ -8,7 +8,7 @@
 
 import Link from 'next/link'
 import { AlertTriangle, ChevronRight, CloudOff, RotateCw, ShieldCheck } from 'lucide-react'
-import { SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
+import { SEVERITY_TEXT_VAR, SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
 import { fill, useI18n } from '@/context/I18nContext'
 import type { WeatherAlert } from '@/types/alerts'
 
@@ -38,7 +38,7 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
     return (
       <div role="status" className="sky-glass flex flex-col items-start justify-between gap-2 border-sev-watch/40 px-4 py-3 text-sm sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-hud">
-          <CloudOff className="size-4 shrink-0 text-sev-watch" />
+          <CloudOff className="size-4 shrink-0 text-sev-watch-text" />
           <span>{error}</span>
         </div>
         {onRetry && (
@@ -51,7 +51,7 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
   }
 
   const staleNote = staleSince ? (
-    <p className="mt-1 text-[11px] text-sev-watch">{fill(t('banner.stale'), { time: timeOf(staleSince) })}</p>
+    <p className="mt-1 text-[11px] text-sev-watch-text">{fill(t('banner.stale'), { time: timeOf(staleSince) })}</p>
   ) : null
   const place = locationName ? locationName.split(',')[0] : t('banner.thisPlace')
 
@@ -60,10 +60,10 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
       <div role="status" className="sky-glass px-4 py-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-hud">
-            <ShieldCheck className="size-4 shrink-0 text-sev-none" />
+            <ShieldCheck className="size-4 shrink-0 text-sev-none-text" />
             <span>{fill(t('banner.none'), { place })}</span>
           </div>
-          <Link href="/alerts" className="inline-flex items-center gap-1 font-readout text-[11px] uppercase tracking-[0.14em] text-accent hover:underline">
+          <Link href="/alerts" className="inline-flex items-center gap-1 font-readout text-[11px] uppercase tracking-[0.14em] text-accent-text hover:underline">
             {t('banner.details')} <ChevronRight className="size-3" />
           </Link>
         </div>
@@ -82,7 +82,7 @@ export function AlertBanner({ alerts, locationName, loading, error, staleSince, 
       style={{ borderColor: `color-mix(in srgb, ${color} 50%, transparent)`, boxShadow: `0 0 60px -30px ${color}` }}
     >
       <div className="flex min-w-0 items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl" style={{ color, background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl" style={{ color: SEVERITY_TEXT_VAR[top.severity], background: `color-mix(in srgb, ${color} 16%, transparent)` }}>
           <AlertTriangle className="size-4" />
         </span>
         <div className="min-w-0">

@@ -21,7 +21,7 @@ export function ForecastPanel({ state }: { state: DataState<WeatherResponse> }) 
     body = <p className="text-sm text-hud-dim">{t('forecast.loading')}</p>
   } else if (status === 'error') {
     body = (
-      <p className="text-sm text-sev-watch">
+      <p className="text-sm text-sev-watch-text">
         {t('forecast.error')} {error ? <span className="text-hud-dim">({error})</span> : null}
       </p>
     )

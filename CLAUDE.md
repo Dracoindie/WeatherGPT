@@ -130,7 +130,12 @@ Every page must look like it belongs to the Living Sky home. Before adding UI, r
 
 1. **Shell.** Every route renders inside `<AppShell>` (`components/ui/AppShell.tsx`). It gives the sky background, the one nav (`SkyNav`), the bottom nav and the page padding. Never add another nav or header.
 2. **Background.** Inner pages use the CSS `StaticSky` (no WebGL); call `useSkyFromCurrent(current, timezone)` when the page has current weather. Only `/` runs the WebGL scene. The sky must cover the full page height (it fades into `--sky-floor`).
-3. **Tokens, not hex.** Text is `text-hud` / `text-hud-dim`, the accent is `text-accent` / `bg-accent`, lines are `border-white/10`. Severity uses only `--sev-none | advisory | watch | warning | unknown` (Tailwind `sev-*`, or `SEVERITY_VAR` for inline styles). Do not use the old light classes (`bg-panel`, `text-ink`, `teal`, `coral`): they are aliases kept only for safety.
+3. **Tokens, not hex.**
+   - Text is `text-hud` / `text-hud-dim`, and lines are `border-white/10`.
+   - **Strong colours are for fills, borders, dots, glows and map markers:** `bg-accent`, `border-accent`, `--sev-none | advisory | watch | warning | unknown` (Tailwind `bg-sev-*` / `border-sev-*`, or `SEVERITY_VAR` for inline styles).
+   - **Text and icons in a severity or accent colour use the lighter text shades:** `text-accent-text`, `text-sev-*-text`, or `SEVERITY_TEXT_VAR`. The strong red is about 2.2:1 as text on glass over a daytime sky; the text shades stay at 4.5:1 or more over every sky phase. `--sky-accent-text` follows the severity state (cyan → amber → rose).
+   - `e2e/contrast.spec.ts` computes these ratios from the live tokens and the real sky palette (`PALETTES` in `lib/weatherScene.ts`), and fails on `text-sev-<level>` without `-text`, on `text-accent`, and on inline `color: SEVERITY_VAR`. axe can't measure text over the sky gradient, so this spec is the contrast check.
+   - Do not use the old light classes (`bg-panel`, `text-ink`, `teal`, `coral`): they are aliases kept only for safety.
 4. **Components.**
    - Surfaces are `GlassPanel` (or the `.sky-glass` class), with the label in `.sky-label`.
    - Buttons are `SkyButton` / `SkyLinkButton` (`primary | ghost | subtle`), and inputs are `SkyInput` / `.sky-input`.
