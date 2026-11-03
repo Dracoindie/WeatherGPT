@@ -49,12 +49,8 @@ import {
   type HexPick,
 } from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
+import { KEYLESS, mapSources, type MapSources } from './sources'
 
-/** OpenFreeMap: free vector tiles, no key. */
-export const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/dark'
-/** AWS Open Data terrain tiles (Mapzen terrarium encoding), no key. */
-export const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
-const TERRAIN_ATTRIBUTION = 'Terrain: Mapzen / AWS Terrain Tiles'
 
 /** Country view when no place is picked yet: India as a whole, not a city. */
 const INDIA_VIEW = { center: [80, 22.5] as [number, number], zoom: 3.6 }
@@ -115,6 +111,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [hazardType, setHazardType] = useState<HazardType>('overall')
   const [hexPick, setHexPick] = useState<HexPick | null>(null)
   const [mapObj, setMapObj] = useState<MapLibreMap | null>(null)
+  // MapTiler when NEXT_PUBLIC_MAPTILER_KEY is set, else (or after a refusal) the keyless sources
+  const sourcesRef = useRef<MapSources>(mapSources())
+  const [basemap, setBasemap] = useState<MapSources['provider']>(() => mapSources().provider)
   const [viewCentre, setViewCentre] = useState<{ latitude: number; longitude: number } | null>(null)
   const [hour, setHour] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -210,7 +209,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       const p = initialPlace.current
       map = new MapLibreMap({
         container: el,
-        style: BASEMAP_STYLE,
+        style: sourcesRef.current.style,
         center: p ? [p.longitude, p.latitude] : INDIA_VIEW.center,
         zoom: p ? 8 : INDIA_VIEW.zoom,
         maxPitch: 72,
@@ -242,7 +241,16 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     })
     map.on('pitchend', () => setPitch(Math.round(map.getPitch())))
     map.on('click', (e) => clickRef.current(e.point.x, e.point.y, e.lngLat.lat, e.lngLat.lng))
-    map.on('error', (e) => console.warn('[map]', e.error?.message ?? e))
+    map.on('error', (e) => {
+      console.warn('[map]', e.error?.message ?? e)
+      // MapTiler refused the key, is over quota or unreachable: fall back to the keyless sources
+      const status = (e.error as { status?: number } | undefined)?.status
+      if (sourcesRef.current.provider === 'maptiler' && (!map.isStyleLoaded() || status === 401 || status === 403 || status === 429)) {
+        sourcesRef.current = KEYLESS
+        setBasemap('openfreemap')
+        map.setStyle(KEYLESS.style)
+      }
+    })
 
     return () => {
       gridAbort.current?.abort()
@@ -288,8 +296,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     map.resize()
     if (broadcast3d) {
       if (!map.getSource('terrain')) {
-        map.addSource('terrain', { type: 'raster-dem', tiles: [TERRAIN_TILES], tileSize: 256, encoding: 'terrarium', maxzoom: 13, attribution: TERRAIN_ATTRIBUTION })
-        map.addSource('terrain-shade', { type: 'raster-dem', tiles: [TERRAIN_TILES], tileSize: 256, encoding: 'terrarium', maxzoom: 13 })
+        const dem = sourcesRef.current.terrain
+        map.addSource('terrain', { type: 'raster-dem', ...dem })
+        map.addSource('terrain-shade', { type: 'raster-dem', ...dem, attribution: undefined })
       }
       if (!map.getLayer('terrain-hillshade')) {
         map.addLayer({
@@ -766,6 +775,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
       data-layer={layer}
       data-pitch={pitch}
+      data-basemap={basemap}
       data-hazard-type={hazardOn ? hazardType : undefined}
       data-hazard-cells={hazard ? hazard.cells.length : 0}
       data-road-pieces={hz.roads.length}

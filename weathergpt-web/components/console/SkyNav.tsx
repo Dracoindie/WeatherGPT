@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, Settings2, X } from 'lucide-react'
 import { LiteToggle } from '@/components/common/LiteToggle'
+import { OfflineMapPrep } from '@/components/common/OfflineMapPrep'
 import { RoleSelector } from '@/components/common/RoleSelector'
 import { cn } from '@/lib/utils'
 import { LANGUAGE_LABELS, LANGUAGES, useI18n, type TranslationKey } from '@/context/I18nContext'
@@ -108,6 +109,10 @@ export function SkyNav() {
         <p className="sky-label mb-1.5">{t('nav.lite')}</p>
         <LiteToggle />
       </div>
+      <div>
+        <p className="sky-label mb-1.5">{t('offlineMap.title')}</p>
+        <OfflineMapPrep />
+      </div>
     </div>
   )
 
@@ -170,7 +175,7 @@ export function SkyNav() {
               <Settings2 className="size-4" />
             </button>
             {settings && (
-              <div role="dialog" aria-label={t('nav.settings')} className="sky-glass absolute right-0 top-11 w-72 p-4">
+              <div role="dialog" aria-label={t('nav.settings')} className="sky-glass sky-popover absolute right-0 top-11 w-72 p-4">
                 {settingsBody}
               </div>
             )}

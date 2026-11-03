@@ -92,8 +92,46 @@ The service worker (`weathergpt-web/public/sw.js`) precaches:
 So the UI opens with no internet once the site has been loaded once (open it on the demo laptop before going offline). The service worker is active in production builds (`npm run build; npm run start`) and on the deployed site.
 
 **Limits:**
-- Map tiles are not cached.
+- Map tiles are cached only for the demo region, and only after "Prepare offline map" (below).
 - Push needs the internet.
 - The `/alerts` "type a city" search calls Nominatim from the browser, so offline it can only use the replayed chat answers. Use the chat (questions 1–10) and `/disaster` for offline alerts.
 
 **Running everything on the laptop** (`localhost` backend and frontend) does not need Wi-Fi at all apart from the live services, and replay covers those.
+
+## The map offline (Pune–Mumbai)
+
+`/map` needs two things offline: the **weather** (backend replay) and the **map tiles** (browser cache). Both cover one demo region, Pune to Mumbai, defined once in `backend/maps/demo.py` (`GET /api/map/demo-region`).
+
+**1. Record the map weather (backend, needs internet), the morning of the demo:**
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map          # with the chat questions
+backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map-only     # only the map
+```
+
+- **Weather tiles.** It saves the weather tiles (`backend/data/demo_fixtures/map_tiles/`) for every grid step used between about zoom 8 and 11 over the region: 69 tiles of 25 points, 72 hours each.
+- **Tap points.** It also saves `/api/map/point` answers on a 0.25° lattice (35 points).
+- **Cost.** That is about 1,800 Open-Meteo location-calls, in 4-tile batches. Run it once, not in a loop (`docs/OPEN_METEO.md`).
+
+With `DEMO_REPLAY=1`:
+- **The weather layers come from the recorded tiles.** These are the temperature, humidity, wind, rain and heat surfaces, plus the hazard hexes, hazard roads and the 25 km summary. Every response carries the recording time, so the amber "Replay" badge shows.
+- **A tap shows the nearest recorded point within 25 km**, with that point's own coordinates on the card. It is never relabelled as the tapped spot.
+- **Outside the region, offline:** the map says "Map weather is unavailable", and a tap far from any recorded point gets the offline-demo 503.
+
+**2. Save the map tiles (browser, needs internet), once on the demo laptop:**
+
+- Open the site, then **Settings → Offline demo map → Prepare offline map**. It saves about 100 files (a few MB) into the browser's cache:
+  - the OpenFreeMap style, sprites and fonts (Latin and Devanagari)
+  - vector tiles and AWS terrain tiles for the region at zoom 6–10
+  - MapLibre's worker
+- It is deliberately small and polite to the free tile services: one region, 4 requests at a time, run by hand.
+- **The service worker uses these files only when the network fails.** It never adds tiles while you browse.
+- **Always the keyless sources.** With a MapTiler key the map falls back to them offline.
+
+**Check before the judges arrive:**
+1. Turn Wi-Fi off and open `/map`.
+2. Pick Pune and zoom to 8–10: the basemap, terrain in broadcast mode, layers and hazard hexes should all draw.
+3. Tap near Pune: the card shows a recorded point.
+4. Zooming in past 10 shows a blank basemap. That is expected: the pack stops at zoom 10.
+

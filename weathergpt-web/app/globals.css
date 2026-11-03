@@ -403,3 +403,11 @@ body {
 /* Broadcast view: no zoom buttons over the lower third (gestures and keys
    still zoom); the attribution stays visible below it. */
 .map-broadcast .maplibregl-ctrl-group { display: none; }
+
+/* Popovers over page content (settings): near-solid, so what is behind
+   never shows through the text. */
+@layer components {
+  .sky-glass.sky-popover {
+    background: color-mix(in srgb, var(--map-base) 98%, transparent);
+  }
+}

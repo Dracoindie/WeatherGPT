@@ -17,7 +17,7 @@ WeatherGPT gets its weather, archive and air-quality data from [Open-Meteo](http
 |---|---|---|
 | Chat question | 1 forecast call (plus 1 air-quality call for AQI questions, 1 archive call for climate) | none: every answer is fresh |
 | `/api/map/point` (tap on the map) | 1 forecast + 1 air-quality | 10 min, per ~1 km |
-| `/api/map/grid` | 25 per **missing** tile, in one request | 15 min per tile, **shared by all users** |
+| `/api/map/grid`, `/api/map/hazard`, `/api/map/hazard/summary` | 25 per **missing** tile, in one request | 15 min per tile, **shared by all users** |
 | `/api/alerts`, risk board, push job | 1 forecast per place | alerts keep the last good answer for stale serving |
 
 **The map tiles (`backend/maps/tiles.py`).**
@@ -25,6 +25,8 @@ WeatherGPT gets its weather, archive and air-quality data from [Open-Meteo](http
 - A tile's points sit on exact multiples of the step, so every user whose view touches a tile at that zoom band shares the same cached copy.
 - Panning fetches only the tiles that are new, in one request.
 - A busy demo region therefore costs about the same as a single viewer.
+
+**Recording the offline map demo** (`backend/scripts/record_demo_fixtures.py --map`, `docs/DEMO.md`) fetches 69 tiles (about 1,700 location-calls) in 4-tile requests, plus 35 tap points. Run it once on the morning of the demo, not in a loop.
 
 ## The optional key: `OPEN_METEO_API_KEY`
 

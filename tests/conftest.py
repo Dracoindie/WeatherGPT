@@ -48,3 +48,17 @@ def reset_alerts_cache():
     alerts.clear_cache()
     yield
     alerts.clear_cache()
+
+
+@pytest.fixture(autouse=True)
+def reset_map_tile_hooks():
+    """demo_replay.install() sets the tile layer's replay/record hooks; never leak them."""
+    from maps import tiles
+
+    tiles.fixture_loader = None
+    tiles.fixture_saver = None
+    tiles.clear_cache()
+    yield
+    tiles.fixture_loader = None
+    tiles.fixture_saver = None
+    tiles.clear_cache()

@@ -19,6 +19,15 @@ DEMO_RECORD=1
 Matching is on method + path + a normalised query/body: coordinates are
 rounded to 0.01°, chat text is case- and punctuation-folded, and follow-up
 context (intent, place, date, parameter) is part of the key.
+
+The map is different, because every pan asks for a new box:
+- /api/map/grid, /api/map/hazard and /hazard/summary are built from the shared
+  weather tiles (maps/tiles.py). Recorded tiles live in
+  demo_fixtures/map_tiles/ and are served by the tile layer itself; the
+  responses carry ``recorded_at`` and the replay header.
+- /api/map/point answers a tap with the nearest recorded point within
+  POINT_RADIUS_KM, with that point's own coordinates (never relabelled as the
+  tapped spot).
 """
 
 from __future__ import annotations
@@ -51,6 +60,11 @@ OFFLINE_HEADER = "X-WeatherGPT-Offline-Demo"
 _SKIP_PREFIXES = ("/api/push", "/api/alerts/check")
 _COORD_KEYS = {"latitude", "longitude", "lat", "lon"}
 _CONTEXT_KEYS = ("intent", "location_name", "date_reference", "weather_parameter", "climate_period")
+# Map endpoints built from weather tiles: the tile layer replays them (see above).
+_TILE_PATHS = ("/api/map/grid", "/api/map/hazard", "/api/map/hazard/summary", "/api/map/demo-region")
+POINT_PATH = "/api/map/point"
+POINT_RADIUS_KM = 25.0
+TILE_DIR_NAME = "map_tiles"
 
 OFFLINE_CHAT = {
     "en": "Offline demo: only the prepared demo questions are available right now (no internet connection).",
@@ -182,6 +196,79 @@ class FixtureStore:
         return target
 
 
+    def nearest_point(self, latitude: float, longitude: float, radius_km: float = POINT_RADIUS_KM) -> Optional[dict]:
+        """The recorded /api/map/point answer closest to a tap, within radius_km."""
+        best, best_km = None, radius_km
+        for f in self.fixtures.values():
+            if f.get("request", {}).get("path") != POINT_PATH or f.get("status", 200) != 200:
+                continue
+            r = f.get("response") or {}
+            if r.get("latitude") is None or r.get("longitude") is None:
+                continue
+            km = _km(latitude, longitude, float(r["latitude"]), float(r["longitude"]))
+            if km <= best_km:
+                best, best_km = f, km
+        return best
+
+
+def _km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    import math
+
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
+
+
+class TileFixtureStore:
+    """Recorded weather tiles (maps/tiles.py), one JSON file per tile."""
+
+    def __init__(self, directory: Path):
+        self.directory = directory
+
+    def _path(self, key) -> Path:
+        step, row, col = key
+        return self.directory / f"tile_{step:g}_{row}_{col}.json"
+
+    def count(self) -> int:
+        return len(list(self.directory.glob("tile_*.json"))) if self.directory.is_dir() else 0
+
+    def save(self, tile) -> Path:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        record = {
+            "key": list(tile.key),
+            "recorded_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "times": tile.times,
+            "points": [
+                {"latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation, "hourly": p.hourly, "current": p.current}
+                for p in tile.points
+            ],
+        }
+        target = self._path(tile.key)
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record) + "\n", encoding="utf-8")
+        tmp.replace(target)
+        return target
+
+    def load(self, key):
+        from maps.tiles import Tile, TilePoint
+
+        path = self._path(key)
+        if not path.is_file():
+            return None
+        try:
+            d = json.loads(path.read_text(encoding="utf-8"))
+            return Tile(
+                key=tuple(d["key"]),
+                times=d["times"],
+                points=[TilePoint(p["latitude"], p["longitude"], p.get("elevation"), p["hourly"], p["current"]) for p in d["points"]],
+                fetched_at=datetime.fromisoformat(d["recorded_at"].replace("Z", "+00:00")),
+                recorded_at=d["recorded_at"],
+            )
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            logger.warning("Demo replay: skipping unreadable tile %s: %s", path.name, exc)
+            return None
+
+
 # ---------------------------------------------------------------------------
 # Internet check (cached so an offline venue does not wait on every request)
 # ---------------------------------------------------------------------------
@@ -229,14 +316,21 @@ def install(app: FastAPI, *, replay: Optional[bool] = None, record: Optional[boo
     if not (replay or record):
         return None
     store = store or FixtureStore()
+    tile_store = TileFixtureStore(store.directory / TILE_DIR_NAME)
+    from maps import tiles as map_tiles
+
+    map_tiles.fixture_loader = tile_store.load if replay else None
+    map_tiles.fixture_saver = tile_store.save if record else None
     logger.warning(
-        "Demo mode: replay=%s record=%s, %d fixture(s) in %s", replay, record, len(store.fixtures), store.directory
+        "Demo mode: replay=%s record=%s, %d fixture(s) and %d map tile(s) in %s",
+        replay, record, len(store.fixtures), tile_store.count(), store.directory,
     )
 
     @app.middleware("http")
     async def demo_replay_middleware(request: Request, call_next):
         method, path = request.method, request.url.path
-        if not replayable(method, path):
+        if not replayable(method, path) or path in _TILE_PATHS:
+            # map grids and hazards replay through the tile layer (recorded tiles)
             return await call_next(request)
         query = dict(request.query_params)
         body: Any = None
@@ -249,6 +343,11 @@ def install(app: FastAPI, *, replay: Optional[bool] = None, record: Optional[boo
 
         if replay:
             hit = store.get(request_key(method, path, query, body))
+            if hit is None and path == POINT_PATH:
+                try:
+                    hit = store.nearest_point(float(query["latitude"]), float(query["longitude"]))
+                except (KeyError, ValueError):
+                    hit = None
             if hit is not None:
                 return JSONResponse(hit["response"], status_code=hit.get("status", 200), headers={REPLAY_HEADER: hit["recorded_at"]})
             if not await internet_reachable():

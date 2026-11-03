@@ -15,6 +15,11 @@ Places are geocoded through /api/geocode (Nominatim), never hard-coded.
 Options:
     --clean     delete existing fixtures first (default: overwrite matching ones)
     --dry-run   print the steps without calling anything
+    --map       also record the offline map for the demo region (maps/demo.py):
+                the weather tiles for every grid step used between about zoom 8
+                and 11 (one Open-Meteo request per 4 tiles) and a 0.25° lattice
+                of tap points. About 1,800 Open-Meteo location-calls: run once.
+    --map-only  record only the map
 """
 
 from __future__ import annotations
@@ -75,9 +80,18 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--clean", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--map", action="store_true")
+    ap.add_argument("--map-only", action="store_true")
     args = ap.parse_args()
+    if args.map_only:
+        args.map = True
 
     if args.dry_run:
+        if args.map:
+            from maps.demo import DEMO_REGION, DEMO_STEPS, point_lattice, region_tile_keys
+
+            n = sum(len(region_tile_keys(s)) for s in DEMO_STEPS)
+            print(f"map: {DEMO_REGION['name']}, {n} tiles over {len(DEMO_STEPS)} steps, {len(point_lattice())} tap points")
         for m, role, fu in DEMO_CHAT:
             print(f"chat [{role}{', follow-up' if fu else ''}] {m}")
         print("alerts:", ", ".join(ALERT_PLACES))
@@ -91,6 +105,8 @@ def main() -> int:
 
     if args.clean and demo_replay.FIXTURE_DIR.is_dir():
         for f in demo_replay.FIXTURE_DIR.glob("*.json"):
+            f.unlink()
+        for f in (demo_replay.FIXTURE_DIR / demo_replay.TILE_DIR_NAME).glob("tile_*.json"):
             f.unlink()
 
     failures: list[str] = []
@@ -110,6 +126,11 @@ def main() -> int:
         if role in ROLE_PANEL:
             extra = {"hours": 24} if role == "researcher" else {}
             get(ROLE_PANEL[role], latitude=lat, longitude=lon, **extra)
+
+    if args.map:
+        record_map(get, failures)
+    if args.map_only:
+        return report(failures)
 
     get("/api/alerts/thresholds")
 
@@ -149,8 +170,37 @@ def main() -> int:
         else:
             print(f"risk board: {len(districts)} districts")
 
+    return report(failures)
+
+
+def record_map(get, failures: list[str]) -> None:
+    """Weather tiles for the demo region (saved by the tile layer while DEMO_RECORD=1) and tap points."""
+    import asyncio
+
+    from maps import tiles as T
+    from maps.demo import DEMO_REGION, DEMO_STEPS, point_lattice, region_tile_keys
+
+    per_request = T.MAX_POINTS // (T.TILE_POINTS * T.TILE_POINTS)
+    for step in DEMO_STEPS:
+        keys = region_tile_keys(step)
+        for i in range(0, len(keys), per_request):
+            try:
+                asyncio.run(T.get_tiles(keys[i : i + per_request]))
+            except RuntimeError as exc:
+                failures.append(f"map tiles step {step} batch {i // per_request} -> {exc}")
+        print(f"map tiles: step {step}°, {len(keys)} tiles")
+    points = point_lattice()
+    for lat, lon in points:
+        get("/api/map/point", latitude=lat, longitude=lon)
+    print(f"map points: {len(points)} in {DEMO_REGION['name']}")
+
+
+def report(failures: list[str]) -> int:
+    import demo_replay
+
     count = len(list(demo_replay.FIXTURE_DIR.glob("*.json")))
-    print(f"\n{count} fixture file(s) in {demo_replay.FIXTURE_DIR}")
+    tiles = len(list((demo_replay.FIXTURE_DIR / demo_replay.TILE_DIR_NAME).glob("tile_*.json")))
+    print(f"\n{count} fixture file(s) and {tiles} map tile(s) in {demo_replay.FIXTURE_DIR}")
     if failures:
         print("\nNot recorded (check the internet connection, then run again):")
         for f in failures:

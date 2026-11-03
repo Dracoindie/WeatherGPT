@@ -90,7 +90,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 - **Pages** (`app/`):
   - `/`: the Living Sky chat console, with a 3D sky scene driven by real codes and wind
   - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/login`, `/signup`, `/offline`
-  - `/map` is `components/map3d/` (MapLibre GL + deck.gl, loaded only there). Basemap: OpenFreeMap `dark` style; terrain: AWS terrarium tiles; both keyless. MapLibre's worker is copied to `public/vendor/` by `scripts/copy-maplibre-worker.mjs` (`predev`/`prebuild`, git-ignored). Broadcast mode renders through a portal on `<body>`; the map container node is moved, never rebuilt. Map colours are the `--map-*` tokens in `globals.css` (validated one-hue ramps). Every map shows "Model grid ≈ 8 km · estimated · not official IMD". Roadmap: `docs/VISION.md`.
+  - `/map` is `components/map3d/` (MapLibre GL + deck.gl, loaded only there). Basemap: OpenFreeMap `dark` style; terrain: AWS terrarium tiles; both keyless (`components/map3d/sources.ts`). With `NEXT_PUBLIC_MAPTILER_KEY`: MapTiler `dataviz-dark` and `terrain-rgb-v2`, falling back to keyless at runtime on 401/403/429 or a failed style. MapLibre's worker is copied to `public/vendor/` by `scripts/copy-maplibre-worker.mjs` (`predev`/`prebuild`, git-ignored). Broadcast mode renders through a portal on `<body>`; the map container node is moved, never rebuilt. Map colours are the `--map-*` tokens in `globals.css` (validated one-hue ramps). Every map shows "Model grid ≈ 8 km · estimated · not official IMD". Roadmap: `docs/VISION.md`.
   - Hazard mode (`components/map3d/hazard.tsx`, `roads.ts`): H3 hexes by level from `/api/map/hazard` (h3-js for the boundaries), hazard-type chips, a tap card with value vs threshold, a 25 km summary with "Show me the worst". Roads are coloured by the cells they cross, using the basemap's own `transportation` vectors (major classes only, a vertex budget, recomputed only on view, hour or type change); the legend says road colour is NOT traffic. No wind particles in hazard mode. Fly-tos use `flyToSteady` (a resize mid-flight would shift the end point).
 - **Shared code:**
   - `context/`: `I18nContext` (UI dictionary: EN / हि / Hinglish / मरा), `AuthContext`, `DemoContext`
@@ -197,7 +197,7 @@ npm run dev               # http://localhost:3000
 - Playwright mocks the backend, Nominatim and Supabase (`e2e/support/mockApi.ts`).
 - If `npm run dev` is also running, use `--workers=1`, or WebGL-heavy tests may time out.
 - Headless Chromium draws WebGL in software (SwiftShader), so lite mode's auto setting picks the CSS sky in e2e (`lib/liteMode.ts`, reason `software-renderer`). That is the CI fix. A test that needs the WebGL sky sets `localStorage['wgpt:lite-mode'] = 'off'`, as the screenshot and audit specs do.
-- Demo replay for offline judging: `docs/DEMO.md` (`DEMO_REPLAY=1`, fixtures in `backend/data/demo_fixtures/`).
+- Demo replay for offline judging: `docs/DEMO.md` (`DEMO_REPLAY=1`, fixtures in `backend/data/demo_fixtures/`). The map replays from recorded weather tiles (`demo_fixtures/map_tiles/`, `record_demo_fixtures.py --map`) for the Pune–Mumbai region in `backend/maps/demo.py`; taps get the nearest recorded point within 25 km with its own coordinates. Settings -> "Prepare offline map" (`lib/offlineMap.ts`, dynamic import) saves basemap and terrain tiles for that region at zoom 6-10; `public/sw.js` serves them only when the network fails.
 - On Windows, set `PYTHONIOENCODING=utf-8` when printing Devanagari from Python.
 
 ## Environment variables
@@ -211,7 +211,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
 - **Web Push:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `ALERT_JOB_TOKEN`. Key generation is in `docs/EARLY_WARNING.md`.
 - **Open-Meteo:** `OPEN_METEO_API_KEY` (optional, backend only; switches every client to the commercial `customer-` hosts via `open_meteo_access.py`). Without it the free endpoints are used: non-commercial only, 10,000 calls/day (`docs/OPEN_METEO.md`).
 - **Other backend:** `ALLOWED_ORIGINS`
-- **Frontend:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL`
+- **Frontend:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL`, and optionally `NEXT_PUBLIC_MAPTILER_KEY` (MapTiler basemap and terrain for `/map`; a public browser key, so restrict it by domain; without it, or if MapTiler refuses it, the keyless OpenFreeMap and AWS sources are used)
 
 ## Docs
 

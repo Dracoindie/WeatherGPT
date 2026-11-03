@@ -106,3 +106,10 @@ async def map_hazard_summary(
         response.headers[REPLAY_HEADER] = result.recorded_at
     return result
 
+
+@router.get("/api/map/demo-region")
+async def map_demo_region() -> dict:
+    """The offline demo region (docs/DEMO.md) and the zoom levels the web app precaches."""
+    from maps.demo import DEMO_REGION, MAX_ZOOM, MIN_ZOOM
+
+    return {**DEMO_REGION, "min_zoom": MIN_ZOOM, "max_zoom": MAX_ZOOM}

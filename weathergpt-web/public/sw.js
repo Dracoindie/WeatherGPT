@@ -10,12 +10,17 @@
  * - Backend GET /api/{weather,forecast,alerts,climate}: network-first, the
  *   last good response per URL is kept for offline viewing. POSTs (chat) and
  *   Supabase are never cached.
+ * - Map tiles, terrain and MapLibre's worker: the network, and only when it
+ *   fails the "offline demo map" pack (lib/offlineMap.ts fills MAP by hand).
+ *   Browsing never adds tiles to it.
  */
 
 const VERSION = 'wgpt-v2'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const DATA = `${VERSION}-data`
+// Same name as OFFLINE_MAP_CACHE in lib/offlineMap.ts.
+const MAP = `${VERSION}-map`
 const SHELL_URLS = [
   '/',
   '/offline',
@@ -146,10 +151,33 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
+function isMapRequest(url) {
+  if (url.hostname === 'tiles.openfreemap.org') return true
+  if (url.hostname === 's3.amazonaws.com' && url.pathname.startsWith('/elevation-tiles-prod/')) return true
+  return url.origin === self.location.origin && url.pathname === '/vendor/maplibre-gl-worker.mjs'
+}
+
+async function networkThenMapPack(request, url) {
+  try {
+    return await fetch(request)
+  } catch (err) {
+    const cache = await caches.open(MAP)
+    // the worker URL carries ?v=<maplibre version>
+    const hit = await cache.match(request, { ignoreSearch: url.pathname.startsWith('/vendor/'), ignoreVary: true })
+    if (hit) return hit
+    throw err
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
   const url = new URL(request.url)
+
+  if (isMapRequest(url)) {
+    event.respondWith(networkThenMapPack(request, url))
+    return
+  }
 
   if (request.mode === 'navigate' && url.origin === self.location.origin) {
     event.respondWith(networkFirst(request, SHELL, ['/', '/offline']))
