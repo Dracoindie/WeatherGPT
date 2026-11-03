@@ -33,6 +33,18 @@
   --sev-warning-text: #fecdd3;
   --sev-unknown-text: #e2e8f0;
 
+  /* /map (components/map3d): the basemap tint, the gold pin, and one-hue
+     sequential ramps, dark -> bright = low -> high. Each ramp passed the
+     dataviz validator (--ordinal, dark surface #0b1220). Fills only, never text. */
+  --map-base: #0b1220;
+  --map-water: #071a2e;
+  --map-gold: #fcd34d;
+  --map-temp-0: #9a3412; --map-temp-1: #c2410c; --map-temp-2: #f97316; --map-temp-3: #fdba74;
+  --map-humidity-0: #164e63; --map-humidity-1: #0e7490; --map-humidity-2: #22d3ee; --map-humidity-3: #a5f3fc;
+  --map-wind-0: #4338ca; --map-wind-1: #6366f1; --map-wind-2: #818cf8; --map-wind-3: #c7d2fe;
+  --map-rain-0: #1d4ed8; --map-rain-1: #3b82f6; --map-rain-2: #60a5fa; --map-rain-3: #bfdbfe;
+  --map-heat-0: #be123c; --map-heat-1: #e11d48; --map-heat-2: #fb7185; --map-heat-3: #fecdd3;
+
   --background: var(--sky-floor);
   --foreground: var(--sky-text);
 
@@ -369,3 +381,16 @@ body {
     outline-offset: 2px;
   }
 }
+
+/* Glass over the live map (components/map3d): backdrop blur does not reach a
+   WebGL canvas, so wind particles would show through; a near-opaque surface
+   keeps the text readable. */
+@layer components {
+  .sky-glass.map-overlay {
+    background: color-mix(in srgb, var(--map-base) 92%, transparent);
+  }
+}
+
+/* Broadcast view: no zoom buttons over the lower third (gestures and keys
+   still zoom); the attribution stays visible below it. */
+.map-broadcast .maplibregl-ctrl-group { display: none; }

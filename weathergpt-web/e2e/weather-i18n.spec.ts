@@ -61,7 +61,7 @@ for (const { code, label } of LANGS) {
     await page.locator('a[href="/map"]').first().dispatchEvent('click')
     await page.waitForURL('**/map')
     await page.getByRole('button', { name: LOCATION_BUTTON[code] }).first().click()
-    await expect(page.locator('.leaflet-popup [data-testid="weather-description"]')).toBeVisible({ timeout: 20_000 })
+    await expect(page.locator('[data-testid="map-location-card"] [data-testid="weather-description"]')).toBeVisible({ timeout: 20_000 })
     await expectNoEnglish(page, 1)
   })
 }

@@ -23,7 +23,7 @@ const AQI_COLOR: Record<AqiCategory, string> = {
   very_poor: '#ff3b30',
   severe: '#c00000',
 }
-const AQI_LABEL: Record<AqiCategory, Record<Language, string>> = {
+export const AQI_LABEL: Record<AqiCategory, Record<Language, string>> = {
   good: { en: 'Good', hi: 'अच्छा', hinglish: 'Good', mr: 'चांगली' },
   satisfactory: { en: 'Satisfactory', hi: 'संतोषजनक', hinglish: 'Satisfactory', mr: 'समाधानकारक' },
   moderate: { en: 'Moderately polluted', hi: 'मध्यम प्रदूषित', hinglish: 'Moderate', mr: 'मध्यम प्रदूषित' },
@@ -39,7 +39,7 @@ const UV_COLOR: Record<UvCategory, string> = {
   very_high: '#ff3b30',
   extreme: '#b04bd8',
 }
-const UV_LABEL: Record<UvCategory, Record<Language, string>> = {
+export const UV_LABEL: Record<UvCategory, Record<Language, string>> = {
   low: { en: 'Low', hi: 'कम', hinglish: 'Low', mr: 'कमी' },
   moderate: { en: 'Moderate', hi: 'मध्यम', hinglish: 'Moderate', mr: 'मध्यम' },
   high: { en: 'High', hi: 'उच्च', hinglish: 'High', mr: 'जास्त' },

@@ -135,3 +135,30 @@ test('@screens demo-session pages', async ({ page }, info) => {
     await shot(page, info.project.name, path.slice(1))
   }
 })
+
+test('@screens map: point card, heat layer, broadcast', async ({ page, isMobile }, info) => {
+  await mockBackend(page)
+  await enterDemo(page)
+  await navigate(page, '/map')
+  await pickLocation(page)
+  const canvas = page.locator('[data-testid="weather-map"] canvas.maplibregl-canvas')
+  await canvas.waitFor({ timeout: 30_000 })
+  await page.getByTestId('map-legend').waitFor({ timeout: 30_000 })
+  await canvas.scrollIntoViewIfNeeded()
+  const box = (await canvas.boundingBox())!
+  const at = { x: box.x + box.width * 0.35, y: box.y + box.height * 0.45 }
+  if (isMobile) await page.touchscreen.tap(at.x, at.y)
+  else await page.mouse.click(at.x, at.y)
+  await page.getByTestId('map-point-temp').waitFor({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  await shot(page, info.project.name, 'map-point')
+
+  await page.getByTestId('map-layer-heat').click()
+  await page.waitForTimeout(800)
+  await shot(page, info.project.name, 'map-heat')
+
+  await page.getByTestId('map-layer-rain').click()
+  await page.getByTestId('map-broadcast').click()
+  await page.waitForTimeout(4000)
+  await shot(page, info.project.name, 'map-broadcast', false)
+})

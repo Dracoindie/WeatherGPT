@@ -1,0 +1,751 @@
+'use client'
+
+/**
+ * The /map engine: MapLibre GL (OpenFreeMap vector tiles, AWS terrain tiles,
+ * both keyless) with a deck.gl overlay. Loaded only on /map (next/dynamic,
+ * ssr: false), so no other route ships maplibre or deck.gl.
+ *
+ * - Tap anywhere: GET /api/map/point, a gold pin and a glass card.
+ * - Layers: GET /api/map/grid for the visible box (one batched Open-Meteo
+ *   request), drawn as a surface interpolated between the grid points.
+ * - Time slider over the next 72 hours drives every layer.
+ * - Broadcast mode: 3D terrain, tilt, extruded rain columns, wind particles
+ *   that follow the real wind, a slow flyover and a big title and legend.
+ *   Under prefers-reduced-motion or lite mode it stays 2D and still: no
+ *   terrain, no flyover, no particles (wind arrows instead).
+ *
+ * Every number drawn comes from the API. The map always says the model grid
+ * size and that values are estimated and not official IMD data.
+ */
+
+import 'maplibre-gl/dist/maplibre-gl.css'
+import { COORDINATE_SYSTEM, type Layer } from '@deck.gl/core'
+import { BitmapLayer, ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
+import { MapboxOverlay } from '@deck.gl/mapbox'
+import { useReducedMotion } from 'framer-motion'
+import { Crosshair, Pause, Play, Tv, X } from 'lucide-react'
+import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type StyleSpecification } from 'maplibre-gl'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { SkyButton } from '@/components/ui/SkyButton'
+import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
+import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
+import { formatLocalTime, zonedClock } from '@/lib/format'
+import { useLiteMode } from '@/lib/liteMode'
+import { cn } from '@/lib/utils'
+import { fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
+import { MapLegend } from './MapLegend'
+import { MapPointCard, type PointState } from './MapPointCard'
+import { createField, particleCount, step, type ParticleField } from './particles'
+
+/** OpenFreeMap: free vector tiles, no key. */
+export const BASEMAP_STYLE = 'https://tiles.openfreemap.org/styles/dark'
+/** AWS Open Data terrain tiles (Mapzen terrarium encoding), no key. */
+export const TERRAIN_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+const TERRAIN_ATTRIBUTION = 'Terrain: Mapzen / AWS Terrain Tiles'
+
+/** Country view when no place is picked yet: India as a whole, not a city. */
+const INDIA_VIEW = { center: [80, 22.5] as [number, number], zoom: 3.6 }
+
+export interface MapPlace {
+  latitude: number
+  longitude: number
+  name: string
+}
+
+interface Props {
+  place: MapPlace | null
+  /** for the place card: weather in the UI language, alert status line */
+  conditionLabel?: string
+  statusText?: string
+  statusTone?: 'none' | 'warning'
+  /** IANA zone for time labels (the place's, from /api/weather) */
+  timezone?: string
+}
+
+type GridStatus = 'idle' | 'loading' | 'ready' | 'error' | 'too-large'
+
+const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
+
+export function WeatherMap({ place: placeProp, conditionLabel, statusText, statusTone = 'none', timezone }: Props) {
+  // The page passes a new object each render; only a real move counts.
+  const placeKey = placeProp ? `${placeProp.latitude},${placeProp.longitude},${placeProp.name}` : ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const place = useMemo(() => placeProp, [placeKey])
+  const { t, language } = useI18n()
+  const reducedMotion = useReducedMotion() ?? false
+  const { lite } = useLiteMode()
+  const motion = !reducedMotion && !lite
+
+  // The MapLibre container is created once and moved between the inline slot
+  // and the full-screen broadcast slot (a portal on <body>), so the map is
+  // never rebuilt. A portal escapes the page's stacking contexts and the
+  // glass panels' backdrop-filter, which would otherwise trap position: fixed.
+  const [mapEl] = useState(() => {
+    const d = document.createElement('div')
+    d.className = 'h-full w-full'
+    d.setAttribute('role', 'region')
+    return d
+  })
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const overlayRef = useRef<MapboxOverlay | null>(null)
+  const [mapError, setMapError] = useState(false)
+  const [mapReady, setMapReady] = useState(false)
+
+  const [grid, setGrid] = useState<MapGrid | null>(null)
+  const [gridStatus, setGridStatus] = useState<GridStatus>('idle')
+  const [layer, setLayer] = useState<LayerId>('temperature')
+  const [hour, setHour] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [broadcast, setBroadcast] = useState(false)
+  const [point, setPoint] = useState<PointState | null>(null)
+  // ssr: false, so window exists on first render
+  const [pitch, setPitch] = useState(0)
+  const [mobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
+
+  const broadcast3d = broadcast && motion
+  const particlesOn = motion && (broadcast || layer === 'wind')
+  const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
+
+  // ---------------------------------------------------------------- grid ---
+  const gridAbort = useRef<AbortController | null>(null)
+  const gridTimer = useRef<number | null>(null)
+  const loadGrid = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+    if (gridTimer.current) window.clearTimeout(gridTimer.current)
+    gridTimer.current = window.setTimeout(() => {
+      const b = map.getBounds()
+      const box = {
+        south: Math.max(-84, b.getSouth()),
+        north: Math.min(84, b.getNorth()),
+        west: Math.max(-179.9, b.getWest()),
+        east: Math.min(179.9, b.getEast()),
+      }
+      if (box.north <= box.south || box.east <= box.west) return
+      gridAbort.current?.abort()
+      const ctrl = new AbortController()
+      gridAbort.current = ctrl
+      setGridStatus('loading')
+      const max = window.innerWidth < 640 ? 49 : 81
+      fetchMapGrid(box, max, ctrl.signal)
+        .then((g) => {
+          setGrid(g)
+          setGridStatus('ready')
+          setHour((h) => Math.min(h, Math.max(0, g.times.length - 1)))
+        })
+        .catch((err: unknown) => {
+          if (err instanceof DOMException && err.name === 'AbortError') return
+          setGridStatus(err instanceof Error && /422/.test(err.message) ? 'too-large' : 'error')
+        })
+    }, 450)
+  }, [])
+
+  // --------------------------------------------------------------- point ---
+  const pointAbort = useRef<AbortController | null>(null)
+  const pinStart = useRef(0)
+  const showPoint = useCallback((latitude: number, longitude: number) => {
+    pointAbort.current?.abort()
+    const ctrl = new AbortController()
+    pointAbort.current = ctrl
+    pinStart.current = performance.now()
+    setPoint({ status: 'loading', latitude, longitude })
+    fetchMapPoint(latitude, longitude, ctrl.signal)
+      .then((data) => setPoint({ status: 'ready', latitude, longitude, data }))
+      .catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setPoint({ status: 'error', latitude, longitude })
+      })
+  }, [])
+
+  // ------------------------------------------------------------ map init ---
+  const initialPlace = useRef(place)
+  useEffect(() => {
+    const el = mapEl
+    let map: MapLibreMap
+    try {
+      setWorkerUrl(`/vendor/maplibre-gl-worker.mjs?v=${getVersion()}`)
+      const p = initialPlace.current
+      map = new MapLibreMap({
+        container: el,
+        style: BASEMAP_STYLE,
+        center: p ? [p.longitude, p.latitude] : INDIA_VIEW.center,
+        zoom: p ? 8 : INDIA_VIEW.zoom,
+        maxPitch: 72,
+        attributionControl: { compact: true },
+        // Keyboard users pan with the arrow keys; the map canvas is focusable.
+        keyboard: true,
+      })
+    } catch {
+      // No WebGL (or it failed to start): the page still shows the place and its weather.
+      const id = window.setTimeout(() => setMapError(true), 0)
+      return () => window.clearTimeout(id)
+    }
+    mapRef.current = map
+    map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
+    const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
+    overlayRef.current = overlay
+    map.addControl(overlay)
+
+    map.on('style.load', () => tintBasemap(map))
+    map.on('load', () => {
+      setMapReady(true)
+      loadGrid()
+    })
+    map.on('moveend', loadGrid)
+    map.on('pitchend', () => setPitch(Math.round(map.getPitch())))
+    map.on('click', (e) => showPoint(e.lngLat.lat, e.lngLat.lng))
+    map.on('error', (e) => console.warn('[map]', e.error?.message ?? e))
+
+    return () => {
+      gridAbort.current?.abort()
+      pointAbort.current?.abort()
+      if (gridTimer.current) window.clearTimeout(gridTimer.current)
+      overlayRef.current = null
+      mapRef.current = null
+      map.remove()
+    }
+  }, [mapEl, loadGrid, showPoint])
+
+  useLayoutEffect(() => {
+    if (!slot) return
+    slot.appendChild(mapEl)
+    mapRef.current?.resize()
+  }, [slot, mapEl])
+
+  useEffect(() => {
+    mapEl.setAttribute('aria-label', t('map.region'))
+  }, [mapEl, t])
+
+  // No page scroll behind the full-screen broadcast.
+  useEffect(() => {
+    if (!broadcast) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [broadcast])
+
+  // Follow the picked place.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !place) return
+    map.flyTo({ center: [place.longitude, place.latitude], zoom: Math.max(map.getZoom(), 8), animate: motion })
+  }, [place, motion])
+
+  // ------------------------------------------------------ broadcast mode ---
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    map.resize()
+    if (broadcast3d) {
+      if (!map.getSource('terrain')) {
+        map.addSource('terrain', { type: 'raster-dem', tiles: [TERRAIN_TILES], tileSize: 256, encoding: 'terrarium', maxzoom: 13, attribution: TERRAIN_ATTRIBUTION })
+        map.addSource('terrain-shade', { type: 'raster-dem', tiles: [TERRAIN_TILES], tileSize: 256, encoding: 'terrarium', maxzoom: 13 })
+      }
+      if (!map.getLayer('terrain-hillshade')) {
+        map.addLayer({
+          id: 'terrain-hillshade',
+          type: 'hillshade',
+          source: 'terrain-shade',
+          paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
+        })
+      }
+      map.setTerrain({ source: 'terrain', exaggeration: 1.6 })
+      map.easeTo({ pitch: 58, bearing: -18, zoom: Math.max(map.getZoom(), 6.5), duration: 1800 })
+    } else {
+      if (map.getTerrain()) map.setTerrain(null)
+      if (map.getLayer('terrain-hillshade')) map.removeLayer('terrain-hillshade')
+      if (map.getPitch() !== 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: motion ? 900 : 0 })
+    }
+  }, [broadcast3d, broadcast, mapReady, motion])
+
+  // Esc leaves broadcast mode; broadcast plays the 72 hours when motion is allowed.
+  useEffect(() => {
+    if (!broadcast) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setBroadcast(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [broadcast])
+
+  // ----------------------------------------------------------- time play ---
+  useEffect(() => {
+    if (!playing || !grid) return
+    const id = window.setInterval(() => setHour((h) => (h + 1) % grid.times.length), 900)
+    return () => window.clearInterval(id)
+  }, [playing, grid])
+
+  // -------------------------------------------------------------- layers ---
+  const colors = useMemo(
+    () => ({ gold: tokenRgb('--map-gold', [252, 211, 77]), accent: tokenRgb('--sky-accent', [34, 211, 238]), ink: tokenRgb('--sky-text', [231, 240, 255]) }),
+    []
+  )
+
+  const staticLayers = useMemo<Layer[]>(() => {
+    const out: Layer[] = []
+    if (grid && gridStatus !== 'too-large') {
+      const ramp = rampFor(layer)
+      const w = Math.min(192, grid.cols * 16)
+      const h = Math.min(192, grid.rows * 16)
+      const px = fieldPixels(grid, layer, hour, ramp, w, h, broadcast ? 150 : 115)
+      const north = grid.south + (grid.rows - 1) * grid.step_deg
+      const east = grid.west + (grid.cols - 1) * grid.step_deg
+      out.push(
+        new BitmapLayer({
+          id: 'field',
+          image: new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h),
+          bounds: [grid.west, grid.south, east, north],
+          _imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
+          opacity: 0.85,
+          pickable: false,
+        })
+      )
+
+      if (broadcast || layer === 'rain') {
+        const rain = valuesAt(grid, 'rain', hour)
+        const ramp = rampFor('rain')
+        const wet = grid.points.map((p, i) => ({ p, mm: rain[i] })).filter((d) => d.mm != null && d.mm >= 0.1) as Array<{ p: MapGrid['points'][number]; mm: number }>
+        const radius = grid.spacing_km * 1000 * 0.22
+        // the wettest column is ~1.5 grid spacings tall, whatever the zoom
+        const maxMm = Math.max(1, ...wet.map((d) => d.mm))
+        out.push(
+          broadcast3d
+            ? new ColumnLayer({
+                id: 'rain-columns',
+                data: wet,
+                getPosition: (d) => [d.p.longitude, d.p.latitude],
+                getElevation: (d) => d.mm,
+                elevationScale: (grid.spacing_km * 1000 * 1.5) / maxMm,
+                radius,
+                diskResolution: 12,
+                extruded: true,
+                getFillColor: (d) => rgba(ramp[Math.min(3, Math.floor(d.mm / 2.5))], 220),
+                updateTriggers: { getElevation: hour, getFillColor: hour },
+              })
+            : new ScatterplotLayer({
+                id: 'rain-dots',
+                data: wet,
+                getPosition: (d) => [d.p.longitude, d.p.latitude],
+                getRadius: (d) => Math.min(14, 3 + d.mm * 1.5),
+                radiusUnits: 'pixels',
+                getFillColor: (d) => rgba(ramp[Math.min(3, Math.floor(d.mm / 2.5))], 200),
+                updateTriggers: { getRadius: hour, getFillColor: hour },
+              })
+        )
+      }
+
+      if (!motion && (broadcast || layer === 'wind')) {
+        // Still wind arrows: from each grid point toward where the air goes.
+        const data = grid.points
+          .map((p) => ({ p, s: p.wind_speed_10m[hour], d: p.wind_direction_10m[hour] }))
+          .filter((x) => x.s != null && x.d != null) as Array<{ p: MapGrid['points'][number]; s: number; d: number }>
+        const scale = grid.step_deg * 0.45
+        const maxS = Math.max(1, ...data.map((x) => x.s))
+        const end = (x: (typeof data)[number]): [number, number] => {
+          const [u, v] = windVector(x.s, x.d)
+          const k = (scale / maxS) * 1
+          return [x.p.longitude + u * k, x.p.latitude + v * k]
+        }
+        out.push(
+          new LineLayer({
+            id: 'wind-arrows',
+            data,
+            getSourcePosition: (x) => [x.p.longitude, x.p.latitude],
+            getTargetPosition: end,
+            getColor: rgba(colors.ink, 220),
+            getWidth: 2,
+            widthUnits: 'pixels',
+            updateTriggers: { getTargetPosition: hour },
+          }),
+          new ScatterplotLayer({
+            id: 'wind-heads',
+            data,
+            getPosition: end,
+            getRadius: 2.5,
+            radiusUnits: 'pixels',
+            getFillColor: rgba(colors.ink, 230),
+            updateTriggers: { getPosition: hour },
+          })
+        )
+      }
+    }
+
+    if (place) {
+      out.push(
+        new ScatterplotLayer({
+          id: 'place',
+          data: [place],
+          getPosition: (d: MapPlace) => [d.longitude, d.latitude],
+          getRadius: 7,
+          radiusUnits: 'pixels',
+          stroked: true,
+          getLineColor: rgba(colors.ink, 255),
+          lineWidthUnits: 'pixels',
+          getLineWidth: 2,
+          getFillColor: rgba(colors.accent, 255),
+        })
+      )
+    }
+    return out
+  }, [grid, gridStatus, layer, hour, broadcast, broadcast3d, motion, place, colors])
+
+  // Particles live outside React state: the frame loop advances them and
+  // pushes layers to deck directly.
+  const fieldRef = useRef<ParticleField | null>(null)
+  useEffect(() => {
+    fieldRef.current = particlesOn && grid ? createField(grid, hour, particleCount(window.innerWidth, mobile)) : null
+  }, [particlesOn, grid, hour, mobile])
+
+  const dynamicLayers = useCallback(
+    (now: number): Layer[] => {
+      const out: Layer[] = []
+      const f = fieldRef.current
+      if (f) {
+        out.push(
+          new LineLayer({
+            id: 'wind-particles',
+            data: f.particles,
+            getSourcePosition: (p) => [p.plon - (p.lon - p.plon) * 4, p.plat - (p.lat - p.plat) * 4],
+            getTargetPosition: (p) => [p.lon, p.lat],
+            getColor: (p) => rgba(colors.ink, Math.round(60 + 150 * Math.min(1, p.speed / Math.max(1, f.maxSpeed)))),
+            getWidth: 1.5,
+            widthUnits: 'pixels',
+            updateTriggers: { getSourcePosition: now, getTargetPosition: now, getColor: now },
+          })
+        )
+      }
+      if (point) {
+        const tPin = motion ? Math.min(1, (now - pinStart.current) / 700) : 1
+        const ease = 1 - Math.pow(1 - tPin, 3)
+        const map = mapRef.current
+        const zoom = map?.getZoom() ?? 8
+        const mpp = (156543.03 * Math.cos((point.latitude * Math.PI) / 180)) / Math.pow(2, zoom)
+        const pulse = motion ? ((now - pinStart.current) % 1600) / 1600 : 0.6
+        if (broadcast3d) {
+          // a standing 3D pin only when the camera is tilted; seen from
+          // straight above, perspective would draw it as a sideways capsule
+          out.push(
+            new ColumnLayer({
+            id: 'pin',
+            data: [point],
+            getPosition: (d: PointState) => [d.longitude, d.latitude],
+            radius: 5 * mpp,
+            getElevation: 70 * mpp * ease,
+            extruded: true,
+            diskResolution: 16,
+            getFillColor: rgba(colors.gold, 255),
+            updateTriggers: { getElevation: now },
+          })
+          )
+        }
+        out.push(
+          new ScatterplotLayer({
+            id: 'pin-ring',
+            data: [point],
+            getPosition: (d: PointState) => [d.longitude, d.latitude],
+            getRadius: 6 + 26 * pulse,
+            radiusUnits: 'pixels',
+            stroked: true,
+            filled: false,
+            lineWidthUnits: 'pixels',
+            getLineWidth: 2,
+            getLineColor: rgba(colors.gold, Math.round(255 * (1 - pulse))),
+            updateTriggers: { getRadius: now, getLineColor: now },
+          }),
+          new ScatterplotLayer({
+            id: 'pin-base',
+            data: [point],
+            getPosition: (d: PointState) => [d.longitude, d.latitude],
+            getRadius: 5,
+            radiusUnits: 'pixels',
+            getFillColor: rgba(colors.gold, 255),
+          })
+        )
+      }
+      return out
+    },
+    [point, motion, colors, broadcast3d]
+  )
+
+  // Frame loop: particles, the pin animation and the broadcast flyover.
+  useEffect(() => {
+    const overlay = overlayRef.current
+    const map = mapRef.current
+    if (!overlay || !map) return
+    let raf = 0
+    let flying = broadcast3d
+    const stop = () => {
+      flying = false
+    }
+    map.on('mousedown', stop)
+    map.on('touchstart', stop)
+    map.on('wheel', stop)
+    const animate = motion && (fieldRef.current != null || point != null || broadcast3d)
+    const frame = (now: number) => {
+      const f = fieldRef.current
+      if (f) {
+        const b = map.getBounds()
+        // ~0.4 % of the view width per frame at the fastest wind in view
+        const degPerKmh = ((b.getEast() - b.getWest()) * 0.004) / Math.max(10, f.maxSpeed)
+        step(f, degPerKmh)
+      }
+      // after the tilt has finished: setBearing would cancel the ease
+      if (flying && !map.isMoving()) map.setBearing(map.getBearing() + 0.05)
+      overlay.setProps({ layers: [...staticLayers, ...dynamicLayers(now)] })
+      if (animate) raf = requestAnimationFrame(frame)
+    }
+    raf = requestAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(raf)
+      map.off('mousedown', stop)
+      map.off('touchstart', stop)
+      map.off('wheel', stop)
+    }
+  }, [staticLayers, dynamicLayers, motion, point, broadcast3d, particlesOn, mapReady])
+
+  // ------------------------------------------------------------------ UI ---
+  const timeLabel = useMemo(() => {
+    const iso = grid?.times[hour]
+    if (!iso) return ''
+    const z = zonedClock(iso, 0, tz)
+    return z ? formatLocalTime(z.full.replace(' ', 'T'), language) : ''
+  }, [grid, hour, tz, language])
+
+  const resolution = grid
+    ? fill(t('map.resolution'), { km: grid.model_grid_km, spacing: grid.spacing_km })
+    : point?.status === 'ready'
+      ? fill(t('map.resolutionShort'), { km: point.data.model_grid_km })
+      : null
+
+  const toggleBroadcast = () => {
+    const next = !broadcast
+    setBroadcast(next)
+    setPlaying(next && motion)
+  }
+
+  const centre = () => {
+    const c = mapRef.current?.getCenter()
+    if (c) showPoint(c.lat, c.lng)
+  }
+
+  const layerButtons = (
+    <div role="group" aria-label={t('map.layer.label')} className="flex flex-wrap gap-1.5">
+      {LAYERS.map((id) => (
+        <button
+          key={id}
+          type="button"
+          data-testid={`map-layer-${id}`}
+          aria-pressed={layer === id}
+          onClick={() => setLayer(id)}
+          className={cn(
+            'rounded-full border px-3 py-1.5 text-xs transition-colors',
+            layer === id ? 'border-accent bg-accent/15 text-hud' : 'border-white/10 bg-white/[0.04] text-hud-dim hover:text-hud'
+          )}
+        >
+          {t(`map.layer.${id}` as TranslationKey)}
+        </button>
+      ))}
+    </div>
+  )
+
+  const slider = grid && (
+    <div className="flex items-center gap-3">
+      <SkyButton
+        variant="ghost"
+        className="h-9 w-9 shrink-0 justify-center p-0"
+        onClick={() => setPlaying((p) => !p)}
+        aria-label={playing ? t('map.time.pause') : t('map.time.play')}
+        data-testid="map-play"
+      >
+        {playing ? <Pause className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
+      </SkyButton>
+      <div className="min-w-0 flex-1">
+        <label htmlFor="map-hour" className="flex justify-between gap-2 text-xs text-hud-dim">
+          <span>{t('map.time.label')}</span>
+          <span className="font-readout text-hud" data-testid="map-time-label">
+            {timeLabel}
+          </span>
+        </label>
+        <input
+          id="map-hour"
+          type="range"
+          min={0}
+          max={grid.times.length - 1}
+          value={hour}
+          onChange={(e) => {
+            setPlaying(false)
+            setHour(Number(e.target.value))
+          }}
+          aria-valuetext={timeLabel}
+          data-testid="map-time-slider"
+          className="w-full accent-[var(--sky-accent)]"
+        />
+      </div>
+    </div>
+  )
+
+  const status =
+    gridStatus === 'loading' && !grid
+      ? t('map.loading')
+      : gridStatus === 'error'
+        ? t('map.gridError')
+        : gridStatus === 'too-large'
+          ? t('map.zoomIn')
+          : null
+
+  const placeShort = place?.name.split(',')[0]
+
+  if (mapError) {
+    return (
+      <div className="flex h-full min-h-[200px] items-center justify-center p-6 text-center text-sm text-hud-dim" role="note">
+        {t('map.webgl')}
+      </div>
+    )
+  }
+
+  const broadcastView = broadcast
+    ? createPortal(
+        <div
+          className="map-broadcast fixed inset-0 z-[200] bg-[var(--sky-floor)]"
+          data-testid="map-broadcast-root"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('map.broadcast.kicker')}
+        >
+          <div ref={setSlot} className="absolute inset-0 z-0" />
+          <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
+            <div className="sky-glass map-overlay pointer-events-auto px-3 py-2">{layerButtons}</div>
+            <SkyButton variant="primary" onClick={toggleBroadcast} data-testid="map-broadcast-exit" className="pointer-events-auto">
+              <X className="h-4 w-4" aria-hidden /> {t('map.broadcast.exit')}
+            </SkyButton>
+          </div>
+          {grid && (
+            <div className="sky-glass map-overlay absolute right-3 top-20 hidden w-72 p-4 sm:block">
+              <MapLegend grid={grid} layer={layer} big />
+            </div>
+          )}
+          {point && !mobile && (
+            <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute left-3 top-20 max-h-[45%] w-72 overflow-y-auto" />
+          )}
+          {/* news-style lower third */}
+          <div className="absolute inset-x-3 bottom-9 sm:inset-x-6 sm:bottom-10">
+            <div className="sky-glass map-overlay overflow-hidden p-0">
+              <div className="flex flex-wrap items-stretch">
+                <div className="flex items-center bg-accent px-4 py-2 font-hud text-xs uppercase tracking-[0.2em] text-[var(--sky-floor)] sm:text-sm">
+                  {t('map.broadcast.kicker')}
+                </div>
+                <p className="min-w-0 flex-1 px-4 py-2 font-hud text-xl text-hud sm:text-3xl" data-testid="map-broadcast-title">
+                  {placeShort ? `${placeShort} · ` : ''}
+                  {t(`map.layer.${layer}` as TranslationKey)}
+                </p>
+              </div>
+              {grid && (
+                <div className="border-t border-white/10 px-4 py-2 sm:hidden">
+                  <MapLegend grid={grid} layer={layer} />
+                </div>
+              )}
+              <div className="border-t border-white/10 px-4 py-2">{slider}</div>
+              <p className="border-t border-white/10 px-4 py-1.5 text-[11px] text-hud-dim" data-testid="map-resolution">
+                {resolution}
+                {!broadcast3d && ` · ${t('map.broadcast.flat')}`}
+              </p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )
+    : null
+
+  return (
+    <div
+      data-testid="weather-map"
+      data-broadcast={broadcast ? (broadcast3d ? '3d' : '2d') : 'off'}
+      data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
+      data-layer={layer}
+      data-pitch={pitch}
+      className="flex h-full flex-col gap-3"
+    >
+      {broadcastView}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {layerButtons}
+        <div className="flex flex-wrap gap-1.5">
+          <SkyButton variant="subtle" onClick={centre} data-testid="map-centre">
+            <Crosshair className="h-4 w-4" aria-hidden /> {t('map.centre')}
+          </SkyButton>
+          <SkyButton variant="primary" onClick={toggleBroadcast} data-testid="map-broadcast">
+            <Tv className="h-4 w-4" aria-hidden /> {t('map.broadcast')}
+          </SkyButton>
+        </div>
+      </div>
+
+      <div className="relative min-h-[380px] flex-1 overflow-hidden rounded-xl sm:min-h-[460px] lg:min-h-[580px]">
+        {!broadcast && <div ref={setSlot} className="absolute inset-0 z-0" />}
+
+        {place && (
+          <div className="sky-glass map-overlay pointer-events-none absolute left-2 top-2 max-w-[60%] px-3 py-2 text-xs" data-testid="map-location-card">
+            <p className="truncate font-semibold text-hud" title={place.name}>
+              {placeShort}
+            </p>
+            {conditionLabel && (
+              <p className="text-hud" data-testid="weather-description">
+                {conditionLabel}
+              </p>
+            )}
+            {statusText && <p className={statusTone === 'warning' ? 'text-sev-warning-text' : 'text-sev-none-text'}>{statusText}</p>}
+          </div>
+        )}
+
+        {status && (
+          <p className="sky-glass map-overlay absolute bottom-2 left-2 max-w-[80%] px-3 py-1.5 text-xs text-hud" role="status">
+            {status}
+          </p>
+        )}
+
+        {/* tapped point: overlay on wider screens */}
+        {point && !mobile && !broadcast && (
+          <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto" />
+        )}
+      </div>
+
+      {point && mobile && !broadcast && <MapPointCard point={point} onClose={() => setPoint(null)} />}
+
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+        <div className="min-w-0 space-y-2">
+          {!broadcast && slider}
+          <p className="text-xs text-hud-dim">{t('map.tapHint')}</p>
+        </div>
+        {grid && !broadcast && (
+          <div className="min-w-0">
+            <MapLegend grid={grid} layer={layer} />
+          </div>
+        )}
+      </div>
+      {resolution && !broadcast && (
+        <p className="text-[11px] text-hud-dim" data-testid="map-resolution">
+          {resolution}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Living Sky tint on the OpenFreeMap dark style: navy land, deep-blue water. */
+function tintBasemap(map: MapLibreMap) {
+  const base = cssVar('--map-base', 'black')
+  const water = cssVar('--map-water', 'black')
+  const style = map.getStyle() as StyleSpecification | undefined
+  for (const l of style?.layers ?? []) {
+    try {
+      if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', base)
+      else if (l.id === 'water' && l.type === 'fill') map.setPaintProperty(l.id, 'fill-color', water)
+    } catch {
+      // a layer the style does not have: nothing to tint
+    }
+  }
+}
+
+function cssVar(name: string, fallback: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+}

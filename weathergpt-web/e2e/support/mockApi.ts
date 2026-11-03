@@ -6,6 +6,7 @@
  */
 
 import type { BrowserContext, Page, Route } from '@playwright/test'
+import { deflateSync } from 'node:zlib'
 import THRESHOLDS from './thresholds.json'
 
 export const PUNE = { name: 'Pune, Maharashtra, India', latitude: 18.5204, longitude: 73.8567 }
@@ -21,6 +22,137 @@ const TILE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQUzMBAADeAHlsAsY2AAAAAElFTkSuQmCC',
   'base64'
 )
+
+/** A flat 256x256 terrarium DEM tile (every pixel R=128,G=0,B=0 -> 0 m), so 3D terrain loads offline. */
+function flatTerrainPng(): Buffer {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    return c >>> 0
+  })
+  const crc = (buf: Buffer) => {
+    let c = 0xffffffff
+    for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8)
+    return (c ^ 0xffffffff) >>> 0
+  }
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4)
+    len.writeUInt32BE(data.length)
+    const td = Buffer.concat([Buffer.from(type, 'ascii'), data])
+    const c = Buffer.alloc(4)
+    c.writeUInt32BE(crc(td))
+    return Buffer.concat([len, td, c])
+  }
+  const size = 256
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 2 // RGB
+  const row = Buffer.alloc(1 + size * 3)
+  for (let x = 0; x < size; x++) row[1 + x * 3] = 128
+  const raw = Buffer.concat(Array.from({ length: size }, () => row))
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+const TERRAIN_TILE = flatTerrainPng()
+
+/** Stand-in for the OpenFreeMap dark style: background and nothing else, no network. */
+const MAP_STYLE = {
+  version: 8,
+  name: 'test',
+  sources: {},
+  layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#111827' } }],
+}
+
+/** GET /api/map/point for any tap. Heat index 34.4 = maps/heat_index.py for 31.4 °C / 55 %. */
+export const MAP_POINT = {
+  source: 'open-meteo',
+  latitude: PUNE.latitude,
+  longitude: PUNE.longitude,
+  model_latitude: 18.523726,
+  model_longitude: 73.86876,
+  model_grid_km: 8,
+  timezone: 'Asia/Kolkata',
+  local_time: '2026-11-03T14:45',
+  observed_at: '2026-11-03T14:45',
+  temperature_c: 31.4,
+  feels_like_c: 33.9,
+  humidity_pct: 55,
+  wind_speed_kmh: 14.2,
+  wind_direction_deg: 250,
+  precipitation_probability_pct: 40,
+  precipitation_mm: 0.2,
+  weather_code: 2,
+  uv_index: 7.1,
+  uv_category: 'high',
+  aqi: 81,
+  aqi_category: 'satisfactory',
+  heat_index_c: 34.4,
+  heat_band: 'extreme_caution',
+  note: 'Model values for the grid cell, estimated; not official IMD data.',
+}
+
+/** GET /api/map/grid: 6 rows over the requested box (columns to cover its width), 72 UTC hours. */
+export function mapGrid(q: URLSearchParams) {
+  const rows = 6
+  const south = Number(q.get('south') ?? 18.2)
+  const west = Number(q.get('west') ?? 73.5)
+  const north = Number(q.get('north') ?? south + 1)
+  const east = Number(q.get('east') ?? west + 1)
+  const step = Math.round(Math.max(0.08, (north - south) / (rows - 1)) * 1000) / 1000
+  // like the backend, the grid covers the whole box: more columns when it is wide
+  const cols = Math.max(2, Math.min(12, Math.ceil((east - west) / step) + 1))
+  const start = new Date()
+  start.setUTCMinutes(0, 0, 0)
+  const times = Array.from({ length: 72 }, (_, h) => new Date(start.getTime() + h * 3600_000).toISOString().slice(0, 16) + 'Z')
+  const points = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      const series = (f: (h: number) => number) => times.map((_, h) => Math.round(f(h) * 10) / 10)
+      points.push({
+        latitude: Math.round((south + r * step) * 1e4) / 1e4,
+        longitude: Math.round((west + c * step) * 1e4) / 1e4,
+        elevation: 550 + i,
+        temperature_2m: series((h) => 24 + r * 0.8 + c * 0.4 + 4 * Math.sin((h / 24) * 2 * Math.PI)),
+        relative_humidity_2m: series(() => 50 + (c % 6) * 6), // 50 % to 80 %
+        apparent_temperature: series((h) => 25 + r * 0.8 + 4 * Math.sin((h / 24) * 2 * Math.PI)),
+        precipitation: series((h) => (c >= 3 && h % 12 < 6 ? (c - 2) * 1.5 : 0)),
+        precipitation_probability: series(() => (c >= 3 ? 70 : 10)),
+        wind_speed_10m: series(() => 10 + r * 2),
+        wind_direction_10m: series(() => 250),
+        heat_index: series((h) => 26 + r * 2 + c + 3 * Math.sin((h / 24) * 2 * Math.PI)),
+      })
+    }
+  }
+  return {
+    source: 'open-meteo',
+    retrieved_at: new Date().toISOString(),
+    south,
+    west,
+    north: south + (rows - 1) * step,
+    east: west + (cols - 1) * step,
+    step_deg: step,
+    spacing_km: Math.round(step * 111.32 * 10) / 10,
+    model_grid_km: 8,
+    rows,
+    cols,
+    times,
+    points,
+    heat_index_bands: [
+      { id: 'caution', label: 'Caution', min_c: 26.7 },
+      { id: 'extreme_caution', label: 'Extreme caution', min_c: 32.2 },
+      { id: 'danger', label: 'Danger', min_c: 39.4 },
+      { id: 'extreme_danger', label: 'Extreme danger', min_c: 51.7 },
+    ],
+    note: 'Open-Meteo model values at grid points; the map interpolates between them. Estimated, not official IMD data.',
+  }
+}
 
 // Set per mockBackend() call: the demo replay header (DEMO_REPLAY=1 backend).
 let replayHeaders: Record<string, string> = {}
@@ -350,6 +482,10 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
         return json(route, nwpResponse())
       case '/api/air-quality':
         return json(route, AIR_QUALITY)
+      case '/api/map/point':
+        return json(route, MAP_POINT)
+      case '/api/map/grid':
+        return json(route, mapGrid(new URL(req.url()).searchParams))
       default:
         return json(route, { detail: `Not mocked: ${pathname}` }, 404)
     }
@@ -371,6 +507,15 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
   // Map tiles: a flat slate tile keeps screenshots deterministic and offline.
   await page.route(/basemaps\.cartocdn\.com|tile\.openstreetmap\.org/, (route) =>
     route.fulfill({ status: 200, headers: { 'content-type': 'image/png' }, body: TILE })
+  )
+  // /map: OpenFreeMap style (no tiles needed) and flat AWS terrain tiles.
+  await page.route(/tiles\.openfreemap\.org/, (route) =>
+    route.request().url().includes('/styles/')
+      ? json(route, MAP_STYLE)
+      : route.fulfill({ status: 404, headers: CORS, body: '' })
+  )
+  await page.route(/elevation-tiles-prod/, (route) =>
+    route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'image/png' }, body: TERRAIN_TILE })
   )
   return log
 }

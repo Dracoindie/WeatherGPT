@@ -68,6 +68,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `alerts/engine.py` | Alert engine (advisory / watch / warning). `api/alerts.py` retries, serves stale data, then returns a clean 503. |
 | `climate/` | Open-Meteo archive: a period compared with the same dates over the previous 10 years |
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
+| `maps/` | `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `grid.py` (up to 100 points in ONE Open-Meteo request, 72 h, snapped step ladder, 15 min cache, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
 | `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML), `demo_push.py` (signed-in test push; never writes `last_severity`) |
@@ -77,15 +78,17 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 
 **Endpoints:**
 - `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/thresholds`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
+- `/api/map/point`, `/api/map/grid`
 - `/api/air-quality`, `/api/farm`, `/api/aviation`, `/api/risk`, `/api/compare`
 - `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header), `POST /api/push/test` (signed-in demo push to the caller's own subscriptions, 1/min)
 
-### Frontend (`weathergpt-web/`, Next.js 16, TypeScript, Tailwind, react-three-fiber, Leaflet)
+### Frontend (`weathergpt-web/`, Next.js 16, TypeScript, Tailwind, react-three-fiber, MapLibre GL + deck.gl, Leaflet)
 
 - **This Next.js has breaking changes compared with training data.** Read `weathergpt-web/AGENTS.md` and `node_modules/next/dist/docs/` before writing Next code. It uses `proxy.ts`, not `middleware.ts`.
 - **Pages** (`app/`):
   - `/`: the Living Sky chat console, with a 3D sky scene driven by real codes and wind
   - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/login`, `/signup`, `/offline`
+  - `/map` is `components/map3d/` (MapLibre GL + deck.gl, loaded only there). Basemap: OpenFreeMap `dark` style; terrain: AWS terrarium tiles; both keyless. MapLibre's worker is copied to `public/vendor/` by `scripts/copy-maplibre-worker.mjs` (`predev`/`prebuild`, git-ignored). Broadcast mode renders through a portal on `<body>`; the map container node is moved, never rebuilt. Map colours are the `--map-*` tokens in `globals.css` (validated one-hue ramps). Every map shows "Model grid ≈ 8 km · estimated · not official IMD". Roadmap: `docs/VISION.md`.
 - **Shared code:**
   - `context/`: `I18nContext` (UI dictionary: EN / हि / Hinglish / मरा), `AuthContext`, `DemoContext`
   - `lib/api/`: backend clients
@@ -179,11 +182,11 @@ npm run dev               # http://localhost:3000
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 680 passed. Everything is mocked, so no network is needed. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 700 passed. Everything is mocked, so no network is needed. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build` | succeeds. **Needed before Playwright**, which runs `next start` on port 3100. |
-| E2E | `npx playwright test --grep-invert @screens` | 146 passed, 22 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route) and `e2e/contrast.spec.ts`. |
-| Screenshots | `npx playwright test --grep @screens` | 14 passed. Output goes to `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored). |
+| E2E | `npx playwright test --grep-invert @screens` | 161 passed, 23 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route) and `e2e/contrast.spec.ts`. |
+| Screenshots | `npx playwright test --grep @screens` | 16 passed. Output goes to `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored). |
 | Design audit | `AUDIT_DIR=screenshots/audit-after npx playwright test e2e/audit.spec.ts` | 6 passed. Every route signed out and in demo, 1440 and 390 px (`docs/DESIGN_AUDIT.md`). |
 | Parser benchmark | `backend/.venv/Scripts/python tests/eval/run_eval.py --quiet`; add `--queries tests/eval/heldout.jsonl` for the held-out set | **91.7% held-out (the headline)**, 99.2% tuning set |
 

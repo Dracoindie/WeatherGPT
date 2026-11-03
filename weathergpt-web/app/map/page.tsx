@@ -1,8 +1,10 @@
 'use client'
 
 /**
- * /map: the picked place on the map with its current conditions and 24 h
- * alert status. Data loading is shared with /dashboard (useLocationWeather).
+ * /map: the live weather map (MapLibre GL + deck.gl, components/map3d). Tap
+ * anywhere for point weather; layers, a 72-hour time slider and broadcast
+ * mode. The picked place keeps its alert status, current conditions and
+ * forecast (useLocationWeather, shared with /dashboard).
  */
 
 import dynamic from 'next/dynamic'
@@ -19,9 +21,10 @@ import { fill, useI18n } from '@/context/I18nContext'
 import { useDescribeWeather } from '@/lib/i18n/weather'
 import { useLocationWeather } from '@/lib/useLocationWeather'
 
-const InteractiveMap = dynamic(() => import('@/components/map/InteractiveMap').then((m) => m.InteractiveMap), {
+// maplibre-gl and deck.gl load only here, only in the browser.
+const WeatherMap = dynamic(() => import('@/components/map3d/WeatherMap').then((m) => m.WeatherMap), {
   ssr: false,
-  loading: () => <div className="h-full min-h-[360px] animate-pulse rounded-xl bg-white/[0.03]" />,
+  loading: () => <div className="h-full min-h-[460px] animate-pulse rounded-xl bg-white/[0.03]" />,
 })
 
 export default function MapPage() {
@@ -30,6 +33,7 @@ export default function MapPage() {
   const w = useLocationWeather()
   const code = w.weather?.current.weather_code
   const conditionLabel = code != null ? describe(code) ?? undefined : undefined
+  const loc = w.location
 
   return (
     <AppShell>
@@ -41,56 +45,62 @@ export default function MapPage() {
           actions={<LocationPicker onLocationSelected={w.selectLocation} defaultLocation={w.location} />}
         />
 
-        {!w.location ? (
-          <div className="sky-glass p-8 text-center text-sm text-hud-dim">{t('map.pick')}</div>
-        ) : (
-          <div className="space-y-5">
+        <div className="space-y-5">
+          {loc && (
             <AlertBanner
               alerts={w.alerts}
-              locationName={w.location.name}
+              locationName={loc.name}
               loading={w.alertsLoading}
               error={w.alertsError}
               staleSince={w.alertsStaleSince}
               onRetry={w.retryAlerts}
             />
+          )}
 
-            {w.weatherError && (
-              <div role="alert" className="sky-glass border-sev-watch/40 p-4 text-sm text-hud">
-                {t('dashboard.unavailable')} <span className="text-hud-dim">{w.weatherError}</span>
-              </div>
-            )}
+          {w.weatherError && (
+            <div role="alert" className="sky-glass border-sev-watch/40 p-4 text-sm text-hud">
+              {t('dashboard.unavailable')} <span className="text-hud-dim">{w.weatherError}</span>
+            </div>
+          )}
 
-            <div className="grid gap-5 lg:grid-cols-3">
-              <GlassPanel wet={false} className="flex min-h-[420px] flex-col p-2 sm:p-2 lg:col-span-2">
-                <div className="min-h-0 flex-1">
-                  <InteractiveMap
-                    latitude={w.location.latitude}
-                    longitude={w.location.longitude}
-                    locationName={w.location.name}
-                    alertsCount={w.alerts.length}
-                    conditionLabel={conditionLabel}
-                    alertsText={fill(t('map.alerts'), { n: w.alerts.length })}
-                    normalText={t('map.normal')}
-                  />
-                </div>
-              </GlassPanel>
+          <div className="grid gap-5 lg:grid-cols-3">
+            <GlassPanel wet={false} className={loc ? 'min-w-0 p-2 sm:p-3 lg:col-span-2' : 'min-w-0 p-2 sm:p-3 lg:col-span-3'}>
+              <WeatherMap
+                place={loc ? { latitude: loc.latitude, longitude: loc.longitude, name: loc.name } : null}
+                conditionLabel={conditionLabel}
+                statusText={
+                  loc && !w.alertsLoading
+                    ? w.alerts.length > 0
+                      ? fill(t('map.alerts'), { n: w.alerts.length })
+                      : t('map.normal')
+                    : undefined
+                }
+                statusTone={w.alerts.length > 0 ? 'warning' : 'none'}
+                timezone={w.weather?.timezone}
+              />
+            </GlassPanel>
+            {loc && (
               <div className="min-w-0">
                 <CurrentWeatherHero
                   status={w.weatherStatus}
                   current={w.weather?.current}
-                  locationName={w.location.name}
+                  locationName={loc.name}
                   timezone={w.weather?.timezone}
                   source={w.weather?.source}
                   conditionLabel={conditionLabel}
                   compact
                 />
               </div>
-            </div>
-
-            <ForecastPanel state={w.forecast} />
-            <TrustStrip />
+            )}
           </div>
-        )}
+
+          {loc ? (
+            <ForecastPanel state={w.forecast} />
+          ) : (
+            <div className="sky-glass p-6 text-center text-sm text-hud-dim">{t('map.pick')}</div>
+          )}
+          <TrustStrip />
+        </div>
       </AuthGuard>
     </AppShell>
   )

@@ -1,0 +1,200 @@
+/**
+ * Grid helpers for the /map layers. Pure functions over GET /api/map/grid.
+ *
+ * The surface between grid points is bilinear interpolation, labelled as such
+ * on the map; every value at a grid point is the API's. Colours are the
+ * validated --map-* ramps from app/globals.css.
+ */
+
+import type { GridPoint, HeatBand, MapGrid } from '@/lib/api/map'
+
+export type LayerId = 'temperature' | 'humidity' | 'wind' | 'rain' | 'heat'
+export const LAYERS: LayerId[] = ['temperature', 'humidity', 'wind', 'rain', 'heat']
+
+type SeriesKey = 'temperature_2m' | 'relative_humidity_2m' | 'wind_speed_10m' | 'precipitation' | 'heat_index'
+
+export const LAYER_SERIES: Record<LayerId, SeriesKey> = {
+  temperature: 'temperature_2m',
+  humidity: 'relative_humidity_2m',
+  wind: 'wind_speed_10m',
+  rain: 'precipitation',
+  heat: 'heat_index',
+}
+
+export const LAYER_UNIT: Record<LayerId, string> = {
+  temperature: '°C',
+  humidity: '%',
+  wind: 'km/h',
+  rain: 'mm',
+  heat: '°C',
+}
+
+const RAMP_TOKEN: Record<LayerId, string> = {
+  temperature: '--map-temp',
+  humidity: '--map-humidity',
+  wind: '--map-wind',
+  rain: '--map-rain',
+  heat: '--map-heat',
+}
+
+export type RGB = [number, number, number]
+
+export function hexToRgb(hex: string): RGB {
+  const h = hex.trim().replace('#', '')
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6)
+  const n = parseInt(full, 16)
+  if (Number.isNaN(n)) return [255, 255, 255]
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/** A CSS custom property from :root as RGB (tokens, not hex, in components). */
+export function tokenRgb(name: string, fallback: RGB = [255, 255, 255]): RGB {
+  if (typeof document === 'undefined') return fallback
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name)
+  return v ? hexToRgb(v) : fallback
+}
+
+export function rampFor(layer: LayerId): RGB[] {
+  return [0, 1, 2, 3].map((i) => tokenRgb(`${RAMP_TOKEN[layer]}-${i}`))
+}
+
+export function rampCss(layer: LayerId): string {
+  return `linear-gradient(90deg, ${[0, 1, 2, 3].map((i) => `var(${RAMP_TOKEN[layer]}-${i})`).join(', ')})`
+}
+
+/** One series' values at an hour, row-major like grid.points. */
+export function valuesAt(grid: MapGrid, layer: LayerId, hour: number): Array<number | null> {
+  const key = LAYER_SERIES[layer]
+  return grid.points.map((p) => (p[key] as Array<number | null>)[hour] ?? null)
+}
+
+/** Min and max of a series over every point and every hour (a stable legend). */
+export function seriesRange(grid: MapGrid, layer: LayerId): { min: number; max: number } | null {
+  const key = LAYER_SERIES[layer]
+  let min = Infinity
+  let max = -Infinity
+  for (const p of grid.points) {
+    for (const v of p[key] as Array<number | null>) {
+      if (v == null) continue
+      if (v < min) min = v
+      if (v > max) max = v
+    }
+  }
+  return Number.isFinite(min) ? { min, max } : null
+}
+
+/** Bilinear interpolation at (lat, lon); null outside the grid or next to a missing value. */
+export function sample(grid: MapGrid, values: Array<number | null>, lat: number, lon: number): number | null {
+  const fr = (lat - grid.south) / grid.step_deg
+  const fc = (lon - grid.west) / grid.step_deg
+  if (fr < 0 || fc < 0 || fr > grid.rows - 1 || fc > grid.cols - 1) return null
+  const r0 = Math.min(Math.floor(fr), grid.rows - 2)
+  const c0 = Math.min(Math.floor(fc), grid.cols - 2)
+  const tr = fr - r0
+  const tc = fc - c0
+  const at = (r: number, c: number) => values[r * grid.cols + c]
+  const a = at(r0, c0)
+  const b = at(r0, c0 + 1)
+  const c = at(r0 + 1, c0)
+  const d = at(r0 + 1, c0 + 1)
+  if (a == null || b == null || c == null || d == null) return null
+  return (a * (1 - tc) + b * tc) * (1 - tr) + (c * (1 - tc) + d * tc) * tr
+}
+
+export function rampColor(ramp: RGB[], t: number): RGB {
+  const x = Math.max(0, Math.min(1, t)) * (ramp.length - 1)
+  const i = Math.min(Math.floor(x), ramp.length - 2)
+  const f = x - i
+  const a = ramp[i]
+  const b = ramp[i + 1]
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+}
+
+/** Index of the heat band (0 = Caution … 3 = Extreme danger), -1 below Caution. */
+export function heatBandIndex(bands: HeatBand[], value: number | null): number {
+  if (value == null) return -1
+  let idx = -1
+  bands.forEach((b, i) => {
+    if (value >= b.min_c) idx = i
+  })
+  return idx
+}
+
+/**
+ * RGBA pixels for a layer at an hour, rows north -> south (image order).
+ * Rain below 0.1 mm and heat below Caution are left transparent.
+ */
+export function fieldPixels(
+  grid: MapGrid,
+  layer: LayerId,
+  hour: number,
+  ramp: RGB[],
+  width: number,
+  height: number,
+  alpha = 150
+): Uint8ClampedArray {
+  const values = valuesAt(grid, layer, hour)
+  const range = seriesRange(grid, layer)
+  const out = new Uint8ClampedArray(width * height * 4)
+  if (!range) return out
+  const span = range.max - range.min || 1
+  const north = grid.south + (grid.rows - 1) * grid.step_deg
+  const east = grid.west + (grid.cols - 1) * grid.step_deg
+  for (let y = 0; y < height; y++) {
+    const lat = north - ((north - grid.south) * y) / (height - 1)
+    for (let x = 0; x < width; x++) {
+      const lon = grid.west + ((east - grid.west) * x) / (width - 1)
+      const v = sample(grid, values, lat, lon)
+      if (v == null) continue
+      let rgb: RGB
+      if (layer === 'heat') {
+        const band = heatBandIndex(grid.heat_index_bands, v)
+        if (band < 0) continue
+        rgb = ramp[Math.min(band, ramp.length - 1)]
+      } else if (layer === 'rain') {
+        if (v < 0.1) continue
+        rgb = rampColor(ramp, range.max > 0 ? v / range.max : 0)
+      } else {
+        rgb = rampColor(ramp, (v - range.min) / span)
+      }
+      const o = (y * width + x) * 4
+      out[o] = rgb[0]
+      out[o + 1] = rgb[1]
+      out[o + 2] = rgb[2]
+      out[o + 3] = alpha
+    }
+  }
+  return out
+}
+
+/** Wind as a vector the air moves TOWARD (km/h east, km/h north). Direction is "from", meteorological. */
+export function windVector(speedKmh: number, fromDeg: number): [number, number] {
+  const rad = (fromDeg * Math.PI) / 180
+  return [-speedKmh * Math.sin(rad), -speedKmh * Math.cos(rad)]
+}
+
+/** u and v components at an hour, row-major. */
+export function windComponents(grid: MapGrid, hour: number): { u: Array<number | null>; v: Array<number | null> } {
+  const u: Array<number | null> = []
+  const v: Array<number | null> = []
+  for (const p of grid.points as GridPoint[]) {
+    const s = p.wind_speed_10m[hour]
+    const d = p.wind_direction_10m[hour]
+    if (s == null || d == null) {
+      u.push(null)
+      v.push(null)
+    } else {
+      const [a, b] = windVector(s, d)
+      u.push(a)
+      v.push(b)
+    }
+  }
+  return { u, v }
+}
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const
+export type Compass = (typeof COMPASS)[number]
+
+export function compass(deg: number): Compass {
+  return COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8]
+}
