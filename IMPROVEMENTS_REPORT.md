@@ -9,11 +9,12 @@ All eight tasks are done, with one focused commit per task (plus the alerts-502 
 - `demo-v2` (`e92a072`) is the state after task 8.
 - `demo-v3` (`a32582e`) is the state before the env, test-push, i18n and design work below.
 - `demo-v4` (`b2a9e93`) is the state before the deployment, geocoding and accessibility work below.
+- `demo-v5` (`15aef00`) is the state before the screenshot-review polish (`27e44e4`) and the WMO follow-ups, demo replay, pitch kit, QR script and CI fix below.
 
-**Checks** (run after the severity text shades, `e39674c`)
-- Backend: `pytest tests/` gives **664 passed** (645 at `demo-v4`; 600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
+**Checks** (run after the CI fix, on 2026-11-03)
+- Backend: `pytest tests/` gives **680 passed** (664 at `demo-v5`; 645 at `demo-v4`; 600 at `demo-v3`; 488 at `demo-v2`; 293 at `demo-v1`).
 - Frontend: eslint is clean and `npm run build` succeeds.
-- E2E: Playwright **104 passed** and 22 skipped across desktop and mobile, including 21 axe tests and the token contrast check. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
+- E2E: Playwright **146 passed** and 22 skipped across desktop and mobile, with `--workers=1` in 6.6 min (about 15 min before the CI fix), including 21 axe tests and the token contrast check. The skipped tests are desktop-only tests in the mobile project, plus the opt-in `@audit` spec.
 - Screenshots: **14 passed**. Design audit: **6 passed** (`screenshots/audit-{before,after}/`).
 
 ## What was done
@@ -173,14 +174,57 @@ Before and after are identical. The 3D split was already right: `SkyCanvas` is a
 | `4748027` | **Root `package.json` / `package-lock.json` removed.** Only leaflet/react-leaflet, which `weathergpt-web/package.json` declares itself; nothing referenced them. Build, lint and e2e pass without them. |
 | `e39674c` | **AA text shades for severity and accent.**<br>- Strong colours stay for fills, borders, dots, glows and markers. Text and icons use `--sev-*-text` (the -200 shades; warning `#fecdd3`), `text-sev-*-text` or `SEVERITY_TEXT_VAR`, plus `--sky-accent-text`, which turns amber or rose with the severity state. In a warning the red accent text had been about 2.2:1.<br>- `--sky-text-dim` alpha is now 0.88. The 0.78 from `6023080` was measured against a sky darker than the real day horizon; the true figure was 4.2:1, now 4.8:1.<br>- `e2e/contrast.spec.ts` computes every ratio from the live tokens over each sky phase's real colours (`PALETTES`), on glass and inside badge tints. It also fails on strong colours used as text in the source; on its first run it found a missed alert value in `AlertList`.<br>- CLAUDE.md design rule 3 updated. |
 
+## Demo safety, pitch kit, QR code, CI root cause
+
+`git log demo-v5..HEAD` shows these commits. Nothing was pushed, and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `c59481b` | **WMO follow-ups.** The aviation briefing shows the weather in words; "WMO 61" moves to a tooltip, as on the location panel. The threshold table reads "Any thunderstorm" / "Thunderstorm with hail" in all four languages, with the codes in a tooltip. |
+| `68db064` | **Offline demo replay.**<br>- `DEMO_REPLAY=1` answers prepared questions from `backend/data/demo_fixtures/`, with the header `X-WeatherGPT-Replay: <recorded_at>`. The UI then shows "Replay: recorded data from …" on every page (4 languages), so recorded data is never presented as live.<br>- Unmatched requests go live if the internet is reachable. Otherwise you get "Offline demo: only prepared questions are available": chat replies HTTP 200 in the user's language, other endpoints 503. Push endpoints are never replayed.<br>- `backend/scripts/record_demo_fixtures.py` records 10 questions (EN, HI, Hinglish, MR, two follow-ups, climate, GFS, farmer, aviation) with the panels the UI loads, alerts for 3 places, and the 15-district board. `DEMO_RECORD=1` records UI clicks too.<br>- The service worker precaches every main page, not just `/`.<br>- `docs/DEMO.md`; 15 backend tests and 8 e2e tests. |
+| `b31f3a9` | **`docs/PITCH.md`**: 2- and 5-minute demo scripts, 10 judge questions with honest answers, a 10-slide outline mapped to SIH26068, and a "do not claim" list. |
+| `1f327b6` | **QR code.** `backend/scripts/make_qr.py <url>` writes `docs/qr/<name>.png` and `.svg`. `segno==1.6.6` is pinned as a dev tool (pure Python, no dependencies) and kept out of the Docker image by the same filter as pytest. A test guards it. |
+| `ba2a194` | **CI root cause: the 3D sky drawn in software.** See below. |
+
+### Why CI failed (and passed locally)
+
+`gh run view 41492637577 --log-failed`: backend tests, eslint, build and the Chromium install pass. Playwright gave **116 passed, 4 failed**, all on the desktop home page:
+- a11y keyboard test
+- D-panel scenes
+- console placeholder
+- Marathi aviation panel
+
+The pattern: `locator.evaluate` hung for 60 s on an element that was already visible, and panels that render in milliseconds never appeared. **The page's main thread was blocked.**
+
+**Cause.** Headless Chromium has no GPU, so WebGL runs on **SwiftShader**, on the CPU. This happens on the GitHub runner and on this laptop too: the probe reports `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))`. The animated three.js sky at 1440×900 then competes with React for the CPU. On this machine it was borderline: one single-worker run failed the same a11y test. The slower runner fails every time.
+
+**Fix (product, not test).**
+- `lib/liteMode.ts` auto mode now also turns on lite mode when WebGL is drawn in software (SwiftShader, llvmpipe, softpipe, Microsoft Basic Render Driver), as it already did for ≤2 cores or ≤2 GB.
+- Real users on PCs without graphics acceleration hit the same software path. This was measured only in headless Chromium, not on such a PC. They now get the CSS sky, and the toggle says why: "no graphics acceleration".
+- A manual "off" still forces the WebGL sky, so the lite-mode test still exercises it.
+- No assertion was changed.
+- New e2e test: a faked SwiftShader renderer string turns lite mode on.
+
+**Consequence for tests.** Desktop e2e now runs the CSS sky. WebGL rendering is covered by the lite-mode test (manual "off"), and visually by the screenshot run on a machine with a GPU.
+
+The earlier suspects were checked and ruled out:
+- eccodes / eccodeslib wheels: the backend job passes on 3.11;
+- timezone and locale: the full suite passes with `timezoneId: 'UTC'`, `locale: 'en-US'`;
+- missing files: nothing needed is untracked.
+
 ## Needs your input
 
 1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
 2. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
 3. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
 4. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session.
-5. **Local leftovers (not in git).** The ignored root `node_modules/` (from the removed root `package.json`) and the stray `D:\ci_sim_build.log` can be deleted.
-6. **Still open from before:**
+5. **Local leftovers (not in git).**
+   - The ignored root `node_modules/` (from the removed root `package.json`) and the stray `D:\ci_sim_build.log` can be deleted.
+   - The `mcr.microsoft.com/playwright:v1.64.1-noble` Docker image (about 2 GB, pulled for a CI reproduction that was stopped for low memory) can be removed with `docker rmi mcr.microsoft.com/playwright:v1.64.1-noble`.
+6. **Climate demo question not recorded.** The Open-Meteo archive returned 503 and then timed out on 2026-11-03. Re-run `record_demo_fixtures.py` the morning of the demo (`docs/DEMO.md`); it lists anything it could not record.
+7. **Demo fixtures are not in the Docker image** (`.dockerignore` excludes `data/`). Replay is meant for the demo laptop. The deployed backend always serves live data.
+8. **Push and watch CI.** The fix for the 4 desktop Playwright timeouts is explained above. If CI still fails, `gh run view <id> --log-failed` now gives the exact test.
+9. **Still open from before:**
    - real-device speech recognition for mr-IN
    - no WRF source
    - AQI is modelled, not CPCB stations
