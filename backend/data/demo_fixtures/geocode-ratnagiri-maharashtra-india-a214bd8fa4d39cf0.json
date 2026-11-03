@@ -1,0 +1,19 @@
+{
+  "key": "a214bd8fa4d39cf0",
+  "recorded_at": "2026-11-03T10:17:42Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Ratnagiri, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Ratnagiri, Maharashtra, India",
+    "name": "Ratnagiri, Maharashtra, India",
+    "latitude": 17.2826079,
+    "longitude": 73.4569787
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "key": "10cee9fdcad9caaf",
+  "recorded_at": "2026-11-03T10:16:34Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "aur parso?",
+      "role": "citizen",
+      "context": {
+        "intent": "forecast",
+        "location_name": "Pune, Pune City Subdistrict, Pune",
+        "latitude": 18.5213738,
+        "longitude": 73.8545071,
+        "date_reference": "tomorrow",
+        "weather_parameter": "precipitation",
+        "climate_period": null
+      }
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "Pune, Pune City Subdistrict, Pune mein parso total rain 0 mm hai, peak chance 6% (Open-Meteo).",
+    "intent": {
+      "intent": "forecast",
+      "location_name": null,
+      "date_reference": "day_after_tomorrow",
+      "weather_parameter": "precipitation",
+      "language": "hinglish",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Pune, Pune City Subdistrict, Pune",
+      "latitude": 18.5213738,
+      "longitude": 73.8545071,
+      "source": "conversation_context"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Pune, Pune City Subdistrict, Pune",
+      "requested_time": "day after tomorrow (2026-11-05T00:00 to 2026-11-05T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 31.4,
+      "temperature_min": 20.9,
+      "temperature_max": 31.5,
+      "precipitation": 0.0,
+      "precipitation_probability": 6,
+      "wind_speed_10m": null,
+      "wind_direction_10m": null,
+      "relative_humidity_2m": null,
+      "wind_gusts_10m": 33.1,
+      "visibility": 7.9,
+      "cloud_cover": 20.0,
+      "uv_index": 6.8,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 3,
+      "weather_description": "Overcast",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "low",
+      "condition": "Routine conditions",
+      "advisory": "No specific weather advisories at this time.",
+      "reasons": []
+    },
+    "source": "open-meteo"
+  }
+}

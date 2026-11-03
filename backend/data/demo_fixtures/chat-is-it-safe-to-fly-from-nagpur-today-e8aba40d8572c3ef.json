@@ -1,0 +1,68 @@
+{
+  "key": "e8aba40d8572c3ef",
+  "recorded_at": "2026-11-03T10:17:26Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "Is it safe to fly from Nagpur today?",
+      "role": "aviation"
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "In Nagpur City, Nagpur Urban Taluka, Nagpur today: 31.6°C, overcast, 0 mm precipitation (Open-Meteo). Advisory: Weather conditions are currently normal with no significant risks. Aviation: wind 10.7 km/h, gusts 31.3 km/h, visibility 8.7 km, cloud cover 79% (not a METAR/TAF).",
+    "intent": {
+      "intent": "forecast",
+      "location_name": "Nagpur",
+      "date_reference": "today",
+      "weather_parameter": "advisory",
+      "language": "en",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Nagpur City, Nagpur Urban Taluka, Nagpur",
+      "latitude": 21.1498134,
+      "longitude": 79.0820556,
+      "source": "explicit_query"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Nagpur City, Nagpur Urban Taluka, Nagpur",
+      "requested_time": "today (2026-11-03T00:00 to 2026-11-03T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 31.6,
+      "temperature_min": 22.6,
+      "temperature_max": 31.8,
+      "precipitation": 0.0,
+      "precipitation_probability": 0,
+      "wind_speed_10m": 10.7,
+      "wind_direction_10m": 61.0,
+      "relative_humidity_2m": 56.5,
+      "wind_gusts_10m": 31.3,
+      "visibility": 8.7,
+      "cloud_cover": 79.0,
+      "uv_index": 6.6,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 3,
+      "weather_description": "Overcast",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "low",
+      "condition": "Routine conditions",
+      "advisory": "Weather conditions are currently normal with no significant risks.",
+      "reasons": [
+        "Temperatures, precipitation, and winds are well within safe operating thresholds."
+      ]
+    },
+    "source": "open-meteo"
+  }
+}

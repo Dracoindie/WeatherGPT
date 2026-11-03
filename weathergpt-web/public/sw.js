@@ -1,8 +1,10 @@
 /*
  * WeatherGPT service worker.
  *
- * - App shell: "/", "/offline", manifest and icons are precached, plus the
- *   /_next/static chunks referenced by "/" so the home page boots offline.
+ * - App shell: "/", "/offline", manifest and icons are precached, plus every
+ *   main page (/dashboard, /alerts, /climate, /map, /disaster, /login) and the
+ *   /_next/static chunks they reference, so the whole app opens offline
+ *   (e.g. venue Wi-Fi down during a demo; see docs/DEMO.md).
  * - Pages: network-first; offline falls back to the cached page, then "/".
  * - /_next/static: cache-first (file names are content-hashed).
  * - Backend GET /api/{weather,forecast,alerts,climate}: network-first, the
@@ -10,7 +12,7 @@
  *   Supabase are never cached.
  */
 
-const VERSION = 'wgpt-v1'
+const VERSION = 'wgpt-v2'
 const SHELL = `${VERSION}-shell`
 const ASSETS = `${VERSION}-assets`
 const DATA = `${VERSION}-data`
@@ -21,21 +23,30 @@ const SHELL_URLS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ]
+// Best effort: a page that fails to fetch never blocks installing the worker.
+const PAGE_URLS = ['/dashboard', '/alerts', '/climate', '/map', '/disaster', '/login']
 const DATA_PATHS = /\/api\/(weather|forecast|alerts|climate)$/
 const MAX_DATA_ENTRIES = 40
 
 async function precache() {
   const shell = await caches.open(SHELL)
   await shell.addAll(SHELL_URLS)
-  // Chunks the home page needs, so an offline cold start can hydrate.
-  try {
-    const html = await (await fetch('/', { cache: 'no-store' })).text()
-    const chunks = [...new Set(html.match(/\/_next\/static\/[^"'\s)]+/g) || [])]
-    const assets = await caches.open(ASSETS)
-    await Promise.all(chunks.map((u) => assets.add(u).catch(() => undefined)))
-  } catch {
-    // best effort
-  }
+  // Each page's HTML plus the chunks it needs, so an offline cold start can hydrate.
+  const assets = await caches.open(ASSETS)
+  await Promise.all(
+    ['/', ...PAGE_URLS].map(async (page) => {
+      try {
+        const response = await fetch(page, { cache: 'no-store' })
+        if (!response.ok) return
+        if (page !== '/') await shell.put(page, response.clone())
+        const html = await response.text()
+        const chunks = [...new Set(html.match(/\/_next\/static\/[^"'\s)]+/g) || [])]
+        await Promise.all(chunks.map((u) => assets.add(u).catch(() => undefined)))
+      } catch {
+        // best effort
+      }
+    })
+  )
 }
 
 self.addEventListener('install', (event) => {

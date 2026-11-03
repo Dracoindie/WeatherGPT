@@ -1,0 +1,19 @@
+{
+  "key": "6da5c97db3f0aac2",
+  "recorded_at": "2026-11-03T10:17:46Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Kolhapur, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Kolhapur, Maharashtra, India",
+    "name": "Kolhapur, Karvir, Kolhapur",
+    "latitude": 16.7028412,
+    "longitude": 74.2405329
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "f784621555249b48",
+  "recorded_at": "2026-11-03T10:17:39Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Palghar, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Palghar, Maharashtra, India",
+    "name": "Palghar, Maharashtra, India",
+    "latitude": 19.757249,
+    "longitude": 73.0931199
+  }
+}

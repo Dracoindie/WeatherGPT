@@ -1,0 +1,122 @@
+{
+  "key": "8d754aa8d94aa76c",
+  "recorded_at": "2026-11-03T10:17:26Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/farm",
+    "query": {
+      "latitude": "20.0112475",
+      "longitude": "73.7902364"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "source": "open-meteo",
+    "latitude": 19.999998,
+    "longitude": 73.8,
+    "timezone": "Asia/Kolkata",
+    "generated_at": "2026-11-03T10:17:26.106812Z",
+    "spray_windows": [
+      {
+        "start": "2026-11-03T15:00",
+        "end": "2026-11-03T18:00",
+        "hours": 4,
+        "max_wind_kmh": 8.3,
+        "max_temperature_c": 29.4
+      },
+      {
+        "start": "2026-11-04T06:00",
+        "end": "2026-11-04T18:00",
+        "hours": 13,
+        "max_wind_kmh": 9.2,
+        "max_temperature_c": 29.8
+      },
+      {
+        "start": "2026-11-05T06:00",
+        "end": "2026-11-05T12:00",
+        "hours": 7,
+        "max_wind_kmh": 11.9,
+        "max_temperature_c": 29.4
+      },
+      {
+        "start": "2026-11-05T15:00",
+        "end": "2026-11-05T18:00",
+        "hours": 4,
+        "max_wind_kmh": 8.6,
+        "max_temperature_c": 30.0
+      }
+    ],
+    "irrigation": {
+      "status": "as_usual",
+      "rain_next_48h_mm": 0.0,
+      "max_precipitation_probability_24h": 6,
+      "max_temperature_48h_c": 30.3,
+      "reason": "Only 0 mm of rain expected in 48 h; follow your usual schedule."
+    },
+    "harvest_days": [
+      {
+        "date": "2026-11-03",
+        "precipitation_mm": 0.0,
+        "max_precipitation_probability": 6,
+        "max_wind_kmh": 9.6,
+        "max_temperature_c": 29.4,
+        "harvest": "good",
+        "reasons": []
+      },
+      {
+        "date": "2026-11-04",
+        "precipitation_mm": 0.0,
+        "max_precipitation_probability": 8,
+        "max_wind_kmh": 9.2,
+        "max_temperature_c": 29.8,
+        "harvest": "good",
+        "reasons": []
+      },
+      {
+        "date": "2026-11-05",
+        "precipitation_mm": 0.0,
+        "max_precipitation_probability": 2,
+        "max_wind_kmh": 11.9,
+        "max_temperature_c": 30.3,
+        "harvest": "good",
+        "reasons": []
+      },
+      {
+        "date": "2026-11-06",
+        "precipitation_mm": 0.0,
+        "max_precipitation_probability": 0,
+        "max_wind_kmh": 11.2,
+        "max_temperature_c": 30.4,
+        "harvest": "good",
+        "reasons": []
+      }
+    ],
+    "sowing": {
+      "status": "dry",
+      "rain_next_72h_mm": 0.0,
+      "max_daily_rain_mm": 0.0,
+      "reason": "Only 0 mm of rain in 3 days: sow only with irrigation."
+    },
+    "thresholds": {
+      "spray_min_wind_kmh": 3.0,
+      "spray_max_wind_kmh": 15.0,
+      "spray_max_temperature_c": 30.0,
+      "spray_min_relative_humidity": 40.0,
+      "spray_rain_free_hours": 4.0,
+      "spray_max_rain_probability": 40.0,
+      "irrigation_skip_rain_48h_mm": 10.0,
+      "irrigation_delay_rain_48h_mm": 5.0,
+      "irrigation_delay_probability_24h": 60.0,
+      "irrigation_heat_c": 35.0,
+      "harvest_max_rain_mm": 1.0,
+      "harvest_max_probability": 40.0,
+      "harvest_max_wind_kmh": 30.0,
+      "sowing_min_rain_72h_mm": 10.0,
+      "sowing_max_rain_72h_mm": 50.0,
+      "sowing_heavy_day_mm": 50.0,
+      "sowing_max_temperature_c": 38.0
+    },
+    "note": "Guidance computed from Open-Meteo forecast thresholds by WeatherGPT; not an official IMD / agro-met / aviation product."
+  }
+}

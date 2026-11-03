@@ -1,0 +1,19 @@
+{
+  "key": "e3f689ef9f8da652",
+  "recorded_at": "2026-11-03T10:17:33Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Chennai"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Chennai",
+    "name": "Chennai, Chennai Metropolitan Area, Chennai District",
+    "latitude": 13.0800915,
+    "longitude": 80.2807978
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "4cd7a36bd7db9c97",
+  "recorded_at": "2026-11-03T10:17:50Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Solapur, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Solapur, Maharashtra, India",
+    "name": "Solapur, Maharashtra, India",
+    "latitude": 17.8499067,
+    "longitude": 75.2763203
+  }
+}

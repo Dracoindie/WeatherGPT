@@ -1,0 +1,77 @@
+{
+  "key": "e275cecf85158f90",
+  "recorded_at": "2026-11-03T10:16:23Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "What about Mumbai?",
+      "role": "citizen",
+      "context": {
+        "intent": "forecast",
+        "location_name": "Pune, Pune City Subdistrict, Pune",
+        "latitude": 18.5213738,
+        "longitude": 73.8545071,
+        "date_reference": "tomorrow",
+        "weather_parameter": "precipitation",
+        "climate_period": null
+      }
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "In Mumbai, Mumbai Suburban District, Maharashtra tomorrow, total precipitation is 0.3 mm with a peak probability of 29% (Open-Meteo). Advisory: Hot conditions expected. Keep hydrated if spending time outdoors.",
+    "intent": {
+      "intent": "forecast",
+      "location_name": "Mumbai",
+      "date_reference": "tomorrow",
+      "weather_parameter": "precipitation",
+      "language": "en",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Mumbai, Mumbai Suburban District, Maharashtra",
+      "latitude": 19.054999,
+      "longitude": 72.8692035,
+      "source": "explicit_query"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Mumbai, Mumbai Suburban District, Maharashtra",
+      "requested_time": "tomorrow (2026-11-04T00:00 to 2026-11-04T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 33.9,
+      "temperature_min": 26.3,
+      "temperature_max": 35.1,
+      "precipitation": 0.3,
+      "precipitation_probability": 29,
+      "wind_speed_10m": null,
+      "wind_direction_10m": null,
+      "relative_humidity_2m": null,
+      "wind_gusts_10m": 30.6,
+      "visibility": 8.9,
+      "cloud_cover": 20.0,
+      "uv_index": 6.8,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 51,
+      "weather_description": "Light drizzle",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "moderate",
+      "condition": "High Heat",
+      "advisory": "Hot conditions expected. Keep hydrated if spending time outdoors.",
+      "reasons": [
+        "Temperatures reaching 35.1°C."
+      ]
+    },
+    "source": "open-meteo"
+  }
+}

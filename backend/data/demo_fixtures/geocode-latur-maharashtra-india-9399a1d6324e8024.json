@@ -1,0 +1,19 @@
+{
+  "key": "9399a1d6324e8024",
+  "recorded_at": "2026-11-03T10:17:52Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Latur, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Latur, Maharashtra, India",
+    "name": "Latur, Maharashtra, India",
+    "latitude": 18.3553347,
+    "longitude": 76.7548997
+  }
+}

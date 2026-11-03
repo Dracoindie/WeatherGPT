@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 /**
  * Typed clients for the role endpoints (backend/api/roles.py). Every number
  * shown from these comes from the API body; the rules are server-side.
@@ -124,7 +125,7 @@ export class RoleApiError extends Error {
 async function call<T>(path: string, init?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   let resp: Response
   try {
-    resp = await fetch(`${API_BASE}${path}`, init)
+    resp = await apiFetch(`${API_BASE}${path}`, init)
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new RoleApiError(0, 'Could not reach the WeatherGPT backend.')

@@ -67,12 +67,20 @@ app = FastAPI(
     description="SIH 2026 WeatherGPT prototype backend",
 )
 
+# Demo replay/record (DEMO_REPLAY / DEMO_RECORD); off unless set. Added before
+# CORS so replayed answers still carry CORS headers.
+import demo_replay  # noqa: E402
+
+demo_replay.install(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The UI reads this to show "Replay: recorded data from …".
+    expose_headers=[demo_replay.REPLAY_HEADER, demo_replay.OFFLINE_HEADER],
 )
 
 # Register routers

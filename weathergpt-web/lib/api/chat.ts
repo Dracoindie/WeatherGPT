@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 /**
  * Typed client for POST /api/chat.
  *
@@ -217,7 +218,7 @@ export async function postChat(
 
   let response: Response
   try {
-    response = await fetch(`${API_BASE}/api/chat`, {
+    response = await apiFetch(`${API_BASE}/api/chat`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

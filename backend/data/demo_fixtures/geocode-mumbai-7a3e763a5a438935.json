@@ -1,0 +1,19 @@
+{
+  "key": "7a3e763a5a438935",
+  "recorded_at": "2026-11-03T10:17:31Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Mumbai"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Mumbai",
+    "name": "Mumbai, Mumbai Suburban District, Maharashtra",
+    "latitude": 19.054999,
+    "longitude": 72.8692035
+  }
+}

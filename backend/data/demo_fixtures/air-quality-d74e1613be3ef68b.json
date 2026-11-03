@@ -1,0 +1,46 @@
+{
+  "key": "d74e1613be3ef68b",
+  "recorded_at": "2026-11-03T10:17:28Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/air-quality",
+    "query": {
+      "latitude": "21.1498134",
+      "longitude": "79.0820556"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "latitude": 21.1498134,
+    "longitude": 79.0820556,
+    "timezone": "Asia/Kolkata",
+    "last_24h": {
+      "source": "open-meteo-air-quality (CAMS)",
+      "window": "2026-11-02T16:00 to 2026-11-03T15:00",
+      "hours": 24,
+      "pm2_5": 29.1,
+      "pm10": 32.4,
+      "aqi": 48,
+      "aqi_category": "good",
+      "aqi_dominant": "pm2_5",
+      "note": "Indian AQI computed by WeatherGPT (CPCB method) from modelled PM data; not a CPCB station reading."
+    },
+    "next_24h": {
+      "source": "open-meteo-air-quality (CAMS)",
+      "window": "2026-11-03T16:00 to 2026-11-04T15:00",
+      "hours": 24,
+      "pm2_5": 34.8,
+      "pm10": 40.7,
+      "aqi": 59,
+      "aqi_category": "satisfactory",
+      "aqi_dominant": "pm2_5",
+      "note": "Indian AQI computed by WeatherGPT (CPCB method) from modelled PM data; not a CPCB station reading."
+    },
+    "uv_index": 2.3,
+    "uv_max_today": 6.6,
+    "uv_category": "low",
+    "uv_max_category": "high",
+    "note": "AQI computed by WeatherGPT with the CPCB method from Open-Meteo (CAMS) modelled PM2.5/PM10; not a CPCB monitoring-station reading. UV index from Open-Meteo."
+  }
+}

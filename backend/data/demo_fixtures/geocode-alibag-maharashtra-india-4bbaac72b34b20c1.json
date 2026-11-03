@@ -1,0 +1,19 @@
+{
+  "key": "4bbaac72b34b20c1",
+  "recorded_at": "2026-11-03T10:17:41Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Alibag, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Alibag, Maharashtra, India",
+    "name": "Alibag, Alibag Taluka, Raigad",
+    "latitude": 18.6498427,
+    "longitude": 72.8765469
+  }
+}

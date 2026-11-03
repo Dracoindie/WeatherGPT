@@ -1,0 +1,19 @@
+{
+  "key": "7f1600b5f3e40f6e",
+  "recorded_at": "2026-11-03T10:17:53Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Nanded, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Nanded, Maharashtra, India",
+    "name": "Nanded, Maharashtra, India",
+    "latitude": 19.0942729,
+    "longitude": 77.4832628
+  }
+}

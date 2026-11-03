@@ -1,0 +1,19 @@
+{
+  "key": "93d4ec9b6b982e15",
+  "recorded_at": "2026-11-03T10:17:49Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Chhatrapati Sambhajinagar, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Chhatrapati Sambhajinagar, Maharashtra, India",
+    "name": "Chhatrapati Sambhajinagar, Maharashtra, 431002",
+    "latitude": 19.877263,
+    "longitude": 75.3390241
+  }
+}

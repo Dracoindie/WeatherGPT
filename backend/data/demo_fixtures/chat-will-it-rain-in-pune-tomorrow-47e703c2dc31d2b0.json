@@ -1,0 +1,66 @@
+{
+  "key": "47e703c2dc31d2b0",
+  "recorded_at": "2026-11-03T10:16:19Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "Will it rain in Pune tomorrow?",
+      "role": "citizen"
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "In Pune, Pune City Subdistrict, Pune tomorrow, total precipitation is 1.4 mm with a peak probability of 24% (Open-Meteo).",
+    "intent": {
+      "intent": "forecast",
+      "location_name": "Pune",
+      "date_reference": "tomorrow",
+      "weather_parameter": "precipitation",
+      "language": "en",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Pune, Pune City Subdistrict, Pune",
+      "latitude": 18.5213738,
+      "longitude": 73.8545071,
+      "source": "explicit_query"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Pune, Pune City Subdistrict, Pune",
+      "requested_time": "tomorrow (2026-11-04T00:00 to 2026-11-04T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 30.7,
+      "temperature_min": 21.1,
+      "temperature_max": 30.7,
+      "precipitation": 1.4,
+      "precipitation_probability": 24,
+      "wind_speed_10m": null,
+      "wind_direction_10m": null,
+      "relative_humidity_2m": null,
+      "wind_gusts_10m": 31.3,
+      "visibility": 3.1,
+      "cloud_cover": 62.0,
+      "uv_index": 7.1,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 53,
+      "weather_description": "Drizzle",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "low",
+      "condition": "Routine conditions",
+      "advisory": "No specific weather advisories at this time.",
+      "reasons": []
+    },
+    "source": "open-meteo"
+  }
+}

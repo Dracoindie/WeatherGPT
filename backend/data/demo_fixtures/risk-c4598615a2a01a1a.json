@@ -1,0 +1,276 @@
+{
+  "key": "c4598615a2a01a1a",
+  "recorded_at": "2026-11-03T10:18:02Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/risk",
+    "query": {},
+    "body": {
+      "districts": [
+        {
+          "name": "Mumbai",
+          "latitude": 19.054999,
+          "longitude": 72.8692035
+        },
+        {
+          "name": "Thane",
+          "latitude": 19.3653598,
+          "longitude": 73.3685437
+        },
+        {
+          "name": "Palghar",
+          "latitude": 19.757249,
+          "longitude": 73.0931199
+        },
+        {
+          "name": "Raigad (Alibag)",
+          "latitude": 18.6498427,
+          "longitude": 72.8765469
+        },
+        {
+          "name": "Ratnagiri",
+          "latitude": 17.2826079,
+          "longitude": 73.4569787
+        },
+        {
+          "name": "Pune",
+          "latitude": 18.5213738,
+          "longitude": 73.8545071
+        },
+        {
+          "name": "Satara",
+          "latitude": 17.6361289,
+          "longitude": 74.2982781
+        },
+        {
+          "name": "Kolhapur",
+          "latitude": 16.7028412,
+          "longitude": 74.2405329
+        },
+        {
+          "name": "Nashik",
+          "latitude": 20.0112475,
+          "longitude": 73.7902364
+        },
+        {
+          "name": "Chhatrapati Sambhajinagar",
+          "latitude": 19.877263,
+          "longitude": 75.3390241
+        },
+        {
+          "name": "Solapur",
+          "latitude": 17.8499067,
+          "longitude": 75.2763203
+        },
+        {
+          "name": "Latur",
+          "latitude": 18.3553347,
+          "longitude": 76.7548997
+        },
+        {
+          "name": "Nanded",
+          "latitude": 19.0942729,
+          "longitude": 77.4832628
+        },
+        {
+          "name": "Amravati",
+          "latitude": 21.1545412,
+          "longitude": 77.6442962
+        },
+        {
+          "name": "Nagpur",
+          "latitude": 21.1498134,
+          "longitude": 79.0820556
+        }
+      ]
+    }
+  },
+  "status": 200,
+  "response": {
+    "source": "open-meteo",
+    "generated_at": "2026-11-03T10:18:02.313373Z",
+    "districts": [
+      {
+        "name": "Satara",
+        "latitude": 17.6361289,
+        "longitude": 74.2982781,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 4.0,
+        "max_wind_24h_kmh": 17.1,
+        "max_temperature_24h_c": 28.8,
+        "error": null
+      },
+      {
+        "name": "Latur",
+        "latitude": 18.3553347,
+        "longitude": 76.7548997,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 1.1,
+        "max_wind_24h_kmh": 14.9,
+        "max_temperature_24h_c": 30.6,
+        "error": null
+      },
+      {
+        "name": "Nanded",
+        "latitude": 19.0942729,
+        "longitude": 77.4832628,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.4,
+        "max_wind_24h_kmh": 12.5,
+        "max_temperature_24h_c": 31.5,
+        "error": null
+      },
+      {
+        "name": "Ratnagiri",
+        "latitude": 17.2826079,
+        "longitude": 73.4569787,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.4,
+        "max_wind_24h_kmh": 9.8,
+        "max_temperature_24h_c": 32.5,
+        "error": null
+      },
+      {
+        "name": "Solapur",
+        "latitude": 17.8499067,
+        "longitude": 75.2763203,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.3,
+        "max_wind_24h_kmh": 13.0,
+        "max_temperature_24h_c": 31.8,
+        "error": null
+      },
+      {
+        "name": "Kolhapur",
+        "latitude": 16.7028412,
+        "longitude": 74.2405329,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.1,
+        "max_wind_24h_kmh": 14.5,
+        "max_temperature_24h_c": 30.8,
+        "error": null
+      },
+      {
+        "name": "Pune",
+        "latitude": 18.5213738,
+        "longitude": 73.8545071,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.1,
+        "max_wind_24h_kmh": 10.9,
+        "max_temperature_24h_c": 30.3,
+        "error": null
+      },
+      {
+        "name": "Amravati",
+        "latitude": 21.1545412,
+        "longitude": 77.6442962,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 12.3,
+        "max_temperature_24h_c": 29.8,
+        "error": null
+      },
+      {
+        "name": "Raigad (Alibag)",
+        "latitude": 18.6498427,
+        "longitude": 72.8765469,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 12.0,
+        "max_temperature_24h_c": 33.0,
+        "error": null
+      },
+      {
+        "name": "Chhatrapati Sambhajinagar",
+        "latitude": 19.877263,
+        "longitude": 75.3390241,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 11.5,
+        "max_temperature_24h_c": 30.7,
+        "error": null
+      },
+      {
+        "name": "Palghar",
+        "latitude": 19.757249,
+        "longitude": 73.0931199,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 11.4,
+        "max_temperature_24h_c": 33.5,
+        "error": null
+      },
+      {
+        "name": "Mumbai",
+        "latitude": 19.054999,
+        "longitude": 72.8692035,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 10.9,
+        "max_temperature_24h_c": 34.8,
+        "error": null
+      },
+      {
+        "name": "Nagpur",
+        "latitude": 21.1498134,
+        "longitude": 79.0820556,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 10.7,
+        "max_temperature_24h_c": 31.8,
+        "error": null
+      },
+      {
+        "name": "Nashik",
+        "latitude": 20.0112475,
+        "longitude": 73.7902364,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 9.8,
+        "max_temperature_24h_c": 29.6,
+        "error": null
+      },
+      {
+        "name": "Thane",
+        "latitude": 19.3653598,
+        "longitude": 73.3685437,
+        "severity": "none",
+        "alerts_count": 0,
+        "headline": null,
+        "rain_24h_mm": 0.0,
+        "max_wind_24h_kmh": 8.8,
+        "max_temperature_24h_c": 34.3,
+        "error": null
+      }
+    ],
+    "note": "Guidance computed from Open-Meteo forecast thresholds by WeatherGPT; not an official IMD / agro-met / aviation product."
+  }
+}

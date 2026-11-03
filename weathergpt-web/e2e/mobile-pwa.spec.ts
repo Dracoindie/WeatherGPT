@@ -100,6 +100,29 @@ test.describe('with the service worker', () => {
   await expect(page.getByText(/12\.4 mm/).first()).toBeVisible()
   await context.setOffline(false)
   })
+
+  test('offline: every main page opens from the precached app shell, not just /', async ({ page, context }) => {
+    await mockBackend(context)
+    await page.goto('/')
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined))
+    // wait until install has precached the other pages
+    await expect
+      .poll(() => page.evaluate(async () => !!(await caches.match('/disaster')) && !!(await caches.match('/login'))), {
+        timeout: 20_000,
+      })
+      .toBe(true)
+
+    await context.setOffline(true)
+    for (const [path, heading] of [
+      ['/disaster', /risk|district/i],
+      ['/login', /welcome back/i], // where /alerts sends a signed-out visitor
+
+    ] as const) {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(heading, { timeout: 15_000 })
+    }
+    await context.setOffline(false)
+  })
 })
 
 test('no horizontal page scroll at 390 px', async ({ page, context, isMobile }) => {

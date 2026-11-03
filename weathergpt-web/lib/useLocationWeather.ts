@@ -20,6 +20,7 @@ import { fetchForecast } from '@/lib/api/forecast'
 import { describeWeather } from '@/lib/i18n/weather'
 import { upsertProfile } from '@/lib/profile/profileService'
 import type { WeatherAlert } from '@/types/alerts'
+import { apiFetch } from '@/lib/replay'
 
 export interface WeatherApiResponse {
   source: string
@@ -101,7 +102,7 @@ export function useLocationWeather() {
       }
 
       try {
-        const resp = await fetch(`${API_BASE}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`)
+        const resp = await apiFetch(`${API_BASE}/api/weather?latitude=${loc.latitude}&longitude=${loc.longitude}`)
         if (!resp.ok) throw new Error(`Weather API error: ${resp.status}`)
         setWeather((await resp.json()) as WeatherApiResponse)
         setWeatherStatus('ready')

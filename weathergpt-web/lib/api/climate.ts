@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 // Climate API wrapper
 import type { ClimateResponse } from "@/types/climate";
 import { API_BASE } from "@/lib/api/base";
@@ -13,7 +14,7 @@ export async function fetchClimate(
   url.searchParams.set("longitude", longitude.toString());
   if (startDate) url.searchParams.set("start_date", startDate);
   if (endDate) url.searchParams.set("end_date", endDate);
-  const res = await fetch(url.toString());
+  const res = await apiFetch(url.toString());
   if (!res.ok) {
     const txt = await res.text();
     throw new Error(`Climate API error ${res.status}: ${txt}`);

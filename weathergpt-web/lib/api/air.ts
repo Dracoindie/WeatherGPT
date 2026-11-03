@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 /** Typed client for GET /api/air-quality (backend/api/air.py). */
 
 import { API_BASE } from '@/lib/api/base'
@@ -30,7 +31,7 @@ export interface AirQualityReport {
 export async function getAirQuality(latitude: number, longitude: number, signal?: AbortSignal): Promise<AirQualityReport> {
   let resp: Response
   try {
-    resp = await fetch(`${API_BASE}/api/air-quality?latitude=${latitude}&longitude=${longitude}`, { signal })
+    resp = await apiFetch(`${API_BASE}/api/air-quality?latitude=${latitude}&longitude=${longitude}`, { signal })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new Error('Could not reach the WeatherGPT backend.')

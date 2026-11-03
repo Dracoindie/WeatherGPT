@@ -1,0 +1,66 @@
+{
+  "key": "9e323c5db8e2ebb9",
+  "recorded_at": "2026-11-03T10:16:26Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "दिल्ली में कल बारिश होगी क्या?",
+      "role": "citizen"
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "Delhi, India में कल कुल वर्षा 0 मिमी और अधिकतम वर्षा संभावना 0% है (Open-Meteo)।",
+    "intent": {
+      "intent": "forecast",
+      "location_name": "Delhi",
+      "date_reference": "tomorrow",
+      "weather_parameter": "precipitation",
+      "language": "hi",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Delhi, India",
+      "latitude": 28.6328027,
+      "longitude": 77.2197713,
+      "source": "explicit_query"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Delhi, India",
+      "requested_time": "tomorrow (2026-11-04T00:00 to 2026-11-04T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 28.1,
+      "temperature_min": 17.4,
+      "temperature_max": 28.3,
+      "precipitation": 0.0,
+      "precipitation_probability": 0,
+      "wind_speed_10m": null,
+      "wind_direction_10m": null,
+      "relative_humidity_2m": null,
+      "wind_gusts_10m": 20.9,
+      "visibility": 5.8,
+      "cloud_cover": 0.0,
+      "uv_index": 4.7,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 0,
+      "weather_description": "Clear sky",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "low",
+      "condition": "Routine conditions",
+      "advisory": "No specific weather advisories at this time.",
+      "reasons": []
+    },
+    "source": "open-meteo"
+  }
+}

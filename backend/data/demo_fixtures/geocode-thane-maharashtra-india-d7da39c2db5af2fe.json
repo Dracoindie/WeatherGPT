@@ -1,0 +1,19 @@
+{
+  "key": "d7da39c2db5af2fe",
+  "recorded_at": "2026-11-03T10:17:38Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Thane, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Thane, Maharashtra, India",
+    "name": "Thane, Maharashtra, India",
+    "latitude": 19.3653598,
+    "longitude": 73.3685437
+  }
+}

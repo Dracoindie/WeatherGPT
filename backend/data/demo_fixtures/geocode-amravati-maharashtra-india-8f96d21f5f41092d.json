@@ -1,0 +1,19 @@
+{
+  "key": "8f96d21f5f41092d",
+  "recorded_at": "2026-11-03T10:17:55Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Amravati, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Amravati, Maharashtra, India",
+    "name": "Amravati, Maharashtra, India",
+    "latitude": 21.1545412,
+    "longitude": 77.6442962
+  }
+}

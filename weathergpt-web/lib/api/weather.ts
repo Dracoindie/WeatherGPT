@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 /**
  * Typed client for GET /api/weather (mirrors backend/models/weather.py).
  *
@@ -74,7 +75,7 @@ export async function getWeather(
 
   let response: Response
   try {
-    response = await fetch(url.toString(), { signal })
+    response = await apiFetch(url.toString(), { signal })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new WeatherApiError(0, 'Could not reach the weather API. Is the backend running?')

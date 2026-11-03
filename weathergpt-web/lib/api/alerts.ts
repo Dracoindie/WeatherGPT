@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 import type { AlertsResponse } from '@/types/alerts';
 import { API_BASE } from '@/lib/api/base';
 
@@ -25,7 +26,7 @@ export async function fetchAlerts(params: {
 
   let resp: Response;
   try {
-    resp = await fetch(url.toString());
+    resp = await apiFetch(url.toString());
   } catch {
     throw new AlertsUnavailableError(0, 'Could not reach the WeatherGPT backend, so alerts are unavailable.');
   }
@@ -58,7 +59,7 @@ export interface ThresholdRule {
 
 /** The single hazard rule table (backend/thresholds.py). */
 export async function fetchThresholds(): Promise<ThresholdRule[]> {
-  const resp = await fetch(`${API_BASE}/api/alerts/thresholds`)
+  const resp = await apiFetch(`${API_BASE}/api/alerts/thresholds`)
   if (!resp.ok) throw new Error('Thresholds unavailable')
   const body = (await resp.json()) as { rules: ThresholdRule[] }
   return body.rules

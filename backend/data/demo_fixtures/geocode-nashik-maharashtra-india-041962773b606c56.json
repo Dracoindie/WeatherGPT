@@ -1,0 +1,19 @@
+{
+  "key": "041962773b606c56",
+  "recorded_at": "2026-11-03T10:17:48Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Nashik, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Nashik, Maharashtra, India",
+    "name": "Nashik, Nashik Subdistrict, Nashik",
+    "latitude": 20.0112475,
+    "longitude": 73.7902364
+  }
+}

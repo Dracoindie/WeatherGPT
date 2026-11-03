@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/replay'
 import { NwpResponse } from '@/types/nwp';
 import { API_BASE } from '@/lib/api/base';
 
@@ -18,7 +19,7 @@ export async function fetchNwp(
   url.searchParams.set('latitude', String(latitude));
   url.searchParams.set('longitude', String(longitude));
   url.searchParams.set('hours', String(hours));
-  const resp = await fetch(url.toString());
+  const resp = await apiFetch(url.toString());
   if (resp.status === 503) throw new NwpUnavailableError();
   if (!resp.ok) {
     const err = await resp.text();

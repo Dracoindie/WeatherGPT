@@ -1,0 +1,66 @@
+{
+  "key": "4d5a0eb4339ba7c2",
+  "recorded_at": "2026-11-03T10:17:20Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "Can I spray pesticide in Nashik tomorrow?",
+      "role": "farmer"
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "In Nashik, Nashik Subdistrict, Nashik tomorrow: 29.8°C, partly cloudy, 0 mm precipitation (Open-Meteo). Farm guidance: conditions suit spraying and field work.",
+    "intent": {
+      "intent": "forecast",
+      "location_name": "Nashik",
+      "date_reference": "tomorrow",
+      "weather_parameter": "general",
+      "language": "en",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Nashik, Nashik Subdistrict, Nashik",
+      "latitude": 20.0112475,
+      "longitude": 73.7902364,
+      "source": "explicit_query"
+    },
+    "weather": {
+      "source": "open-meteo",
+      "location": "Nashik, Nashik Subdistrict, Nashik",
+      "requested_time": "tomorrow (2026-11-04T00:00 to 2026-11-04T23:00)",
+      "timezone": "Asia/Kolkata",
+      "temperature_2m": 29.8,
+      "temperature_min": 20.5,
+      "temperature_max": 29.8,
+      "precipitation": 0.0,
+      "precipitation_probability": 8,
+      "wind_speed_10m": 9.2,
+      "wind_direction_10m": 90.0,
+      "relative_humidity_2m": 64.6,
+      "wind_gusts_10m": 25.2,
+      "visibility": 10.6,
+      "cloud_cover": 27.0,
+      "uv_index": 6.8,
+      "pm2_5": null,
+      "pm10": null,
+      "aqi": null,
+      "aqi_category": null,
+      "aqi_dominant": null,
+      "weather_code": 2,
+      "weather_description": "Partly cloudy",
+      "period_available": true
+    },
+    "climate": null,
+    "nwp": null,
+    "advisory": {
+      "severity": "low",
+      "condition": "Routine conditions",
+      "advisory": "No specific weather advisories at this time.",
+      "reasons": []
+    },
+    "source": "open-meteo"
+  }
+}

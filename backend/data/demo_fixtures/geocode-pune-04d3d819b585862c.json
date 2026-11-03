@@ -1,0 +1,19 @@
+{
+  "key": "04d3d819b585862c",
+  "recorded_at": "2026-11-03T10:17:30Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Pune"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Pune",
+    "name": "Pune, Pune City Subdistrict, Pune",
+    "latitude": 18.5213738,
+    "longitude": 73.8545071
+  }
+}

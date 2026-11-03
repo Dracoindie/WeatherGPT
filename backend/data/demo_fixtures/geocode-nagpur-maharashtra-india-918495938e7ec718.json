@@ -1,0 +1,19 @@
+{
+  "key": "918495938e7ec718",
+  "recorded_at": "2026-11-03T10:17:57Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Nagpur, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Nagpur, Maharashtra, India",
+    "name": "Nagpur City, Nagpur Urban Taluka, Nagpur",
+    "latitude": 21.1498134,
+    "longitude": 79.0820556
+  }
+}

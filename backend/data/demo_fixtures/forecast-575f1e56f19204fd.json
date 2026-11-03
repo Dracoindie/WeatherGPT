@@ -1,0 +1,69 @@
+{
+  "key": "575f1e56f19204fd",
+  "recorded_at": "2026-11-03T10:17:32Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/forecast",
+    "query": {
+      "latitude": "19.054999",
+      "longitude": "72.8692035",
+      "days": "5"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "source": "open-meteo",
+    "latitude": 19.086115,
+    "longitude": 72.85291,
+    "timezone": "Asia/Kolkata",
+    "retrieved_at": "2026-11-03T10:17:32.971490Z",
+    "daily": [
+      {
+        "date": "2026-11-03",
+        "weather_code": 3,
+        "max_temperature": 34.8,
+        "min_temperature": 26.2,
+        "precipitation_sum": 0.0,
+        "precipitation_probability_max": 14,
+        "max_wind_speed": 10.9
+      },
+      {
+        "date": "2026-11-04",
+        "weather_code": 51,
+        "max_temperature": 35.1,
+        "min_temperature": 26.2,
+        "precipitation_sum": 0.3,
+        "precipitation_probability_max": 29,
+        "max_wind_speed": 11.1
+      },
+      {
+        "date": "2026-11-05",
+        "weather_code": 2,
+        "max_temperature": 35.5,
+        "min_temperature": 25.9,
+        "precipitation_sum": 0.0,
+        "precipitation_probability_max": 4,
+        "max_wind_speed": 14.1
+      },
+      {
+        "date": "2026-11-06",
+        "weather_code": 1,
+        "max_temperature": 35.8,
+        "min_temperature": 26.3,
+        "precipitation_sum": 0.0,
+        "precipitation_probability_max": 9,
+        "max_wind_speed": 14.2
+      },
+      {
+        "date": "2026-11-07",
+        "weather_code": 0,
+        "max_temperature": 35.7,
+        "min_temperature": 26.5,
+        "precipitation_sum": 0.0,
+        "precipitation_probability_max": 10,
+        "max_wind_speed": 12.4
+      }
+    ]
+  }
+}

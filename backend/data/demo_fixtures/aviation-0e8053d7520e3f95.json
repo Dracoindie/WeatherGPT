@@ -1,0 +1,49 @@
+{
+  "key": "0e8053d7520e3f95",
+  "recorded_at": "2026-11-03T10:17:30Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/aviation",
+    "query": {
+      "latitude": "21.1498134",
+      "longitude": "79.0820556"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "source": "open-meteo",
+    "latitude": 21.124779,
+    "longitude": 79.11585,
+    "timezone": "Asia/Kolkata",
+    "generated_at": "2026-11-03T10:17:30.394645Z",
+    "observation_time": "2026-11-03T15:45",
+    "visibility_km": 13.3,
+    "visibility_band": "good",
+    "cloud_cover_percent": 91.0,
+    "wind_kmh": 7.5,
+    "wind_kt": 4.0,
+    "wind_direction_deg": 73.0,
+    "gust_kmh": 24.8,
+    "gust_kt": 13.0,
+    "precipitation_mm": 0.0,
+    "weather_code": 3,
+    "weather_description": "Overcast",
+    "next_hours": 6,
+    "next_min_visibility_km": 10.7,
+    "next_max_gust_kmh": 23.8,
+    "next_max_wind_kmh": 8.3,
+    "next_precipitation_mm": 0.0,
+    "next_max_weather_code": 3,
+    "flags": [],
+    "thresholds": {
+      "visibility_good_km": 8.0,
+      "visibility_moderate_km": 5.0,
+      "visibility_poor_km": 1.5,
+      "gust_spread_kmh": 18.5,
+      "strong_wind_kmh": 46.0,
+      "thunderstorm_wmo_code": 95.0
+    },
+    "note": "Guidance computed from Open-Meteo forecast thresholds by WeatherGPT; not an official IMD / agro-met / aviation product."
+  }
+}

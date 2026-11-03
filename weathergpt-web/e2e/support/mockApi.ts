@@ -22,10 +22,13 @@ const TILE = Buffer.from(
   'base64'
 )
 
+// Set per mockBackend() call: the demo replay header (DEMO_REPLAY=1 backend).
+let replayHeaders: Record<string, string> = {}
+
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({
     status,
-    headers: { ...CORS, 'content-type': 'application/json' },
+    headers: { ...CORS, ...replayHeaders, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
 }
@@ -253,6 +256,8 @@ export type ChatHandler = (body: Record<string, unknown>) => object
 export interface MockOptions {
   chat?: ChatHandler
   weatherCode?: number
+  /** Answer like a DEMO_REPLAY=1 backend: every JSON response carries this recorded_at. */
+  replayAt?: string
   /** Extra JSON routes by backend pathname, e.g. { '/api/aviation': {...} }. */
   routes?: Record<string, unknown>
   /** Fail backend paths with an HTTP status, e.g. { '/api/alerts': 503 }. */
@@ -281,6 +286,9 @@ export interface MockLog {
  * context routes also see requests the worker makes. */
 export async function mockBackend(page: Page | BrowserContext, opts: MockOptions = {}): Promise<MockLog> {
   const log: MockLog = { chat: [], paths: [] }
+  replayHeaders = opts.replayAt
+    ? { 'x-weathergpt-replay': opts.replayAt, 'access-control-expose-headers': 'X-WeatherGPT-Replay' }
+    : {}
 
   await page.route('http://localhost:8000/**', async (route) => {
     const req = route.request()

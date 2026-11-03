@@ -12,6 +12,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { SkyNav } from '@/components/console/SkyNav'
 import { StaticSky } from '@/components/sky/StaticSky'
+import { ReplayBadge } from '@/components/ui/ReplayBadge'
 import { sky } from '@/lib/skyStore'
 import { localHour, sceneFromCode } from '@/lib/weatherScene'
 import { cn } from '@/lib/utils'
@@ -35,6 +36,7 @@ export function AppShell({ children, background, severity = 'low', overlay, bare
       {background ?? <StaticSky />}
       {overlay}
       {!bare && <SkyNav />}
+      <ReplayBadge />
       <main
         className={cn(
           'relative z-10 mx-auto w-full max-w-[1400px] flex-1 px-4 pb-16 pt-4 sm:px-6 lg:pt-6',

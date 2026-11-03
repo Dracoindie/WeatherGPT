@@ -1,0 +1,49 @@
+{
+  "key": "c21e181243add007",
+  "recorded_at": "2026-11-03T10:17:04Z",
+  "request": {
+    "method": "POST",
+    "path": "/api/chat",
+    "query": {},
+    "body": {
+      "message": "What does GFS say for tomorrow in Pune?",
+      "role": "researcher"
+    }
+  },
+  "status": 200,
+  "response": {
+    "message": "GFS model (run 2026-11-03 06:00 UTC) for Pune, Pune City Subdistrict, Pune tomorrow: 21.7–30.3°C, 0.2 mm of precipitation, winds up to 13.1 km/h. Raw model output, not an official forecast.",
+    "intent": {
+      "intent": "nwp",
+      "location_name": "Pune",
+      "date_reference": "tomorrow",
+      "weather_parameter": "general",
+      "language": "en",
+      "climate_period": null
+    },
+    "location": {
+      "name": "Pune, Pune City Subdistrict, Pune",
+      "latitude": 18.5213738,
+      "longitude": 73.8545071,
+      "source": "explicit_query"
+    },
+    "weather": null,
+    "climate": null,
+    "nwp": {
+      "source": "gfs-nomads",
+      "model": "GFS",
+      "run": "2026-11-03T06:00:00+00:00",
+      "location": "Pune, Pune City Subdistrict, Pune",
+      "requested_time": "tomorrow (2026-11-04T00:30 to 2026-11-04T23:30)",
+      "timezone": "Asia/Kolkata",
+      "hours": 24,
+      "temperature_min": 21.7,
+      "temperature_max": 30.3,
+      "precipitation": 0.2,
+      "wind_speed_max": 13.1,
+      "period_available": true
+    },
+    "advisory": null,
+    "source": "gfs-nomads"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "8f290e80afb60718",
+  "recorded_at": "2026-11-03T10:17:45Z",
+  "request": {
+    "method": "GET",
+    "path": "/api/geocode",
+    "query": {
+      "q": "Satara, Maharashtra, India"
+    },
+    "body": null
+  },
+  "status": 200,
+  "response": {
+    "query": "Satara, Maharashtra, India",
+    "name": "Satara, Maharashtra, India",
+    "latitude": 17.6361289,
+    "longitude": 74.2982781
+  }
+}
