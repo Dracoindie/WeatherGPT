@@ -179,10 +179,10 @@ npm run dev               # http://localhost:3000
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 664 passed. Everything is mocked, so no network is needed. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root; `pytest.ini` sets the paths) | 680 passed. Everything is mocked, so no network is needed. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build` | succeeds. **Needed before Playwright**, which runs `next start` on port 3100. |
-| E2E | `npx playwright test --grep-invert @screens` | 104 passed, 22 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route) and `e2e/contrast.spec.ts`. |
+| E2E | `npx playwright test --grep-invert @screens` | 146 passed, 22 skipped (desktop-only tests in the mobile project, plus the opt-in `@audit` spec). Includes `e2e/a11y.spec.ts` (axe, every route) and `e2e/contrast.spec.ts`. |
 | Screenshots | `npx playwright test --grep @screens` | 14 passed. Output goes to `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored). |
 | Design audit | `AUDIT_DIR=screenshots/audit-after npx playwright test e2e/audit.spec.ts` | 6 passed. Every route signed out and in demo, 1440 and 390 px (`docs/DESIGN_AUDIT.md`). |
 | Parser benchmark | `backend/.venv/Scripts/python tests/eval/run_eval.py --quiet`; add `--queries tests/eval/heldout.jsonl` for the held-out set | **91.7% held-out (the headline)**, 99.2% tuning set |
@@ -190,6 +190,8 @@ npm run dev               # http://localhost:3000
 **Test notes:**
 - Playwright mocks the backend, Nominatim and Supabase (`e2e/support/mockApi.ts`).
 - If `npm run dev` is also running, use `--workers=1`, or WebGL-heavy tests may time out.
+- Headless Chromium draws WebGL in software (SwiftShader), so lite mode's auto setting picks the CSS sky in e2e (`lib/liteMode.ts`, reason `software-renderer`). That is the CI fix. A test that needs the WebGL sky sets `localStorage['wgpt:lite-mode'] = 'off'`, as the screenshot and audit specs do.
+- Demo replay for offline judging: `docs/DEMO.md` (`DEMO_REPLAY=1`, fixtures in `backend/data/demo_fixtures/`).
 - On Windows, set `PYTHONIOENCODING=utf-8` when printing Devanagari from Python.
 
 ## Environment variables

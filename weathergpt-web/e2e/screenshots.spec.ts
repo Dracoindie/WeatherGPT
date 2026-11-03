@@ -11,6 +11,12 @@ import { AVIATION, BOARD, COMPARE, FARM } from './support/roleFixtures'
 
 test.describe.configure({ mode: 'serial', timeout: 300_000 })
 
+// Headless Chromium draws WebGL in software, where lite mode's auto setting now
+// picks the CSS sky. Screenshots show what a GPU user sees: force the WebGL sky.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
+})
+
 const shot = (page: Page, project: string, name: string, fullPage = true) =>
   page.screenshot({ path: `screenshots/${project}/${name}.png`, fullPage })
 

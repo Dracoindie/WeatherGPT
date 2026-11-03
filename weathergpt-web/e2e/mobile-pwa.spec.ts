@@ -55,6 +55,28 @@ test('web app manifest and icons are served', async ({ request }) => {
   expect((await request.get('/sw.js')).ok()).toBe(true)
 })
 
+test('lite mode turns on automatically when WebGL is drawn in software (no GPU)', async ({ page, isMobile }) => {
+  // What a GPU-less PC (or a CI runner) reports: the animated sky would run on the CPU.
+  await page.addInitScript(() => {
+    for (const Ctx of [WebGLRenderingContext, WebGL2RenderingContext]) {
+      const original = Ctx.prototype.getParameter
+      Ctx.prototype.getParameter = function (this: WebGLRenderingContext, p: number) {
+        if (p === 0x9246 || p === 0x1f01) return 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)'
+        return original.call(this, p)
+      } as typeof original
+    }
+  })
+  await mockBackend(page)
+  await page.goto('/')
+  await page.waitForLoadState('networkidle')
+  if (isMobile) await page.getByRole('button', { name: /menu/i }).first().click()
+  else await page.getByRole('button', { name: 'Settings' }).click()
+  const toggle = page.getByRole('button', { name: /lite mode/i }).first()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(toggle).toHaveAttribute('title', /no graphics acceleration/)
+  await expect(page.locator(SKY_CANVAS)).toHaveCount(0)
+})
+
 test('lite mode turns on automatically with Save-Data and can be switched off', async ({ page, isMobile }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'connection', {

@@ -8,6 +8,7 @@ const REASON: Record<Exclude<LiteReason, null>, string> = {
   'save-data': 'Data Saver is on',
   'slow-connection': 'slow connection',
   'low-end-device': 'low-power device',
+  'software-renderer': 'no graphics acceleration',
 }
 
 /** Lite mode switch: shows the effective state; auto-detection explains itself. */

@@ -15,6 +15,12 @@ const DIR = process.env.AUDIT_DIR
 test.skip(!DIR, 'set AUDIT_DIR to run the design audit')
 test.describe.configure({ mode: 'serial', timeout: 300_000 })
 
+// Headless Chromium draws WebGL in software, where lite mode's auto setting now
+// picks the CSS sky. Screenshots show what a GPU user sees: force the WebGL sky.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
+})
+
 const ROUTES = ['/', '/dashboard', '/alerts', '/climate', '/map', '/disaster', '/login', '/signup', '/offline']
 
 const name = (route: string) => (route === '/' ? 'home' : route.slice(1))
