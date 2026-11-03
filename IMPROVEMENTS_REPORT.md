@@ -212,6 +212,59 @@ The earlier suspects were checked and ruled out:
 - timezone and locale: the full suite passes with `timezoneId: 'UTC'`, `locale: 'en-US'`;
 - missing files: nothing needed is untracked.
 
+## Live weather map: vision and step 1 (map engine)
+
+The roadmap is in `docs/VISION.md`: live 3D map, hazard hex map with road colouring, weather-safe routes, community reports, Android via Capacitor, then bulletins, ensemble confidence and heat stress. Step 1 is done. Nothing was pushed, and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `78dc30f` | **`docs/VISION.md`**: the six-step roadmap and the honesty rules every map must follow. |
+| `79fecb2` | **Backend map data.**<br>- `GET /api/map/point` returns, for a tapped point: temperature, feels-like (Open-Meteo `apparent_temperature`, now requested as an optional field by the shared client), humidity, wind and direction, rain chance this hour, UV, CAMS AQI, heat index and band, local time, and the model cell that answered. AQI down still answers; forecast down is a 503. Cached 10 min per ~1 km.<br>- `GET /api/map/grid` covers the visible box with **one batched Open-Meteo request** (comma-separated coordinates), at most 100 points and 72 hourly values. The grid snaps to a step ladder (0.08°–5°), with the step picked from the box size, so pans hit the 15-minute cache. A box too large is a 422.<br>- Heat index: NWS method (Rothfusz with adjustments) in `maps/heat_index.py`. Bands (NWS categories) live in `thresholds.py`.<br>- 20 tests (all mocked; `MockTransport` checks there is exactly one upstream request). |
+| `3624e30` | **The map engine on `/map`** (MapLibre GL 6.14 + deck.gl 9.4, pinned). Details below. |
+
+### What `/map` does now
+
+- **Basemap and terrain, both keyless.** OpenFreeMap `dark` vector style, tinted to Living Sky (`--map-base`, `--map-water`); AWS open terrain tiles (terrarium). No source needed a key.
+- **Tap anywhere** (or "Weather at map centre" for keyboard users): a gold pin with a pulsing ring, and a glass card with temperature, feels-like, humidity, wind with an arrow and compass direction, rain chance, AQI and band, UV and band, local time, and heat index with advice. All in en / hi / Hinglish / mr. Every number is the API's (e2e checks each one against the fixture).
+- **Layers**: temperature, humidity, wind, rain, heat stress.
+  - Each is drawn as a surface interpolated (bilinear) between the grid points and labelled "Smoothed between grid points".
+  - The legend's min and max are the data's own range over the 72 hours.
+  - Rain under 0.1 mm stays transparent, and the legend says so.
+  - The ramps are one-hue sequential `--map-*` tokens, each passing the dataviz validator against the dark surface.
+- **Heat stress**: bands and lower bounds come from `thresholds.py` through the grid response. The advice is for outdoor workers ("guidance … not an official warning", in the shade; full sun feels hotter), with no invented numbers.
+- **Time slider**: the next 72 hours with play/pause. It moves every layer, and labels are local time.
+- **Broadcast mode**: full screen, rendered in a portal on `<body>`; the live MapLibre node is moved there, not rebuilt.
+  - 3D terrain with hillshade, tilt to 58°, then a slow flyover.
+  - Extruded rain columns scaled to the grid spacing, plus wind particles that follow the interpolated real wind (speed and direction).
+  - A news-style lower third (kicker, place · layer, slider, honesty line) and a large legend. Esc leaves.
+- **Reduced motion and lite mode**: broadcast stays 2D and still (no terrain, tilt, flyover or particles). Wind becomes static arrows, rain becomes sized dots, and the line says "2D view".
+- **Phones**: 350 particles (900 / 1500 on wider screens). The grid is 49 points (81 on desktop), and the point card sits below the map.
+- **Honesty line, always shown**: "Model grid ≈ 8 km · points every N km · estimated · not official IMD". The 8 km is measured, not assumed: Open-Meteo's best_match snaps Pune coordinates to cells 0.070° apart (≈ 7.8 km). India has no 1–3 km model in Open-Meteo, so the "~1–10 km" in the brief is really "~8 km" here.
+- **Kept**: the place marker (now a card on the map with the condition in the UI language and the alert status), `LocationPicker`, `AlertBanner`, current conditions and the 7-day forecast. The Leaflet `InteractiveMap` is removed. Leaflet stays for the risk board.
+
+### Performance
+
+- The map chunk is 1.54 MB raw / 419 kB gzip, plus MapLibre's 508 kB worker.
+- It loads **only on `/map`**: `next/dynamic`, `ssr: false`. An e2e test checks that `/` loads no maplibre or deck.gl code.
+- Particles and the pin animate outside React state: one rAF loop pushes layers to deck.
+- The surface is a bitmap of at most 192×192, recomputed only when the hour or layer changes.
+- Not measured on a mid-range laptop with a GPU. Headless Chromium draws in software.
+
+### Tests
+
+- Backend: **700 passed**.
+- E2E: **161 passed, 23 skipped**. The 15 new tests in `e2e/map.spec.ts`:
+  - tap for weather with every value checked, keyboard centre, Marathi card
+  - layer toggles, legend ranges, heat bands from the API, time slider
+  - broadcast 3D (pitch > 30°, particles, fills the screen above the header), reduced-motion 2D, lite-mode 2D
+  - map code absent from `/`
+- Screenshots: **16 passed**, including map point / heat / broadcast at both widths.
+- The screenshot review found four problems, now fixed:
+  - the pin drawn as a sideways capsule when seen from above
+  - the tilt cancelled, first by the flyover and then by the map re-centring on the place every render
+  - particles drawn over the overlays
+  - a squeezed forecast
+
 ## Needs your input
 
 1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
@@ -230,3 +283,9 @@ The earlier suspects were checked and ruled out:
    - AQI is modelled, not CPCB stations
    - smart-city feature only partial
    - with `npm run dev` running, use `npx playwright test --workers=1`
+10. **Look at `/map` on a real GPU with live tiles.** Tests use a blank stand-in style and flat terrain, so screenshots cannot show the OpenFreeMap roads, labels or real hillshade. Run the backend and `npm run dev`, enter demo, open `/map`, try broadcast mode, and tell me what to tune: tint, opacity, column height, particle density.
+11. **Open-Meteo limits.** Each grid point counts as one Open-Meteo call (81 per grid on desktop; the free tier is 10,000 a day, 600 a minute). The 15-minute snapped cache keeps a demo well inside that, but public traffic would not be. Should I add an optional `OPEN_METEO_API_KEY` (their commercial endpoint), or lower the point cap?
+12. **Free tile services have no SLA.** OpenFreeMap and the AWS terrain bucket are keyless and free. For production, consider self-hosting, or a keyed provider such as MapTiler, which I would read from env with this as the fallback.
+13. **The map is online-only.** Demo replay has no `/api/map/*` fixtures, and tiles need the internet. The rest of the app still replays offline, and `/map` shows "Map weather is unavailable" instead of failing.
+14. **`h3-js` is installed but not used yet.** It is approved and reserved for the step 2 hex grid, so it is in no bundle.
+15. **Next step.** Step 2 (hazard hex grid and road colouring) is ready to start when you say so.
