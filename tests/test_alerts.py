@@ -116,10 +116,11 @@ def test_evaluate_alerts_thunderstorm_code():
     alerts_ts = evaluate_alerts(weather_ts)
     assert any(a.alert_type == "storm" for a in alerts_ts)
 
-    weather_severe_ts = _mock_weather_response(weather_code=99)
-    alerts_severe = evaluate_alerts(weather_severe_ts)
-    storm_alert = next(a for a in alerts_severe if a.alert_type == "storm")
-    assert storm_alert.severity == "warning"
+    # thresholds.py: 96 (hail) is a warning, 99 (heavy hail) is severe
+    hail = next(a for a in evaluate_alerts(_mock_weather_response(weather_code=96)) if a.alert_type == "storm")
+    assert hail.severity == "warning"
+    heavy_hail = next(a for a in evaluate_alerts(_mock_weather_response(weather_code=99)) if a.alert_type == "storm")
+    assert heavy_hail.severity == "severe"
 
 
 @pytest.mark.asyncio

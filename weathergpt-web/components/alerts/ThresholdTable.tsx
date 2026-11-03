@@ -17,6 +17,16 @@ import { GlassPanel } from '@/components/panels/GlassPanel'
 const CODE_RULE_TEXT: Partial<Record<string, TranslationKey>> = {
   thunderstorm: 'thresholds.anyThunderstorm',
   thunderstorm_hail: 'thresholds.withHail',
+  thunderstorm_heavy_hail: 'thresholds.withHeavyHail',
+}
+
+/** The rule's window (thresholds.py) in the UI language. */
+const WINDOW_TEXT: Record<string, TranslationKey> = {
+  '24 h total': 'thresholds.window.total',
+  '24 h maximum': 'thresholds.window.max',
+  '24 h minimum': 'thresholds.window.min',
+  '24 h maximum heat index': 'thresholds.window.heatIndex',
+  current: 'thresholds.window.current',
 }
 
 function rangeText(r: ThresholdRule, t: (k: TranslationKey) => string): string {
@@ -51,7 +61,7 @@ export function ThresholdTable() {
               <tr key={r.id} className="border-b border-white/5 last:border-0">
                 <th scope="row" className="py-2 pr-2 text-left font-normal text-hud">
                   {t(`threshold.${r.id}` as TranslationKey) || r.label}
-                  <span className="block text-[11px] text-hud-dim">{r.window}</span>
+                  <span className="block text-[11px] text-hud-dim">{WINDOW_TEXT[r.window] ? t(WINDOW_TEXT[r.window]) : r.window}</span>
                 </th>
                 <td
                   className={`py-2 pr-2 text-right text-hud ${r.comparator === 'in' ? '' : 'font-readout whitespace-nowrap'}`}

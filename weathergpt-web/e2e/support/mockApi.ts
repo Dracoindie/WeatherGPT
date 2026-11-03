@@ -7,6 +7,7 @@
 
 import type { BrowserContext, Page, Route } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
+import { cellToLatLng, latLngToCell, polygonToCells } from 'h3-js'
 import THRESHOLDS from './thresholds.json'
 
 export const PUNE = { name: 'Pune, Maharashtra, India', latitude: 18.5204, longitude: 73.8567 }
@@ -61,12 +62,31 @@ function flatTerrainPng(): Buffer {
 }
 const TERRAIN_TILE = flatTerrainPng()
 
-/** Stand-in for the OpenFreeMap dark style: background and nothing else, no network. */
+/**
+ * Stand-in for the OpenFreeMap dark style, no network: a background and a
+ * small GeoJSON road network ("roads" source with an OpenMapTiles-style
+ * "class"), so the hazard road layer has real lines to colour.
+ */
+export const ROADS = {
+  type: 'FeatureCollection',
+  features: [
+    // east-west motorway through Pune
+    { type: 'Feature', properties: { class: 'motorway' }, geometry: { type: 'LineString', coordinates: [[72.9, 18.52], [73.5, 18.55], [73.86, 18.52], [74.3, 18.5], [74.9, 18.45]] } },
+    // north-south trunk road
+    { type: 'Feature', properties: { class: 'trunk' }, geometry: { type: 'LineString', coordinates: [[73.86, 17.9], [73.9, 18.52], [73.95, 19.2]] } },
+    // a minor road: never coloured
+    { type: 'Feature', properties: { class: 'minor' }, geometry: { type: 'LineString', coordinates: [[73.6, 18.3], [74.1, 18.8]] } },
+  ],
+}
+
 const MAP_STYLE = {
   version: 8,
   name: 'test',
-  sources: {},
-  layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#111827' } }],
+  sources: { roads: { type: 'geojson', data: ROADS } },
+  layers: [
+    { id: 'background', type: 'background', paint: { 'background-color': '#111827' } },
+    { id: 'roads-base', type: 'line', source: 'roads', paint: { 'line-color': '#334155', 'line-width': 1 } },
+  ],
 }
 
 /** GET /api/map/point for any tap. Heat index 34.4 = maps/heat_index.py for 31.4 °C / 55 %. */
@@ -152,6 +172,113 @@ export function mapGrid(q: URLSearchParams) {
     ],
     note: 'Open-Meteo model values at grid points; the map interpolates between them. Estimated, not official IMD data.',
   }
+}
+
+// ---------------------------------------------------------------------------
+// Hazard map fixtures (/api/map/hazard and /summary). Thresholds come from
+// thresholds.json, the copy of backend/thresholds.py.
+// ---------------------------------------------------------------------------
+
+type Rule = (typeof THRESHOLDS)[number]
+const RULE = (id: string): Rule => THRESHOLDS.find((r) => r.id === id) as Rule
+
+function trigger(id: string, value: number) {
+  const r = RULE(id)
+  return { hazard: r.hazard, level: r.level, rule_id: r.id, label: r.label, value, threshold: r.value, comparator: r.comparator, unit: r.unit, window: r.window }
+}
+
+const CALM_FACTS = { rain_mm: 0, temp_max: 30.2, temp_min: 21.4, wind_max: 14, heat_index_max: 31.5, weather_code: 2 }
+const NONE_LEVELS = { rain: 'none', heat: 'none', wind: 'none', storm: 'none', cold: 'none' }
+
+/** Sample points: [0] calm, [1] the place (45 mm, same as the /api/alerts mock: rain watch),
+ * [2] 72 mm rain warning, [3] 95 km/h storm-force wind (severe), [4] 36 °C high heat (advisory). */
+export const HAZARD_POINTS = [
+  { latitude: 18.4, longitude: 73.6, overall: 'none', levels: NONE_LEVELS, facts: CALM_FACTS, triggers: [] },
+  { latitude: 18.5, longitude: 73.85, overall: 'watch', levels: { ...NONE_LEVELS, rain: 'watch' }, facts: { ...CALM_FACTS, rain_mm: 45 }, triggers: [trigger('heavy_rain', 45)] },
+  { latitude: 18.5, longitude: 74.4, overall: 'warning', levels: { ...NONE_LEVELS, rain: 'warning' }, facts: { ...CALM_FACTS, rain_mm: 72 }, triggers: [trigger('extreme_rain', 72)] },
+  { latitude: 18.5, longitude: 73.1, overall: 'severe', levels: { ...NONE_LEVELS, wind: 'severe' }, facts: { ...CALM_FACTS, wind_max: 95 }, triggers: [trigger('storm_force_wind', 95)] },
+  { latitude: 19.0, longitude: 73.85, overall: 'advisory', levels: { ...NONE_LEVELS, heat: 'advisory' }, facts: { ...CALM_FACTS, temp_max: 36 }, triggers: [trigger('high_heat', 36)] },
+]
+
+function hazardTimes() {
+  const start = new Date()
+  start.setUTCMinutes(0, 0, 0)
+  return Array.from({ length: 72 }, (_, h) => new Date(start.getTime() + h * 3600_000).toISOString().slice(0, 16) + 'Z')
+}
+
+export function mapHazard(q: URLSearchParams) {
+  const south = Number(q.get('south'))
+  const west = Number(q.get('west'))
+  const north = Number(q.get('north'))
+  const east = Number(q.get('east'))
+  const hour = Math.min(48, Number(q.get('hour') ?? 0))
+  const res = 5
+  const place = latLngToCell(PUNE.latitude, PUNE.longitude, res)
+  const cells = polygonToCells([[south, west], [north, west], [north, east], [south, east]], res).sort()
+  const out: Array<[string, number]> = cells.map((cell) => {
+    if (cell === place) return [cell, 1]
+    const [lat, lon] = cellCentre(cell)
+    if (lon > PUNE.longitude + 0.35) return [cell, 2]
+    if (lon < PUNE.longitude - 0.6) return [cell, 3]
+    if (lat > PUNE.latitude + 0.35) return [cell, 4]
+    return [cell, 0]
+  })
+  const counts: Record<string, number> = { none: 0, advisory: 0, watch: 0, warning: 0, severe: 0 }
+  for (const [, i] of out) counts[HAZARD_POINTS[i].overall] += 1
+  const worstCell = out.find(([, i]) => i === 3)
+  const times = hazardTimes()
+  return {
+    source: 'open-meteo',
+    retrieved_at: new Date().toISOString(),
+    hour,
+    max_hour: 48,
+    window_start: times[hour],
+    window_end: times[hour + 23],
+    window_hours: 24,
+    times,
+    h3_resolution: res,
+    hex_km: 17.1,
+    step_deg: 0.1,
+    spacing_km: 11.1,
+    model_grid_km: 8,
+    levels: ['none', 'advisory', 'watch', 'warning', 'severe'],
+    points: HAZARD_POINTS,
+    cells: out,
+    counts,
+    worst: worstCell ? { cell: worstCell[0], latitude: cellCentre(worstCell[0])[0], longitude: cellCentre(worstCell[0])[1], level: 'severe', point: 3 } : null,
+    rules: THRESHOLDS,
+    note: 'Estimated from Open-Meteo model data (model grid ≈ 8 km) with WeatherGPT\'s thresholds; not official IMD warnings.',
+  }
+}
+
+/** Around the place: 3 warning and 7 watch cells now, 72 mm at most, worst (warning) in 4 h. */
+export function mapHazardSummary(q: URLSearchParams) {
+  const hour = Number(q.get('hour') ?? 0)
+  const times = hazardTimes()
+  return {
+    latitude: Number(q.get('latitude')),
+    longitude: Number(q.get('longitude')),
+    radius_km: 25,
+    hour,
+    window_start: times[hour],
+    window_end: times[hour + 23],
+    h3_resolution: 6,
+    cells: 40,
+    counts: { none: 30, advisory: 0, watch: 7, warning: 3, severe: 0 },
+    max_rain_mm: 72,
+    max_rain_at: { cell: 'x', latitude: 18.55, longitude: 74.05, level: 'warning', point: 2 },
+    worst_now: { cell: 'x', latitude: 18.55, longitude: 74.05, level: 'warning', point: 2 },
+    worst_ahead: { cell: 'x', latitude: 18.6, longitude: 74.1, level: 'warning', point: 2 },
+    worst_ahead_hour: 4,
+    worst_ahead_time: times[4],
+    nearest_sample_km: 3.2,
+    model_grid_km: 8,
+    note: 'Estimated from Open-Meteo model data (model grid ≈ 8 km) with WeatherGPT\'s thresholds; not official IMD warnings.',
+  }
+}
+
+function cellCentre(cell: string): [number, number] {
+  return cellToLatLng(cell) as [number, number]
 }
 
 // Set per mockBackend() call: the demo replay header (DEMO_REPLAY=1 backend).
@@ -486,6 +613,10 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
         return json(route, MAP_POINT)
       case '/api/map/grid':
         return json(route, mapGrid(new URL(req.url()).searchParams))
+      case '/api/map/hazard':
+        return json(route, mapHazard(new URL(req.url()).searchParams))
+      case '/api/map/hazard/summary':
+        return json(route, mapHazardSummary(new URL(req.url()).searchParams))
       default:
         return json(route, { detail: `Not mocked: ${pathname}` }, 404)
     }

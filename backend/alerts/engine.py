@@ -1,267 +1,175 @@
 """
 Deterministic Weather Alert & Early Warning Evaluation Engine.
 
-Uses Open-Meteo verified meteorological data to evaluate rule-based alerts
-without any AI hallucination or unvalidated claims.
+Levels come from alerts/scoring.py, the one scorer shared with the hazard map,
+applied to the place's Open-Meteo forecast for the 24 h starting at the
+current hour (plus the model's current values). This module only turns each
+hazard's highest firing rule into an alert with its text. No AI, no
+unvalidated claims: every number in an alert is the measured/forecast value or
+the rule's threshold from thresholds.py.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional
-import uuid
+from typing import Callable, List, Optional
 
-from models.alerts import WeatherAlert, AlertSeverity, AlertCategory
+from alerts.scoring import WINDOW_HOURS, Current, Hit, score, window_facts
+from models.alerts import WeatherAlert
 from models.weather import WeatherResponse
-# Every threshold and level comes from thresholds.py (single source of truth).
-from thresholds import (
-    COLD,
-    COLD_TEMP_C,
-    EXTREME_HEAT,
-    EXTREME_HEAT_C,
-    EXTREME_RAIN,
-    EXTREME_RAIN_MM,
-    GALE,
-    HEAVY_RAIN,
-    HEAVY_RAIN_MM,
-    HIGH_HEAT,
-    HIGH_WIND_KMH,
-    HOT_TEMP_C,
-    STORM_WIND_KMH,
-    STORM_WMO_CODES,
-    STRONG_WIND,
-    THUNDERSTORM,
-    THUNDERSTORM_HAIL,
-)
+
+# Alert order on every surface (unchanged from before the shared scorer).
+_ORDER = ("rain", "heat", "cold", "wind", "storm")
+
+
+def current_hour_index(weather: WeatherResponse) -> int:
+    """Index of the current hour in the hourly series (Open-Meteo starts at local midnight)."""
+    hour = (weather.current.time or "")[:13]
+    for i, ts in enumerate(weather.hourly.time or []):
+        if ts[:13] == hour:
+            return i
+    return 0
+
+
+def assess(weather: WeatherResponse) -> dict[str, Optional[Hit]]:
+    """Each hazard's highest firing rule for the next 24 h at this place."""
+    h, c = weather.hourly, weather.current
+    facts = window_facts(
+        temperature=h.temperature_2m,
+        humidity=h.relative_humidity_2m,
+        precipitation=h.precipitation,
+        wind_speed=h.wind_speed_10m,
+        weather_code=h.weather_code,
+        start=current_hour_index(weather),
+        hours=WINDOW_HOURS,
+        current=Current(c.temperature_2m, c.relative_humidity_2m, c.precipitation, c.wind_speed_10m, c.weather_code),
+    )
+    return score(facts)
+
+
+# (condition, headline, description, recommended action), keyed by rule id.
+Text = tuple[str, Callable[[float], str], Callable[[float, float], str], str]
+
+_TEXT: dict[str, Text] = {
+    "heavy_rain": (
+        "Heavy Rain Watch",
+        lambda v: f"Watch: Heavy rain ({v:.1f} mm) anticipated",
+        lambda v, t: f"Precipitation of {v:.1f} mm exceeds the heavy rainfall threshold of {t} mm. Expect wet surfaces and reduced visibility.",
+        "Keep an umbrella handy, allow extra commute time, and inspect drainage channels.",
+    ),
+    "extreme_rain": (
+        "Extreme Rain / Flood Risk",
+        lambda v: f"Warning: Extreme rainfall ({v:.1f} mm) recorded/forecasted",
+        lambda v, t: f"Significant precipitation of {v:.1f} mm exceeds the extreme safety threshold of {t} mm. High risk of waterlogging, local flooding, and dangerous road conditions.",
+        "Avoid non-essential travel, stay away from low-lying areas and storm drains, and secure waterproof gear.",
+    ),
+    "very_heavy_rain": (
+        "Very Heavy Rain / Severe Flood Risk",
+        lambda v: f"Severe: Very heavy rainfall ({v:.1f} mm) forecast",
+        lambda v, t: f"Precipitation of {v:.1f} mm reaches the very heavy rainfall level of {t} mm. Flooding of roads and low-lying areas is likely.",
+        "Do not travel unless essential, move away from low-lying areas and drains, and follow local authority instructions.",
+    ),
+    "high_heat": (
+        "High Temperature Advisory",
+        lambda v: f"Advisory: High temperatures ({v:.1f}°C)",
+        lambda v, t: f"Temperatures reaching {v:.1f}°C meet or exceed the elevated heat threshold of {t}°C.",
+        "Drink plenty of fluids, wear lightweight clothing, and limit strenuous outdoor activities in direct sun.",
+    ),
+    "extreme_heat": (
+        "Extreme Heat Warning",
+        lambda v: f"Warning: Dangerous heat ({v:.1f}°C) detected",
+        lambda v, t: f"Ambient temperatures reaching {v:.1f}°C surpass the critical heat threshold of {t}°C. Elevated risk of heat exhaustion and heatstroke.",
+        "Stay hydrated, remain in cool indoor environments during peak afternoon hours, and check on vulnerable individuals.",
+    ),
+    "severe_heat": (
+        "Severe Heat",
+        lambda v: f"Severe: Extreme temperatures ({v:.1f}°C)",
+        lambda v, t: f"Temperatures reaching {v:.1f}°C are at or above the severe heat level of {t}°C. Heatstroke is likely without protection.",
+        "Avoid all outdoor work in the day, stay in the coolest place available, drink water often, and check on vulnerable people.",
+    ),
+    "heat_stress": (
+        "Heat Stress Watch",
+        lambda v: f"Watch: Heat stress (heat index {v:.1f}°C)",
+        lambda v, t: f"Heat and humidity give a heat index of {v:.1f}°C, at or above the danger level of {t}°C (in shade; full sun feels hotter).",
+        "Move heavy outdoor work to early morning, rest in shade often, and drink water regularly.",
+    ),
+    "extreme_heat_stress": (
+        "Extreme Heat Stress Warning",
+        lambda v: f"Warning: Extreme heat stress (heat index {v:.1f}°C)",
+        lambda v, t: f"Heat and humidity give a heat index of {v:.1f}°C, at or above the extreme danger level of {t}°C. Heatstroke is likely.",
+        "Stop outdoor work that can wait, stay in shade or indoors, and watch for signs of heatstroke.",
+    ),
+    "cold": (
+        "Cold Weather Advisory",
+        lambda v: f"Advisory: Chilly conditions ({v:.1f}°C)",
+        lambda v, t: f"Temperatures dropping to {v:.1f}°C meet the cold weather advisory threshold ({t}°C).",
+        "Dress in warm layers, protect pets from prolonged exposure, and guard against hypothermia.",
+    ),
+    "strong_wind": (
+        "Strong Wind Watch",
+        lambda v: f"Watch: Strong winds ({v:.1f} km/h)",
+        lambda v, t: f"Wind velocities of {v:.1f} km/h exceed the high wind threshold of {t} km/h.",
+        "Hold doors firmly, secure loose light items, and exercise caution on elevated bridges.",
+    ),
+    "gale": (
+        "Gale / High Wind Warning",
+        lambda v: f"Warning: Damaging wind gusts ({v:.1f} km/h)",
+        lambda v, t: f"Wind speeds reaching {v:.1f} km/h cross the severe storm wind threshold of {t} km/h. Risk of falling branches and structural hazards.",
+        "Secure outdoor furniture, avoid parking under trees, and drive with extreme caution.",
+    ),
+    "storm_force_wind": (
+        "Storm-Force Wind",
+        lambda v: f"Severe: Storm-force winds ({v:.1f} km/h)",
+        lambda v, t: f"Wind speeds reaching {v:.1f} km/h are at or above the storm-force level of {t} km/h. Trees and weak structures may fall.",
+        "Stay indoors away from windows, do not drive, and keep clear of trees, hoardings and power lines.",
+    ),
+    "thunderstorm": (
+        "Thunderstorm Activity Detected",
+        lambda v: "Thunderstorm Watch",
+        lambda v, t: f"Verified WMO weather code {int(v)} indicates active convective thunderstorm in the immediate area.",
+        "Seek immediate sturdy indoor shelter. Avoid open fields, metal fences, and water bodies. Unplug sensitive electrical equipment.",
+    ),
+    "thunderstorm_hail": (
+        "Thunderstorm Activity Detected",
+        lambda v: "Active Thunderstorm / Lightning Warning",
+        lambda v, t: f"Verified WMO weather code {int(v)} indicates active convective thunderstorm and hail in the immediate area.",
+        "Seek immediate sturdy indoor shelter. Avoid open fields, metal fences, and water bodies. Unplug sensitive electrical equipment.",
+    ),
+    "thunderstorm_heavy_hail": (
+        "Severe Thunderstorm with Heavy Hail",
+        lambda v: "Severe: Thunderstorm with heavy hail",
+        lambda v, t: f"Verified WMO weather code {int(v)} indicates a thunderstorm with heavy hail in the immediate area.",
+        "Stay indoors away from windows, protect vehicles if safe to do so, and avoid open ground until it passes.",
+    ),
+}
+
+_PARAMETER = {"precipitation": "precipitation", "temperature": "temperature", "wind_speed": "wind_speed", "heat_index": "heat_index", "weather_code": "weather_code"}
+
+
+def _alert(hit: Hit, now: datetime) -> WeatherAlert:
+    rule = hit.rule
+    condition, headline, description, action = _TEXT[rule.id]
+    threshold = rule.value
+    return WeatherAlert(
+        id=f"alert-{rule.hazard}-{rule.level}-{int(now.timestamp())}",
+        alert_type=rule.hazard,
+        severity=rule.level,
+        condition=condition,
+        headline=headline(hit.value),
+        description=description(hit.value, threshold),
+        recommended_action=action,
+        relevant_parameter=_PARAMETER[rule.parameter],
+        relevant_value=round(hit.value, 1),
+        threshold_value=threshold,
+        unit=rule.unit,
+        time_window="Current" if rule.parameter == "weather_code" else f"Next {WINDOW_HOURS} hours",
+        source="open-meteo",
+        created_at=now,
+    )
+
 
 def evaluate_alerts(weather: WeatherResponse) -> List[WeatherAlert]:
-    """
-    Evaluate deterministic alert rules against current and next 24-hour weather data.
-    """
-    alerts: List[WeatherAlert] = []
+    """One alert per hazard whose rules fire in the next 24 h (highest level only)."""
     now = datetime.now(timezone.utc)
-    current = weather.current
-    hourly = weather.hourly
-
-    # Gather 24-hour horizon max/sums from hourly data if available
-    h_temp_max: Optional[float] = None
-    h_temp_min: Optional[float] = None
-    h_wind_max: Optional[float] = None
-    h_precip_sum: Optional[float] = None
-
-    if hourly and hourly.temperature_2m:
-        horizon_len = min(24, len(hourly.temperature_2m))
-        h_temp_max = max(hourly.temperature_2m[:horizon_len])
-        h_temp_min = min(hourly.temperature_2m[:horizon_len])
-        if hourly.wind_speed_10m:
-            h_wind_max = max(hourly.wind_speed_10m[:min(horizon_len, len(hourly.wind_speed_10m))])
-        if hourly.precipitation:
-            h_precip_sum = sum(hourly.precipitation[:min(horizon_len, len(hourly.precipitation))])
-
-    # -------------------------------------------------------------------------
-    # 1. PRECIPITATION / RAIN ALERTS
-    # -------------------------------------------------------------------------
-    current_rain = current.precipitation
-    eval_rain = current_rain
-    if h_precip_sum is not None and h_precip_sum > eval_rain:
-        eval_rain = h_precip_sum
-        time_window = "Next 24 hours"
-    else:
-        time_window = "Current / Last Hour"
-
-    if eval_rain >= EXTREME_RAIN_MM:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-rain-warning-{int(now.timestamp())}",
-                alert_type="rain",
-                severity=EXTREME_RAIN.level,
-                condition="Extreme Rain / Flood Risk",
-                headline=f"Warning: Extreme rainfall ({eval_rain:.1f} mm) recorded/forecasted",
-                description=f"Significant precipitation of {eval_rain:.1f} mm exceeds the extreme safety threshold of {EXTREME_RAIN_MM} mm. High risk of waterlogging, local flooding, and dangerous road conditions.",
-                recommended_action="Avoid non-essential travel, stay away from low-lying areas and storm drains, and secure waterproof gear.",
-                relevant_parameter="precipitation",
-                relevant_value=round(eval_rain, 1),
-                threshold_value=EXTREME_RAIN_MM,
-                unit="mm",
-                time_window=time_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-    elif eval_rain >= HEAVY_RAIN_MM:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-rain-watch-{int(now.timestamp())}",
-                alert_type="rain",
-                severity=HEAVY_RAIN.level,
-                condition="Heavy Rain Watch",
-                headline=f"Watch: Heavy rain ({eval_rain:.1f} mm) anticipated",
-                description=f"Precipitation of {eval_rain:.1f} mm exceeds the heavy rainfall threshold of {HEAVY_RAIN_MM} mm. Expect wet surfaces and reduced visibility.",
-                recommended_action="Keep an umbrella handy, allow extra commute time, and inspect drainage channels.",
-                relevant_parameter="precipitation",
-                relevant_value=round(eval_rain, 1),
-                threshold_value=HEAVY_RAIN_MM,
-                unit="mm",
-                time_window=time_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-
-    # -------------------------------------------------------------------------
-    # 2. TEMPERATURE / HEAT ALERTS
-    # -------------------------------------------------------------------------
-    current_temp = current.temperature_2m
-    eval_temp_max = current_temp
-    if h_temp_max is not None and h_temp_max > eval_temp_max:
-        eval_temp_max = h_temp_max
-        temp_window = "Next 24 hours"
-    else:
-        temp_window = "Current"
-
-    if eval_temp_max >= EXTREME_HEAT_C:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-heat-warning-{int(now.timestamp())}",
-                alert_type="heat",
-                severity=EXTREME_HEAT.level,
-                condition="Extreme Heat Warning",
-                headline=f"Warning: Dangerous heat ({eval_temp_max:.1f}°C) detected",
-                description=f"Ambient temperatures reaching {eval_temp_max:.1f}°C surpass the critical heat threshold of {EXTREME_HEAT_C}°C. Elevated risk of heat exhaustion and heatstroke.",
-                recommended_action="Stay hydrated, remain in cool indoor environments during peak afternoon hours, and check on vulnerable individuals.",
-                relevant_parameter="temperature",
-                relevant_value=round(eval_temp_max, 1),
-                threshold_value=EXTREME_HEAT_C,
-                unit="°C",
-                time_window=temp_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-    elif eval_temp_max >= HOT_TEMP_C:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-heat-advisory-{int(now.timestamp())}",
-                alert_type="heat",
-                severity=HIGH_HEAT.level,
-                condition="High Temperature Advisory",
-                headline=f"Advisory: High temperatures ({eval_temp_max:.1f}°C)",
-                description=f"Temperatures reaching {eval_temp_max:.1f}°C meet or exceed the elevated heat threshold of {HOT_TEMP_C}°C.",
-                recommended_action="Drink plenty of fluids, wear lightweight clothing, and limit strenuous outdoor activities in direct sun.",
-                relevant_parameter="temperature",
-                relevant_value=round(eval_temp_max, 1),
-                threshold_value=HOT_TEMP_C,
-                unit="°C",
-                time_window=temp_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-
-    # -------------------------------------------------------------------------
-    # 3. TEMPERATURE / COLD ALERTS
-    # -------------------------------------------------------------------------
-    eval_temp_min = current_temp
-    if h_temp_min is not None and h_temp_min < eval_temp_min:
-        eval_temp_min = h_temp_min
-        cold_window = "Next 24 hours"
-    else:
-        cold_window = "Current"
-
-    if eval_temp_min <= COLD_TEMP_C:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-cold-advisory-{int(now.timestamp())}",
-                alert_type="cold",
-                severity=COLD.level,
-                condition="Cold Weather Advisory",
-                headline=f"Advisory: Chilly conditions ({eval_temp_min:.1f}°C)",
-                description=f"Temperatures dropping to {eval_temp_min:.1f}°C meet the cold weather advisory threshold ({COLD_TEMP_C}°C).",
-                recommended_action="Dress in warm layers, protect pets from prolonged exposure, and guard against hypothermia.",
-                relevant_parameter="temperature",
-                relevant_value=round(eval_temp_min, 1),
-                threshold_value=COLD_TEMP_C,
-                unit="°C",
-                time_window=cold_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-
-    # -------------------------------------------------------------------------
-    # 4. WIND SPEED ALERTS
-    # -------------------------------------------------------------------------
-    current_wind = current.wind_speed_10m
-    eval_wind = current_wind
-    if h_wind_max is not None and h_wind_max > eval_wind:
-        eval_wind = h_wind_max
-        wind_window = "Next 24 hours"
-    else:
-        wind_window = "Current"
-
-    if eval_wind >= STORM_WIND_KMH:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-wind-warning-{int(now.timestamp())}",
-                alert_type="wind",
-                severity=GALE.level,
-                condition="Gale / High Wind Warning",
-                headline=f"Warning: Damaging wind gusts ({eval_wind:.1f} km/h)",
-                description=f"Wind speeds reaching {eval_wind:.1f} km/h cross the severe storm wind threshold of {STORM_WIND_KMH} km/h. Risk of falling branches and structural hazards.",
-                recommended_action="Secure outdoor furniture, avoid parking under trees, and drive with extreme caution.",
-                relevant_parameter="wind_speed",
-                relevant_value=round(eval_wind, 1),
-                threshold_value=STORM_WIND_KMH,
-                unit="km/h",
-                time_window=wind_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-    elif eval_wind >= HIGH_WIND_KMH:
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-wind-watch-{int(now.timestamp())}",
-                alert_type="wind",
-                severity=STRONG_WIND.level,
-                condition="Strong Wind Watch",
-                headline=f"Watch: Strong winds ({eval_wind:.1f} km/h)",
-                description=f"Wind velocities of {eval_wind:.1f} km/h exceed the high wind threshold of {HIGH_WIND_KMH} km/h.",
-                recommended_action="Hold doors firmly, secure loose light items, and exercise caution on elevated bridges.",
-                relevant_parameter="wind_speed",
-                relevant_value=round(eval_wind, 1),
-                threshold_value=HIGH_WIND_KMH,
-                unit="km/h",
-                time_window=wind_window,
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-
-    # -------------------------------------------------------------------------
-    # 5. THUNDERSTORM / SEVERE WEATHER (WMO Code Grounded)
-    # -------------------------------------------------------------------------
-    if current.weather_code in STORM_WMO_CODES:
-        is_severe = current.weather_code in THUNDERSTORM_HAIL.codes
-        rule = THUNDERSTORM_HAIL if is_severe else THUNDERSTORM
-        severity_level: AlertSeverity = rule.level
-        alerts.append(
-            WeatherAlert(
-                id=f"alert-storm-{int(now.timestamp())}",
-                alert_type="storm",
-                severity=severity_level,
-                condition="Thunderstorm Activity Detected",
-                headline="Active Thunderstorm / Lightning Warning" if is_severe else "Thunderstorm Watch",
-                description=f"Verified WMO weather code {current.weather_code} indicates active convective thunderstorm{' and hail' if is_severe else ''} in the immediate area.",
-                recommended_action="Seek immediate sturdy indoor shelter. Avoid open fields, metal fences, and water bodies. Unplug sensitive electrical equipment.",
-                relevant_parameter="weather_code",
-                relevant_value=float(current.weather_code),
-                threshold_value=rule.value,
-                unit="WMO code",
-                time_window="Current",
-                source="open-meteo",
-                created_at=now,
-            )
-        )
-
-    return alerts
+    hits = assess(weather)
+    return [_alert(hits[h], now) for h in _ORDER if hits.get(h) is not None]

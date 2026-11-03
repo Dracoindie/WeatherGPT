@@ -1,4 +1,4 @@
-export type AlertSeverity = 'advisory' | 'watch' | 'warning';
+export type AlertSeverity = 'advisory' | 'watch' | 'warning' | 'severe';
 export type AlertCategory = 'rain' | 'heat' | 'wind' | 'cold' | 'storm';
 
 export interface WeatherAlert {

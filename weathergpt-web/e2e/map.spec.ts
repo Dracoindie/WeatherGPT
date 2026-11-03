@@ -173,3 +173,15 @@ test('the map loads only on /map', async ({ page }) => {
   )
   expect(bodies.some((b) => b.includes('maplibre') || b.includes('deck.gl'))).toBe(false)
 })
+
+test('the map ends centred on the picked place, even when the page grows mid-flight', async ({ page }) => {
+  // motion on: the fly-to animates while the alert banner and panels appear
+  await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/map"]').first().dispatchEvent('click')
+  await page.waitForURL('**/map')
+  await page.locator('canvas.maplibregl-canvas').waitFor({ timeout: 30_000 })
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-center', '18.520,73.857', { timeout: 10_000 })
+})

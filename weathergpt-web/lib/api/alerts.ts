@@ -47,7 +47,7 @@ export async function fetchAlerts(params: {
 export interface ThresholdRule {
   id: string
   hazard: 'rain' | 'heat' | 'cold' | 'wind' | 'storm'
-  level: 'advisory' | 'watch' | 'warning'
+  level: 'advisory' | 'watch' | 'warning' | 'severe'
   label: string
   parameter: string
   comparator: '>=' | '<=' | 'in'

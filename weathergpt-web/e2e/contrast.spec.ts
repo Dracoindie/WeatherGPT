@@ -45,7 +45,7 @@ function ratio(a: RGB, b: RGB) {
 /** Resolve a CSS colour (hex, rgb(), rgba()) to RGB plus alpha via the browser. */
 type Rgba = { rgb: RGB; alpha: number }
 
-const LEVELS = ['none', 'advisory', 'watch', 'warning', 'unknown'] as const
+const LEVELS = ['none', 'advisory', 'watch', 'warning', 'severe', 'unknown'] as const
 
 test('text tokens meet AA on glass over every sky phase', async ({ page, isMobile }) => {
   test.skip(isMobile, 'tokens are the same at every width')
@@ -116,9 +116,9 @@ test('no strong severity or accent colour is used as text in the source', async 
   roots.forEach(walk)
 
   const banned = [
-    /\btext-sev-(none|advisory|watch|warning|unknown)(?!-text)\b(?!-)/, // class without -text
+    /\btext-sev-(none|advisory|watch|warning|severe|unknown)(?!-text)\b(?!-)/, // class without -text
     /\btext-accent(?![-\w])/, // accent class as text
-    /\bcolor:\s*var\(--sev-(none|advisory|watch|warning|unknown)\)/, // inline CSS text colour
+    /\bcolor:\s*var\(--sev-(none|advisory|watch|warning|severe|unknown)\)/, // inline CSS text colour
     /\bcolor:\s*SEVERITY_VAR\b/, // inline React style text colour
     /style=\{\{\s*color[,\s}]/, // `color` shorthand from SEVERITY_VAR
   ]

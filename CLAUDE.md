@@ -63,12 +63,13 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `query_service.py` | Open-Meteo to `WeatherFacts`: period windows in the location's local time, `focus_facts` per parameter, English `WMO_DESCRIPTIONS` |
 | `weather/open_meteo.py` | Forecast client (current + 7-day hourly) |
 | `geocoding.py` | Nominatim search and reverse, TTL cache and rate limit. Raises `RuntimeError` when the service is down; returns `None` for an unknown place. |
-| `thresholds.py` | **The one table of hazard thresholds and levels.** Engine, chat advisories, risk board, push, CAP and `GET /api/alerts/thresholds` all read it. Never hard-code a threshold elsewhere (UI included). |
+| `thresholds.py` | **The one table of hazard thresholds and levels** (none < advisory < watch < warning < severe; rain, heat incl. heat stress, wind, storm, cold). Engine, hazard map, chat advisories, risk board, push, CAP and `GET /api/alerts/thresholds` all read it. Never hard-code a threshold elsewhere (UI included). |
+| `alerts/scoring.py` | **The one scorer**: a 24 h window -> highest firing rule per hazard. The alert engine (alerts, risk board, push, CAP) and the hazard map both call it; `tests/test_hazard.py` checks they agree. |
 | `advisory.py` | Chat advisory from `thresholds.py`, plus localised advisory text |
-| `alerts/engine.py` | Alert engine (advisory / watch / warning). `api/alerts.py` retries, serves stale data, then returns a clean 503. |
+| `alerts/engine.py` | Alert engine: the scorer on the place's forecast for the 24 h from the current hour, plus alert texts. `api/alerts.py` retries, serves stale data, then returns a clean 503. |
 | `climate/` | Open-Meteo archive: a period compared with the same dates over the previous 10 years |
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
-| `maps/` | `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `tiles.py` (fixed 5×5-point tiles per grid step, shared by all users, 15 min cache, only missing tiles fetched in ONE batched request, hours aligned across tiles), `grid.py` (up to 4 tiles = 100 points, 72 h, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
+| `maps/` | `hazard.py` (hazard per H3 cell, res 6 at the ~8 km model grid, coarser when samples are sparser; nearest-sample values; summary within a radius) and `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `tiles.py` (fixed 5×5-point tiles per grid step, shared by all users, 15 min cache, only missing tiles fetched in ONE batched request, hours aligned across tiles), `grid.py` (up to 4 tiles = 100 points, 72 h, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
 | `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML), `demo_push.py` (signed-in test push; never writes `last_severity`) |
@@ -79,7 +80,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 
 **Endpoints:**
 - `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/thresholds`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
-- `/api/map/point`, `/api/map/grid`
+- `/api/map/point`, `/api/map/grid`, `/api/map/hazard`, `/api/map/hazard/summary`
 - `/api/air-quality`, `/api/farm`, `/api/aviation`, `/api/risk`, `/api/compare`
 - `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header), `POST /api/push/test` (signed-in demo push to the caller's own subscriptions, 1/min)
 
@@ -90,6 +91,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
   - `/`: the Living Sky chat console, with a 3D sky scene driven by real codes and wind
   - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/login`, `/signup`, `/offline`
   - `/map` is `components/map3d/` (MapLibre GL + deck.gl, loaded only there). Basemap: OpenFreeMap `dark` style; terrain: AWS terrarium tiles; both keyless. MapLibre's worker is copied to `public/vendor/` by `scripts/copy-maplibre-worker.mjs` (`predev`/`prebuild`, git-ignored). Broadcast mode renders through a portal on `<body>`; the map container node is moved, never rebuilt. Map colours are the `--map-*` tokens in `globals.css` (validated one-hue ramps). Every map shows "Model grid ≈ 8 km · estimated · not official IMD". Roadmap: `docs/VISION.md`.
+  - Hazard mode (`components/map3d/hazard.tsx`, `roads.ts`): H3 hexes by level from `/api/map/hazard` (h3-js for the boundaries), hazard-type chips, a tap card with value vs threshold, a 25 km summary with "Show me the worst". Roads are coloured by the cells they cross, using the basemap's own `transportation` vectors (major classes only, a vertex budget, recomputed only on view, hour or type change); the legend says road colour is NOT traffic. No wind particles in hazard mode. Fly-tos use `flyToSteady` (a resize mid-flight would shift the end point).
 - **Shared code:**
   - `context/`: `I18nContext` (UI dictionary: EN / हि / Hinglish / मरा), `AuthContext`, `DemoContext`
   - `lib/api/`: backend clients
@@ -136,7 +138,7 @@ Every page must look like it belongs to the Living Sky home. Before adding UI, r
 2. **Background.** Inner pages use the CSS `StaticSky` (no WebGL); call `useSkyFromCurrent(current, timezone)` when the page has current weather. Only `/` runs the WebGL scene. The sky must cover the full page height (it fades into `--sky-floor`).
 3. **Tokens, not hex.**
    - Text is `text-hud` / `text-hud-dim`, and lines are `border-white/10`.
-   - **Strong colours are for fills, borders, dots, glows and map markers:** `bg-accent`, `border-accent`, `--sev-none | advisory | watch | warning | unknown` (Tailwind `bg-sev-*` / `border-sev-*`, or `SEVERITY_VAR` for inline styles).
+   - **Strong colours are for fills, borders, dots, glows and map markers:** `bg-accent`, `border-accent`, `--sev-none | advisory | watch | warning | severe | unknown` (traffic colours: green, yellow, orange, red, dark red) (Tailwind `bg-sev-*` / `border-sev-*`, or `SEVERITY_VAR` for inline styles).
    - **Text and icons in a severity or accent colour use the lighter text shades:** `text-accent-text`, `text-sev-*-text`, or `SEVERITY_TEXT_VAR`. The strong red is about 2.2:1 as text on glass over a daytime sky; the text shades stay at 4.5:1 or more over every sky phase. `--sky-accent-text` follows the severity state (cyan → amber → rose).
    - `e2e/contrast.spec.ts` computes these ratios from the live tokens and the real sky palette (`PALETTES` in `lib/weatherScene.ts`), and fails on `text-sev-<level>` without `-text`, on `text-accent`, and on inline `color: SEVERITY_VAR`. axe can't measure text over the sky gradient, so this spec is the contrast check.
    - Do not use the old light classes (`bg-panel`, `text-ink`, `teal`, `coral`): they are aliases kept only for safety.

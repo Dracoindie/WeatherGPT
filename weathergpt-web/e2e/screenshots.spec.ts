@@ -162,3 +162,25 @@ test('@screens map: point card, heat layer, broadcast', async ({ page, isMobile 
   await page.waitForTimeout(4000)
   await shot(page, info.project.name, 'map-broadcast', false)
 })
+
+test('@screens map: hazard hexes, roads, card and summary', async ({ page }, info) => {
+  await mockBackend(page)
+  await enterDemo(page)
+  await navigate(page, '/map')
+  await pickLocation(page)
+  const map = page.getByTestId('weather-map')
+  await map.locator('canvas.maplibregl-canvas').waitFor({ timeout: 30_000 })
+  // let the (animated) fly-to the place finish, so "map centre" is the place
+  await page.waitForTimeout(4000)
+  await page.getByTestId('map-layer-hazard').click()
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid=weather-map]')?.getAttribute('data-road-pieces')) > 0, null, { timeout: 30_000 })
+  await page.getByTestId('map-centre').click()
+  await page.getByTestId('map-hazard-card').waitFor({ timeout: 15_000 })
+  await page.getByTestId('map-hazard-summary').waitFor({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  await shot(page, info.project.name, 'map-hazard')
+
+  await page.getByTestId('map-broadcast').click()
+  await page.waitForTimeout(4000)
+  await shot(page, info.project.name, 'map-hazard-broadcast', false)
+})

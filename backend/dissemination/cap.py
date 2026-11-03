@@ -24,9 +24,9 @@ VALID_HOURS = 12
 AREA_RADIUS_KM = 10
 
 # WeatherGPT level -> CAP severity / urgency / response
-_SEVERITY = {"warning": "Severe", "watch": "Moderate", "advisory": "Minor"}
-_URGENCY = {"warning": "Immediate", "watch": "Expected", "advisory": "Future"}
-_RESPONSE = {"warning": "Prepare", "watch": "Monitor", "advisory": "Monitor"}
+_SEVERITY = {"severe": "Extreme", "warning": "Severe", "watch": "Moderate", "advisory": "Minor"}
+_URGENCY = {"severe": "Immediate", "warning": "Immediate", "watch": "Expected", "advisory": "Future"}
+_RESPONSE = {"severe": "Prepare", "warning": "Prepare", "watch": "Monitor", "advisory": "Monitor"}
 
 
 def _iso(dt: datetime) -> str:

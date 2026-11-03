@@ -49,8 +49,8 @@ Needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` on the backend (503 otherwise) plus
    - reads all subscriptions with the service-role key
    - fetches weather once per ~1 km cell
    - runs the alert engine
-   - sends a push only when the level changes to `warning` from anything lower
-5. **Repeats:** while the level stays `warning`, nothing more is sent. The job re-arms when the level drops.
+   - sends a push when the level becomes `warning` or `severe` from anything lower, and once more if a warning escalates to `severe`
+5. **Repeats:** while the level stays the same, nothing more is sent. The job re-arms when the level drops.
 6. **Delivery outcomes:**
    - Failed and disabled sends keep the previous level, so the next run retries.
    - Subscriptions the push service reports as gone (404/410) are deleted.
@@ -162,27 +162,39 @@ Every hazard rule is in **`backend/thresholds.py`**: hazard, level, comparator, 
 
 | Surface | How it uses the rules |
 |---------|-----------------------|
-| Alert engine (`alerts/engine.py`) | Thresholds **and** levels for `/api/alerts` |
+| The one scorer (`alerts/scoring.py`) | Applies every rule to a 24 h window: rain total, max/min temperature, max wind, max heat index, weather code. Everything below calls it. |
+| Alert engine (`alerts/engine.py`) | Thresholds **and** levels for `/api/alerts`: the 24 h from the **current hour** (not from local midnight) plus current values |
+| Hazard map (`maps/hazard.py`) | `/api/map/hazard` and `/summary`: each grid point, the 24 h from the slider hour (hour 0 also uses current values, like alerts) |
 | Dashboard and map status | `/api/alerts` (the alert banner is the only location status; the old chat-driven "Weather Intelligence" card is gone) |
 | District risk board (`roles/risk.py`) | `evaluate_alerts` |
 | Web Push job (`dissemination/job.py`) | `evaluate_alerts` |
 | CAP export | Each alert's `threshold_value` |
-| Chat advisories (`advisory.py`) | Same values. Severity comes from the rule level through `ADVISORY_SEVERITY`: warning is high; watch and advisory are moderate. |
+| Chat advisories (`advisory.py`) | Same values. Severity comes from the rule level through `ADVISORY_SEVERITY`: severe and warning are high; watch and advisory are moderate. |
 | `/alerts` threshold table | `GET /api/alerts/thresholds` (never hard-coded in the UI) |
 
-| Rule | Level | Threshold | Window |
-|------|-------|-----------|--------|
-| Heavy rain | watch | ≥ 15 mm | 24 h total |
-| Extreme rain | warning | ≥ 50 mm | 24 h total |
-| High heat | advisory | ≥ 35 °C | 24 h maximum |
-| Extreme heat | warning | ≥ 40 °C | 24 h maximum |
-| Cold | advisory | ≤ 5 °C | 24 h minimum |
-| Strong wind | watch | ≥ 40 km/h | 24 h maximum |
-| Gale | warning | ≥ 65 km/h | 24 h maximum |
-| Thunderstorm | watch | WMO 95 | current |
-| Thunderstorm with hail | warning | WMO 96, 99 | current |
+Levels: none < advisory < watch < warning < severe. They are shown as green, yellow, orange, red and dark red (the `--sev-*` tokens) on every surface.
 
-These are WeatherGPT's conservative fallbacks, not IMD criteria.
+| Rule | Level | Threshold | Window | Source of the number |
+|------|-------|-----------|--------|----------------------|
+| Heavy rain | watch | ≥ 15 mm | 24 h total | WeatherGPT fallback |
+| Extreme rain | warning | ≥ 50 mm | 24 h total | WeatherGPT fallback |
+| Very heavy rain | severe | ≥ 115.6 mm | 24 h total | IMD "very heavy rainfall" lower bound |
+| High heat | advisory | ≥ 35 °C | 24 h maximum | WeatherGPT fallback |
+| Extreme heat | warning | ≥ 40 °C | 24 h maximum | WeatherGPT fallback |
+| Severe heat | severe | ≥ 47 °C | 24 h maximum | IMD severe heat wave (actual maximum ≥ 47 °C) |
+| Heat stress | watch | heat index ≥ 39.4 °C | 24 h maximum heat index | NWS "Danger" band |
+| Extreme heat stress | warning | heat index ≥ 51.7 °C | 24 h maximum heat index | NWS "Extreme danger" band |
+| Cold | advisory | ≤ 5 °C | 24 h minimum | WeatherGPT fallback |
+| Strong wind | watch | ≥ 40 km/h | 24 h maximum | WeatherGPT fallback |
+| Gale | warning | ≥ 65 km/h | 24 h maximum | WeatherGPT fallback |
+| Storm-force wind | severe | ≥ 89 km/h | 24 h maximum | Beaufort force 10 |
+| Thunderstorm | watch | WMO 95 | current | WMO code table |
+| Thunderstorm with hail | warning | WMO 96 | current | WMO code table |
+| Thunderstorm with heavy hail | severe | WMO 99 | current | WMO code table |
+
+These are WeatherGPT's rules. Where a number is borrowed from a published category it says so above. That does not make them IMD warnings.
+
+**Agreement.** `tests/test_hazard.py` runs 17 scenarios through the same mocked Open-Meteo data, covering every level and hazard. `/api/alerts`, the risk board, the push job's level, the hazard summary and the hazard map's hex for the place must give identical levels for every hazard.
 
 **Alerts vs chat advisories:**
 - An alert covers the location's current conditions plus the next 24 h.

@@ -56,7 +56,7 @@ const DEFAULT_DISTRICTS: Wanted[] = [
 
 type Failure = 'notFound' | 'geoDown'
 
-const RANK: Record<RiskLevel, number> = { warning: 3, watch: 2, advisory: 1, none: 0, unknown: -1 }
+const RANK: Record<RiskLevel, number> = { severe: 4, warning: 3, watch: 2, advisory: 1, none: 0, unknown: -1 }
 
 /** Same order as backend roles/risk.py sort_board: severity, rain, wind, name. */
 function sortRows(rows: DistrictRisk[]): DistrictRisk[] {
@@ -280,7 +280,7 @@ export default function DisasterPage() {
 
       {rows.length > 0 && (
         <p className="mb-4 flex flex-wrap gap-2" aria-label={t('risk.counts')}>
-          {(['warning', 'watch', 'advisory', 'none', 'unknown'] as RiskLevel[])
+          {(['severe', 'warning', 'watch', 'advisory', 'none', 'unknown'] as RiskLevel[])
             .filter((l) => counts[l])
             .map((l) => (
               <SeverityBadge key={l} level={l} label={`${t(`severity.${l}` as TranslationKey)} · ${counts[l]}`} className="px-2.5 py-1 text-[11px]" />

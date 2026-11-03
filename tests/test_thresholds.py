@@ -35,13 +35,22 @@ def _alert_for(alerts, hazard):
     [
         (T.HEAVY_RAIN, make_weather(rain=lambda i, t: 20.0 / 24)),  # 20 mm in 24 h
         (T.EXTREME_RAIN, make_weather(rain=lambda i, t: 3.0)),
-        (T.HIGH_HEAT, make_weather(temp=lambda i, t: 36.0)),
+        # dry air, so heat stress (heat index 34 °C) stays below Danger
+        (T.HIGH_HEAT, make_weather(temp=lambda i, t: 36.0, rh=lambda i, t: 20.0)),
         (T.EXTREME_HEAT, make_weather(temp=lambda i, t: 41.0)),
         (T.COLD, make_weather(temp=lambda i, t: 4.0)),
         (T.STRONG_WIND, make_weather(wind=lambda i, t: 45.0)),
         (T.GALE, make_weather(wind=lambda i, t: 70.0)),
         (T.THUNDERSTORM, make_weather(code=lambda i, t: 95)),
-        (T.THUNDERSTORM_HAIL, make_weather(code=lambda i, t: 99)),
+        (T.THUNDERSTORM_HAIL, make_weather(code=lambda i, t: 96)),
+        (T.THUNDERSTORM_HEAVY_HAIL, make_weather(code=lambda i, t: 99)),
+        (T.VERY_HEAVY_RAIN, make_weather(rain=lambda i, t: 5.0)),  # 120 mm in 24 h
+        (T.SEVERE_HEAT, make_weather(temp=lambda i, t: 47.5, rh=lambda i, t: 5.0)),
+        (T.STORM_FORCE_WIND, make_weather(wind=lambda i, t: 90.0)),
+        # 36 °C at 60 % RH: heat index ≈ 45 °C (Danger) -> heat stress watch outranks the 35 °C advisory
+        (T.HEAT_STRESS, make_weather(temp=lambda i, t: 36.0, rh=lambda i, t: 60.0)),
+        # 37 °C at 80 % RH: heat index ≈ 66 °C (Extreme danger) -> warning without extreme heat (< 40 °C)
+        (T.EXTREME_HEAT_STRESS, make_weather(temp=lambda i, t: 37.0, rh=lambda i, t: 80.0)),
     ],
 )
 def test_engine_levels_and_thresholds_come_from_the_table(rule, weather):
@@ -92,7 +101,8 @@ def test_just_below_threshold_fires_nothing_anywhere(rule):
     below = rule.value - 0.1
     field = {"precipitation": "rain", "temperature": "temp", "wind_speed": "wind"}[rule.parameter]
     per_hour = below / 24 if field == "rain" else below
-    weather = make_weather(**{field: (lambda i, t, v=per_hour: v)})
+    # dry air, so the heat-stress rules stay out of the heat case
+    weather = make_weather(rh=lambda i, t: 20.0, **{field: (lambda i, t, v=per_hour: v)})
     assert _alert_for(evaluate_alerts(weather), rule.hazard) == []
 
 

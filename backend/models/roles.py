@@ -113,7 +113,7 @@ class RiskRequest(BaseModel):
     districts: list[DistrictIn] = Field(..., min_length=1, max_length=40)
 
 
-RiskLevel = Literal["warning", "watch", "advisory", "none", "unknown"]
+RiskLevel = Literal["severe", "warning", "watch", "advisory", "none", "unknown"]
 
 
 class DistrictRisk(BaseModel):

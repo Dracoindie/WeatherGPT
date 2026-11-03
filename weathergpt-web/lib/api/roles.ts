@@ -69,7 +69,7 @@ export interface District {
   longitude: number
 }
 
-export type RiskLevel = 'warning' | 'watch' | 'advisory' | 'none' | 'unknown'
+export type RiskLevel = 'severe' | 'warning' | 'watch' | 'advisory' | 'none' | 'unknown'
 
 export interface DistrictRisk extends District {
   severity: RiskLevel

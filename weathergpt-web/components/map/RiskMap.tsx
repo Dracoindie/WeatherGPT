@@ -9,15 +9,12 @@ import 'leaflet/dist/leaflet.css'
 import { useEffect } from 'react'
 import L from 'leaflet'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
-import type { DistrictRisk, RiskLevel } from '@/lib/api/roles'
+import type { DistrictRisk } from '@/lib/api/roles'
 
-/** Same values as the --sev-* tokens in globals.css (Leaflet paths need literal colours). */
-export const SEVERITY_COLOR: Record<RiskLevel, string> = {
-  warning: '#f43f5e',
-  watch: '#fbbf24',
-  advisory: '#38bdf8',
-  none: '#34d399',
-  unknown: '#94a3b8',
+/** The --sev-* tokens from globals.css, read at render time (Leaflet paths need literal colours). */
+function cssVar(name: string): string {
+  if (typeof document === 'undefined') return 'gray'
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || 'gray'
 }
 
 /** Fit the map to the points when the set of points changes, and again when the
@@ -54,8 +51,14 @@ export default function RiskMap({ districts }: { districts: DistrictRisk[] }) {
           <CircleMarker
             key={d.name}
             center={[d.latitude, d.longitude]}
-            radius={d.severity === 'warning' ? 13 : d.severity === 'watch' ? 11 : 9}
-            pathOptions={{ color: '#020617', weight: 2, fillColor: SEVERITY_COLOR[d.severity], fillOpacity: 0.85 }}
+            radius={d.severity === 'severe' ? 15 : d.severity === 'warning' ? 13 : d.severity === 'watch' ? 11 : 9}
+            pathOptions={{
+              // severe is dark on the dark map: a light ring keeps it visible
+              color: d.severity === 'severe' ? cssVar('--sev-severe-text') : 'black',
+              weight: 2,
+              fillColor: cssVar(`--sev-${d.severity}`),
+              fillOpacity: 0.85,
+            }}
           >
             <Tooltip>
               <strong>{d.name}</strong> · {d.severity}

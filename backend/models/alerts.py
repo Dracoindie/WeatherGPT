@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
-AlertSeverity = Literal["advisory", "watch", "warning"]
+AlertSeverity = Literal["advisory", "watch", "warning", "severe"]
 AlertCategory = Literal["rain", "heat", "wind", "cold", "storm"]
 
 class WeatherAlert(BaseModel):
@@ -14,7 +14,7 @@ class WeatherAlert(BaseModel):
 
     id: str = Field(..., description="Unique alert identifier")
     alert_type: AlertCategory = Field(..., description="Category of the alert")
-    severity: AlertSeverity = Field(..., description="Severity level: advisory, watch, or warning")
+    severity: AlertSeverity = Field(..., description="Severity level: advisory, watch, warning or severe (backend/thresholds.py)")
     condition: str = Field(..., description="Human-readable condition title, e.g. 'Extreme Rain / Flood Risk'")
     headline: str = Field(..., description="Brief headline summary")
     description: str = Field(..., description="Detailed explanation of the meteorological condition")

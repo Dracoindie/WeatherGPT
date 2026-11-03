@@ -24,7 +24,7 @@ import { BitmapLayer, ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useReducedMotion } from 'framer-motion'
 import { Crosshair, Pause, Play, Tv, X } from 'lucide-react'
-import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type StyleSpecification } from 'maplibre-gl'
+import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type FlyToOptions, type StyleSpecification } from 'maplibre-gl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SkyButton } from '@/components/ui/SkyButton'
@@ -36,6 +36,18 @@ import { cn } from '@/lib/utils'
 import { fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
 import { MapLegend } from './MapLegend'
 import { MapPointCard, type PointState } from './MapPointCard'
+import {
+  HazardCard,
+  HazardLegend,
+  hazardColors,
+  hazardLayers,
+  HazardSummaryPanel,
+  HazardTypeChips,
+  useHazard,
+  useHexPolygons,
+  type HazardType,
+  type HexPick,
+} from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
 
 /** OpenFreeMap: free vector tiles, no key. */
@@ -64,6 +76,9 @@ interface Props {
 }
 
 type GridStatus = 'idle' | 'loading' | 'ready' | 'error' | 'too-large'
+/** A weather surface, or the hazard hexes and roads. */
+type MapMode = LayerId | 'hazard'
+const MODES: MapMode[] = [...LAYERS, 'hazard']
 
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
 
@@ -95,7 +110,12 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   const [grid, setGrid] = useState<MapGrid | null>(null)
   const [gridStatus, setGridStatus] = useState<GridStatus>('idle')
-  const [layer, setLayer] = useState<LayerId>('temperature')
+  const [layer, setLayer] = useState<MapMode>('temperature')
+  const surface: LayerId | null = layer === 'hazard' ? null : layer
+  const [hazardType, setHazardType] = useState<HazardType>('overall')
+  const [hexPick, setHexPick] = useState<HexPick | null>(null)
+  const [mapObj, setMapObj] = useState<MapLibreMap | null>(null)
+  const [viewCentre, setViewCentre] = useState<{ latitude: number; longitude: number } | null>(null)
   const [hour, setHour] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [broadcast, setBroadcast] = useState(false)
@@ -105,8 +125,26 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [mobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
 
   const broadcast3d = broadcast && motion
-  const particlesOn = motion && (broadcast || layer === 'wind')
+  // no particles over the hazard hexes and roads: they would hide the levels
+  const particlesOn = motion && layer !== 'hazard' && (broadcast || layer === 'wind')
   const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
+
+  // -------------------------------------------------------------- hazard ---
+  const hazardOn = layer === 'hazard'
+  const maxGridHour = grid ? grid.times.length - 1 : 0
+  const hz = useHazard({
+    map: mapObj,
+    active: hazardOn,
+    hour: Math.min(hour, 48),
+    type: hazardType,
+    centre: place ?? viewCentre,
+    mapReady,
+  })
+  const hazard = hazardOn ? hz.hazard : null
+  const hexes = useHexPolygons(hazard)
+  const maxHour = hazardOn && hazard ? hazard.max_hour : maxGridHour
+  const hourShown = Math.min(hour, maxHour)
+  const pickedHex = hazard && hexPick && hexPick.point < hazard.points.length ? hexPick : null
 
   // ---------------------------------------------------------------- grid ---
   const gridAbort = useRef<AbortController | null>(null)
@@ -160,6 +198,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       })
   }, [])
 
+  // A tap: in hazard mode the hex under it, otherwise the point weather.
+  const clickRef = useRef<(x: number, y: number, lat: number, lon: number) => void>(() => {})
   // ------------------------------------------------------------ map init ---
   const initialPlace = useRef(place)
   useEffect(() => {
@@ -192,11 +232,16 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     map.on('style.load', () => tintBasemap(map))
     map.on('load', () => {
       setMapReady(true)
+      setMapObj(map)
       loadGrid()
     })
     map.on('moveend', loadGrid)
+    map.on('moveend', () => {
+      const c = map.getCenter()
+      setViewCentre({ latitude: c.lat, longitude: c.lng })
+    })
     map.on('pitchend', () => setPitch(Math.round(map.getPitch())))
-    map.on('click', (e) => showPoint(e.lngLat.lat, e.lngLat.lng))
+    map.on('click', (e) => clickRef.current(e.point.x, e.point.y, e.lngLat.lat, e.lngLat.lng))
     map.on('error', (e) => console.warn('[map]', e.error?.message ?? e))
 
     return () => {
@@ -233,7 +278,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   useEffect(() => {
     const map = mapRef.current
     if (!map || !place) return
-    map.flyTo({ center: [place.longitude, place.latitude], zoom: Math.max(map.getZoom(), 8), animate: motion })
+    return flyToSteady(map, { center: [place.longitude, place.latitude], zoom: Math.max(map.getZoom(), 8), animate: motion })
   }, [place, motion])
 
   // ------------------------------------------------------ broadcast mode ---
@@ -274,9 +319,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   // ----------------------------------------------------------- time play ---
   useEffect(() => {
     if (!playing || !grid) return
-    const id = window.setInterval(() => setHour((h) => (h + 1) % grid.times.length), 900)
+    const id = window.setInterval(() => setHour((h) => (Math.min(h, maxHour) + 1) % (maxHour + 1)), 900)
     return () => window.clearInterval(id)
-  }, [playing, grid])
+  }, [playing, grid, maxHour])
 
   // -------------------------------------------------------------- layers ---
   const colors = useMemo(
@@ -286,11 +331,11 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   const staticLayers = useMemo<Layer[]>(() => {
     const out: Layer[] = []
-    if (grid && gridStatus !== 'too-large') {
-      const ramp = rampFor(layer)
+    if (grid && gridStatus !== 'too-large' && surface) {
+      const ramp = rampFor(surface)
       const w = Math.min(192, grid.cols * 16)
       const h = Math.min(192, grid.rows * 16)
-      const px = fieldPixels(grid, layer, hour, ramp, w, h, broadcast ? 150 : 115)
+      const px = fieldPixels(grid, surface, hour, ramp, w, h, broadcast ? 150 : 115)
       const north = grid.south + (grid.rows - 1) * grid.step_deg
       const east = grid.west + (grid.cols - 1) * grid.step_deg
       out.push(
@@ -373,6 +418,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       }
     }
 
+    if (hazard) {
+      out.push(...hazardLayers({ hazard, hexes, roads: hz.roads, type: hazardType, colors: hazardColors(), big: broadcast }))
+    }
+
     if (place) {
       out.push(
         new ScatterplotLayer({
@@ -390,7 +439,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       )
     }
     return out
-  }, [grid, gridStatus, layer, hour, broadcast, broadcast3d, motion, place, colors])
+  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType])
 
   // Particles live outside React state: the frame loop advances them and
   // pushes layers to deck directly.
@@ -508,13 +557,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   // ------------------------------------------------------------------ UI ---
   const timeLabel = useMemo(() => {
-    const iso = grid?.times[hour]
+    const iso = grid?.times[hourShown]
     if (!iso) return ''
     const z = zonedClock(iso, 0, tz)
     return z ? formatLocalTime(z.full.replace(' ', 'T'), language) : ''
-  }, [grid, hour, tz, language])
+  }, [grid, hourShown, tz, language])
 
-  const resolution = grid
+  const resolution = hazard
+    ? fill(t('map.hazard.resolution'), { km: hazard.model_grid_km, hex: hazard.hex_km, res: hazard.h3_resolution })
+    : grid
     ? fill(t('map.resolution'), { km: grid.model_grid_km, spacing: grid.spacing_km })
     : point?.status === 'ready'
       ? fill(t('map.resolutionShort'), { km: point.data.model_grid_km })
@@ -526,20 +577,54 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     setPlaying(next && motion)
   }
 
+  const handleTap = useCallback(
+    (x: number, y: number, lat: number, lon: number) => {
+      if (hazardOn && overlayRef.current) {
+        const info = overlayRef.current.pickObject({ x, y, radius: 2, layerIds: ['hazard-hex'] })
+        const d = info?.object as { cell: string; point: number } | undefined
+        if (d) {
+          setHexPick({ cell: d.cell, point: d.point })
+          setPoint(null)
+          return
+        }
+      }
+      setHexPick(null)
+      showPoint(lat, lon)
+    },
+    [hazardOn, showPoint]
+  )
+  useEffect(() => {
+    clickRef.current = handleTap
+  }, [handleTap])
+
   const centre = () => {
-    const c = mapRef.current?.getCenter()
-    if (c) showPoint(c.lat, c.lng)
+    const map = mapRef.current
+    const c = map?.getCenter()
+    if (!map || !c) return
+    const px = map.project(c)
+    handleTap(px.x, px.y, c.lat, c.lng)
+  }
+
+  const showWorst = (lat: number, lon: number, h: number) => {
+    setPlaying(false)
+    setHour(h)
+    setHexPick(null)
+    const map = mapRef.current
+    if (map) flyToSteady(map, { center: [lon, lat], zoom: Math.max(map.getZoom(), 9), animate: motion })
   }
 
   const layerButtons = (
     <div role="group" aria-label={t('map.layer.label')} className="flex flex-wrap gap-1.5">
-      {LAYERS.map((id) => (
+      {MODES.map((id) => (
         <button
           key={id}
           type="button"
           data-testid={`map-layer-${id}`}
           aria-pressed={layer === id}
-          onClick={() => setLayer(id)}
+          onClick={() => {
+            setLayer(id)
+            setHexPick(null)
+          }}
           className={cn(
             'rounded-full border px-3 py-1.5 text-xs transition-colors',
             layer === id ? 'border-accent bg-accent/15 text-hud' : 'border-white/10 bg-white/[0.04] text-hud-dim hover:text-hud'
@@ -573,8 +658,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           id="map-hour"
           type="range"
           min={0}
-          max={grid.times.length - 1}
-          value={hour}
+          max={maxHour}
+          value={hourShown}
           onChange={(e) => {
             setPlaying(false)
             setHour(Number(e.target.value))
@@ -587,8 +672,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     </div>
   )
 
-  const status =
-    gridStatus === 'loading' && !grid
+  const status = hazardOn
+    ? hz.status === 'loading' && !hz.hazard
+      ? t('map.hazard.loading')
+      : hz.status === 'error'
+        ? t('map.hazard.error')
+        : hz.status === 'too-large'
+          ? t('map.zoomIn')
+          : null
+    : gridStatus === 'loading' && !grid
       ? t('map.loading')
       : gridStatus === 'error'
         ? t('map.gridError')
@@ -597,6 +689,18 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           : null
 
   const placeShort = place?.name.split(',')[0]
+
+  const legend = (big: boolean) =>
+    hazardOn ? (
+      hazard ? <HazardLegend hazard={hazard} roadsShown={hz.roads.length > 0} tz={tz} big={big} /> : null
+    ) : grid && surface ? (
+      <MapLegend grid={grid} layer={surface} big={big} />
+    ) : null
+
+  const hazardCard = (className?: string) =>
+    hazard && pickedHex ? (
+      <HazardCard hazard={hazard} pick={pickedHex} type={hazardType} tz={tz} onClose={() => setHexPick(null)} className={className} />
+    ) : null
 
   if (mapError) {
     return (
@@ -617,16 +721,16 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         >
           <div ref={setSlot} className="absolute inset-0 z-0" />
           <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
-            <div className="sky-glass map-overlay pointer-events-auto px-3 py-2">{layerButtons}</div>
+            <div className="sky-glass map-overlay pointer-events-auto space-y-2 px-3 py-2">
+              {layerButtons}
+              {hazardOn && <HazardTypeChips type={hazardType} onChange={setHazardType} />}
+            </div>
             <SkyButton variant="primary" onClick={toggleBroadcast} data-testid="map-broadcast-exit" className="pointer-events-auto">
               <X className="h-4 w-4" aria-hidden /> {t('map.broadcast.exit')}
             </SkyButton>
           </div>
-          {grid && (
-            <div className="sky-glass map-overlay absolute right-3 top-20 hidden w-72 p-4 sm:block">
-              <MapLegend grid={grid} layer={layer} big />
-            </div>
-          )}
+          {legend(true) && <div className="sky-glass map-overlay absolute right-3 top-20 hidden w-72 p-4 sm:block">{legend(true)}</div>}
+          {!mobile && hazardCard('absolute left-3 top-20 max-h-[45%] w-72 overflow-y-auto')}
           {point && !mobile && (
             <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute left-3 top-20 max-h-[45%] w-72 overflow-y-auto" />
           )}
@@ -642,11 +746,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
                   {t(`map.layer.${layer}` as TranslationKey)}
                 </p>
               </div>
-              {grid && (
-                <div className="border-t border-white/10 px-4 py-2 sm:hidden">
-                  <MapLegend grid={grid} layer={layer} />
-                </div>
-              )}
+              {legend(false) && <div className="border-t border-white/10 px-4 py-2 sm:hidden">{legend(false)}</div>}
               <div className="border-t border-white/10 px-4 py-2">{slider}</div>
               <p className="border-t border-white/10 px-4 py-1.5 text-[11px] text-hud-dim" data-testid="map-resolution">
                 {resolution}
@@ -666,6 +766,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
       data-layer={layer}
       data-pitch={pitch}
+      data-hazard-type={hazardOn ? hazardType : undefined}
+      data-hazard-cells={hazard ? hazard.cells.length : 0}
+      data-road-pieces={hz.roads.length}
+      data-center={viewCentre ? `${viewCentre.latitude.toFixed(3)},${viewCentre.longitude.toFixed(3)}` : undefined}
       className="flex h-full flex-col gap-3"
     >
       {broadcastView}
@@ -680,6 +784,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           </SkyButton>
         </div>
       </div>
+
+      {hazardOn && <HazardTypeChips type={hazardType} onChange={setHazardType} />}
 
       <div className="relative min-h-[380px] flex-1 overflow-hidden rounded-xl sm:min-h-[460px] lg:min-h-[580px]">
         {!broadcast && <div ref={setSlot} className="absolute inset-0 z-0" />}
@@ -708,21 +814,22 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         {point && !mobile && !broadcast && (
           <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto" />
         )}
+        {!mobile && !broadcast && hazardCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto')}
       </div>
 
       {point && mobile && !broadcast && <MapPointCard point={point} onClose={() => setPoint(null)} />}
+      {mobile && !broadcast && hazardCard()}
 
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
         <div className="min-w-0 space-y-2">
           {!broadcast && slider}
           <p className="text-xs text-hud-dim">{t('map.tapHint')}</p>
         </div>
-        {grid && !broadcast && (
-          <div className="min-w-0">
-            <MapLegend grid={grid} layer={layer} />
-          </div>
-        )}
+        {!broadcast && legend(false) && <div className="min-w-0">{legend(false)}</div>}
       </div>
+      {hazardOn && hz.summary && !broadcast && (
+        <HazardSummaryPanel summary={hz.summary} placeName={placeShort ?? null} tz={tz} onShowWorst={showWorst} />
+      )}
       {resolution && !broadcast && (
         <p className="text-[11px] text-hud-dim" data-testid="map-resolution">
           {resolution}
@@ -730,6 +837,43 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       )}
     </div>
   )
+}
+
+/**
+ * flyTo that still ends on its target when the container resizes during the
+ * flight (the page grows when a place is picked). MapLibre eases in pixels, so
+ * a mid-flight resize shifts the end point. When the flight ends off target,
+ * ease the rest of the way (at most twice). Stops as soon as the user moves
+ * the map or the camera is on target, so it never fights a later tilt or pan.
+ * Returns a cleanup function.
+ */
+function flyToSteady(map: MapLibreMap, opts: FlyToOptions): () => void {
+  const [lng, lat] = opts.center as [number, number]
+  let tries = 0
+  const off = () => {
+    map.off('moveend', check)
+    map.off('movestart', userMove)
+  }
+  const userMove = (e: { originalEvent?: unknown }) => {
+    if (e.originalEvent) off()
+  }
+  function check() {
+    if (map.isMoving()) return
+    const c = map.getCenter()
+    if ((Math.abs(c.lng - lng) < 1e-4 && Math.abs(c.lat - lat) < 1e-4) || ++tries > 2) {
+      off()
+      return
+    }
+    map.easeTo({ center: [lng, lat], zoom: opts.zoom, duration: opts.animate === false ? 0 : 400 })
+  }
+  map.on('moveend', check)
+  map.on('movestart', userMove)
+  map.flyTo(opts)
+  const id = window.setTimeout(off, 10_000)
+  return () => {
+    window.clearTimeout(id)
+    off()
+  }
 }
 
 /** Living Sky tint on the OpenFreeMap dark style: navy land, deep-blue water. */

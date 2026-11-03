@@ -23,7 +23,7 @@ interface AlertBannerProps {
   onRetry?: () => void
 }
 
-const RANK = { advisory: 1, watch: 2, warning: 3 } as const
+const RANK = { advisory: 1, watch: 2, warning: 3, severe: 4 } as const
 
 function timeOf(iso: string) {
   const d = new Date(iso)

@@ -24,6 +24,18 @@
     "codes": []
   },
   {
+    "id": "very_heavy_rain",
+    "hazard": "rain",
+    "level": "severe",
+    "label": "Very heavy rain",
+    "parameter": "precipitation",
+    "comparator": ">=",
+    "value": 115.6,
+    "unit": "mm",
+    "window": "24 h total",
+    "codes": []
+  },
+  {
     "id": "high_heat",
     "hazard": "heat",
     "level": "advisory",
@@ -45,6 +57,42 @@
     "value": 40.0,
     "unit": "°C",
     "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "severe_heat",
+    "hazard": "heat",
+    "level": "severe",
+    "label": "Severe heat",
+    "parameter": "temperature",
+    "comparator": ">=",
+    "value": 47.0,
+    "unit": "°C",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
+    "id": "heat_stress",
+    "hazard": "heat",
+    "level": "watch",
+    "label": "Heat stress",
+    "parameter": "heat_index",
+    "comparator": ">=",
+    "value": 39.4,
+    "unit": "°C",
+    "window": "24 h maximum heat index",
+    "codes": []
+  },
+  {
+    "id": "extreme_heat_stress",
+    "hazard": "heat",
+    "level": "warning",
+    "label": "Extreme heat stress",
+    "parameter": "heat_index",
+    "comparator": ">=",
+    "value": 51.7,
+    "unit": "°C",
+    "window": "24 h maximum heat index",
     "codes": []
   },
   {
@@ -84,6 +132,18 @@
     "codes": []
   },
   {
+    "id": "storm_force_wind",
+    "hazard": "wind",
+    "level": "severe",
+    "label": "Storm-force wind",
+    "parameter": "wind_speed",
+    "comparator": ">=",
+    "value": 89.0,
+    "unit": "km/h",
+    "window": "24 h maximum",
+    "codes": []
+  },
+  {
     "id": "thunderstorm",
     "hazard": "storm",
     "level": "watch",
@@ -108,7 +168,20 @@
     "unit": "WMO code",
     "window": "current",
     "codes": [
-      96,
+      96
+    ]
+  },
+  {
+    "id": "thunderstorm_heavy_hail",
+    "hazard": "storm",
+    "level": "severe",
+    "label": "Thunderstorm with heavy hail",
+    "parameter": "weather_code",
+    "comparator": "in",
+    "value": 99.0,
+    "unit": "WMO code",
+    "window": "current",
+    "codes": [
       99
     ]
   }

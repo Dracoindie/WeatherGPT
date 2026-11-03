@@ -403,6 +403,14 @@ Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or der
 - Optional `OPEN_METEO_API_KEY` switches all Open-Meteo calls to the commercial endpoints. Without it the free tier is used, which is non-commercial only (`docs/OPEN_METEO.md`).
 - The response carries `spacing_km`, `model_grid_km` (≈ 8 km: Open-Meteo's cell spacing over India, measured from its snapped coordinates), the `heat_index_bands` from `thresholds.py`, and a note that values are estimated and not official IMD data.
 
+`GET /api/map/hazard?south=&west=&north=&east=&hour=0` returns the hazard per **H3 cell** for the 24 h from `hour` (0–48; hour 0 includes the model's current values, like `/api/alerts`):
+- **Resolution:** res 6 hexagons (6.5 km across) when the samples are ~8 km apart, the closest size to the ~8 km model cell that is not coarser. When zoomed out it is the finest resolution at least 0.7 × the sample spacing.
+- **Values:** each cell takes its nearest sample point's values, with no interpolation.
+- **Response:** `points` (per sample: `levels` per hazard, `overall`, the window's `facts`, and `triggers`: rule, value vs threshold, unit, window), `cells` (`[h3, point index]`), `counts` per level, the `worst` cell, and the rules table.
+- **Same scorer as alerts:** scored by `alerts/scoring.py`, the scorer the alert engine, risk board, push and CAP use.
+
+`GET /api/map/hazard/summary?latitude=&longitude=&radius_km=25&hour=0` returns the cells per level within the radius, the most rain (24 h), the worst cell now, and the first window (hours from now) at the worst level in the next 72 h.
+
 **Heat index.** The NWS method (Rothfusz regression with the low/high humidity adjustments) in `backend/maps/heat_index.py`. The bands are the NWS categories (Caution 26.7 °C, Extreme caution 32.2 °C, Danger 39.4 °C, Extreme danger 51.7 °C) in `thresholds.py`. It is guidance for outdoor workers, assumes shade, and is not an official product.
 
 **LLM provider setup** (optional)

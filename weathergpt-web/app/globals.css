@@ -18,19 +18,26 @@
   --sky-line: rgba(160, 200, 255, 0.12);
   --sky-surface: rgba(8, 14, 26, 0.72);
 
-  /* Severity: the same five colours on every surface (badges, banners, map dots) */
-  --sev-none: #34d399;
-  --sev-advisory: #38bdf8;
-  --sev-watch: #fbbf24;
-  --sev-warning: #f43f5e;
+  /* Severity: the same traffic colours on every surface (badges, banners, map
+     dots, hazard hexes, hazard roads): none green, advisory yellow, watch
+     orange, warning red, severe dark red. Adjacent levels pass the dataviz
+     validator's normal-vision (>= 16) and colour-blind (>= 12) separation on
+     the dark map surface. Severe is below 3:1 on that surface, so it always
+     carries a light outline (--sev-severe-text) or its word. */
+  --sev-none: #22c55e;
+  --sev-advisory: #fde047;
+  --sev-watch: #fb923c;
+  --sev-warning: #ef4444;
+  --sev-severe: #991b1b;
   --sev-unknown: #94a3b8;
   /* Severity as TEXT (labels, badge text, icons, messages). The strong colours
      above are for fills, borders, dots and map markers only; as text they fall
      to ~2.2:1 on glass over a daytime sky. These stay ≥4.5:1 (e2e/a11y.spec.ts). */
-  --sev-none-text: #a7f3d0;
-  --sev-advisory-text: #bae6fd;
-  --sev-watch-text: #fde68a;
-  --sev-warning-text: #fecdd3;
+  --sev-none-text: #bbf7d0;
+  --sev-advisory-text: #fef9c3;
+  --sev-watch-text: #fed7aa;
+  --sev-warning-text: #fecaca;
+  --sev-severe-text: #fee2e2;
   --sev-unknown-text: #e2e8f0;
 
   /* /map (components/map3d): the basemap tint, the gold pin, and one-hue
@@ -89,11 +96,13 @@
   --color-sev-advisory: var(--sev-advisory);
   --color-sev-watch: var(--sev-watch);
   --color-sev-warning: var(--sev-warning);
+  --color-sev-severe: var(--sev-severe);
   --color-sev-unknown: var(--sev-unknown);
   --color-sev-none-text: var(--sev-none-text);
   --color-sev-advisory-text: var(--sev-advisory-text);
   --color-sev-watch-text: var(--sev-watch-text);
   --color-sev-warning-text: var(--sev-warning-text);
+  --color-sev-severe-text: var(--sev-severe-text);
   --color-sev-unknown-text: var(--sev-unknown-text);
 }
 
