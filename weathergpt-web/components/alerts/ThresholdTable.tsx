@@ -13,8 +13,17 @@ import { useI18n, type TranslationKey } from '@/context/I18nContext'
 import { SeverityBadge } from '@/components/ui/SeverityBadge'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 
-function rangeText(r: ThresholdRule): string {
-  if (r.comparator === 'in') return `WMO ${r.codes.join(', ')}`
+/** Plain words for code-list rules; the WMO codes stay in the tooltip. */
+const CODE_RULE_TEXT: Partial<Record<string, TranslationKey>> = {
+  thunderstorm: 'thresholds.anyThunderstorm',
+  thunderstorm_hail: 'thresholds.withHail',
+}
+
+function rangeText(r: ThresholdRule, t: (k: TranslationKey) => string): string {
+  if (r.comparator === 'in') {
+    const key = CODE_RULE_TEXT[r.id]
+    return key ? t(key) : `WMO ${r.codes.join(', ')}`
+  }
   return `${r.comparator === '>=' ? '≥' : '≤'} ${r.value} ${r.unit}`
 }
 
@@ -44,8 +53,12 @@ export function ThresholdTable() {
                   {t(`threshold.${r.id}` as TranslationKey) || r.label}
                   <span className="block text-[11px] text-hud-dim">{r.window}</span>
                 </th>
-                <td className="py-2 pr-2 text-right font-readout text-hud whitespace-nowrap" data-testid={`threshold-${r.id}`}>
-                  {rangeText(r)}
+                <td
+                  className={`py-2 pr-2 text-right text-hud ${r.comparator === 'in' ? '' : 'font-readout whitespace-nowrap'}`}
+                  data-testid={`threshold-${r.id}`}
+                  title={r.comparator === 'in' ? `WMO ${r.codes.join(', ')}` : undefined}
+                >
+                  {rangeText(r, t)}
                 </td>
                 <td className="py-2 text-right">
                   <SeverityBadge level={r.level} />

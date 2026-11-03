@@ -149,7 +149,7 @@ function AviationBody({ b }: { b: AviationBriefing }) {
     ['Wind', `${fmt(b.wind_direction_deg)}° / ${fmt(b.wind_kt)} kt (${fmt(b.wind_kmh)} km/h)`],
     ['Gusts', b.gust_kt == null ? '—' : `${fmt(b.gust_kt)} kt (${fmt(b.gust_kmh)} km/h)`],
     ['Precipitation', `${fmt(b.precipitation_mm)} mm`],
-    ['Weather', `${describe(b.weather_code, b.weather_description)} (WMO ${b.weather_code})`],
+    ['Weather', describe(b.weather_code, b.weather_description) ?? '—'],
   ]
   return (
     <>
@@ -157,7 +157,13 @@ function AviationBody({ b }: { b: AviationBriefing }) {
         {cells.map(([k, v]) => (
           <div key={k}>
             <dt className="sky-label">{k}</dt>
-            <dd className="font-readout text-sm text-hud" data-testid={k === 'Weather' ? 'weather-description' : undefined}>{v}</dd>
+            <dd
+              className="font-readout text-sm text-hud"
+              data-testid={k === 'Weather' ? 'weather-description' : undefined}
+              title={k === 'Weather' && b.weather_code != null ? `WMO ${b.weather_code}` : undefined}
+            >
+              {v}
+            </dd>
           </div>
         ))}
       </dl>

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { enterDemo, mockBackend, PUNE } from './support/mockApi'
+import { AVIATION } from './support/roleFixtures'
 
 /**
  * Screenshot-review polish: whole-word console placeholder, one sign-in line
@@ -85,3 +86,33 @@ test('dashboard GFS table shows local clock times, with the run time as caption'
   await expect(table.getByText('06:30', { exact: true })).toBeVisible()
   await expect(table.getByText(/\+\d+ h/)).toHaveCount(0)
 })
+
+test('aviation briefing keeps the WMO code in a tooltip, not in the text', async ({ page }) => {
+  await mockBackend(page, { routes: { '/api/aviation': AVIATION } })
+  await page.addInitScript(() => localStorage.setItem('wgpt:role', 'aviation'))
+  await askPune(page)
+  // the briefing's cell (code 61) is distinct from the answer panel's (code 63)
+  await expect(page.locator(`[data-testid="weather-description"][title="WMO ${AVIATION.weather_code}"]`)).toBeVisible({ timeout: 20_000 })
+  // the briefing grid shows words only (flags are backend sentences and may cite a code)
+  await expect(page.locator('dl').filter({ hasText: 'Visibility' }).getByText(/WMO \d+/)).toHaveCount(0)
+})
+
+const ANY_STORM: Record<string, string> = {
+  en: 'Any thunderstorm',
+  hi: 'कोई भी गरज वाला तूफ़ान',
+  hinglish: 'Koi bhi toofan (garaj)',
+  mr: 'कोणतेही गडगडाटी वादळ',
+}
+
+for (const [lang, text] of Object.entries(ANY_STORM)) {
+  test(`threshold table says "any thunderstorm" in words (${lang})`, async ({ page }) => {
+    await page.addInitScript((l) => localStorage.setItem('wgpt:lang', l), lang)
+    await mockBackend(page)
+    await enterDemo(page)
+    await page.locator('a[href="/alerts"]').first().dispatchEvent('click')
+    await page.waitForURL('**/alerts')
+    const cell = page.getByTestId('threshold-thunderstorm')
+    await expect(cell).toHaveText(text)
+    await expect(cell).toHaveAttribute('title', 'WMO 95')
+  })
+}
