@@ -388,6 +388,22 @@ fails, the answer uses the coordinates and calls the place "selected location".
 - Results are cached in memory for 24 h. Hits are also saved to `backend/data/geocode_cache.json` (git-ignored, 30 days), so they survive a restart. Set `GEOCODE_CACHE_PATH` to move that file, or to an empty string to turn it off.
 - The `/disaster` board stores district **names** only and resolves them here. Each district appears as soon as it is located. The first run takes about 1 s per district; after that the lookups come from the cache.
 
+### Map data
+
+Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or derived from it with a documented method.
+
+`GET /api/map/point?latitude=&longitude=` is the weather at a tapped point. It uses the same Open-Meteo client and validation as `/api/weather`, plus the CAMS-based Indian AQI:
+- Fields: `temperature_c`, `feels_like_c` (Open-Meteo apparent temperature), `humidity_pct`, `wind_speed_kmh`, `wind_direction_deg`, `precipitation_probability_pct` (this hour), `uv_index`, `aqi`, `heat_index_c` with `heat_band`, `local_time`, and `model_latitude`/`model_longitude` (the model cell that answered).
+- The AQI is null if the air-quality service is down. The response is 503 if the forecast is down. It is cached 10 min per ~1 km.
+
+`GET /api/map/grid?south=&west=&north=&east=&max_points=64` returns 72 hourly values (UTC `times`) per grid point:
+- Variables: temperature, humidity, feels-like, rain, rain probability, wind speed and direction, and the computed `heat_index`.
+- **One batched Open-Meteo request** (comma-separated coordinates). There are at most 100 points (`max_points` 4–100).
+- The grid is snapped to a step ladder (0.08°–5°) so small pans reuse the 15-minute cache. A box too large for the cap is a 422; Open-Meteo down is a 503.
+- The response carries `spacing_km`, `model_grid_km` (≈ 8 km: Open-Meteo's cell spacing over India, measured from its snapped coordinates), the `heat_index_bands` from `thresholds.py`, and a note that values are estimated and not official IMD data.
+
+**Heat index.** The NWS method (Rothfusz regression with the low/high humidity adjustments) in `backend/maps/heat_index.py`. The bands are the NWS categories (Caution 26.7 °C, Extreme caution 32.2 °C, Danger 39.4 °C, Extreme danger 51.7 °C) in `thresholds.py`. It is guidance for outdoor workers, assumes shade, and is not an official product.
+
 **LLM provider setup** (optional)
 
 Set on the FastAPI process (see `.env.example` and `backend/llm/provider.py`):

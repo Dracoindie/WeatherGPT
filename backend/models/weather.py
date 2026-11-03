@@ -49,6 +49,7 @@ class CurrentWeather(BaseModel):
     cloud_cover: Optional[float] = Field(None, description="Total cloud cover (%)")
     wind_gusts_10m: Optional[float] = Field(None, description="Wind gusts at 10 m (km/h)")
     uv_index: Optional[float] = Field(None, description="UV index")
+    apparent_temperature: Optional[float] = Field(None, description="Feels-like temperature (°C), from Open-Meteo")
 
 
 class HourlyWeather(BaseModel):
@@ -76,6 +77,9 @@ class HourlyWeather(BaseModel):
         None, description="Hourly wind gusts at 10 m (km/h)"
     )
     uv_index: Optional[list[Optional[float]]] = Field(None, description="Hourly UV index")
+    apparent_temperature: Optional[list[Optional[float]]] = Field(
+        None, description="Hourly feels-like temperature (°C)"
+    )
 
 
 # ---------------------------------------------------------------------------

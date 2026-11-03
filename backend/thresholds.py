@@ -86,3 +86,42 @@ def as_table() -> list[dict]:
         row["codes"] = list(r.codes)
         rows.append(row)
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Heat index bands (heat stress for people working outdoors)
+# ---------------------------------------------------------------------------
+# Guidance, not alert rules: they colour the map's heat-stress layer and pick
+# the outdoor-work advice. The bands are the US National Weather Service heat
+# index categories (80 / 90 / 103 / 125 °F), converted to °C. The heat index
+# itself is computed in maps/heat_index.py (Rothfusz regression).
+
+
+@dataclass(frozen=True)
+class HeatBand:
+    id: Literal["caution", "extreme_caution", "danger", "extreme_danger"]
+    label: str
+    min_c: float  # heat index at or above this value
+
+
+HEAT_INDEX_BANDS: tuple[HeatBand, ...] = (
+    HeatBand("caution", "Caution", 26.7),
+    HeatBand("extreme_caution", "Extreme caution", 32.2),
+    HeatBand("danger", "Danger", 39.4),
+    HeatBand("extreme_danger", "Extreme danger", 51.7),
+)
+
+
+def heat_band(heat_index_c: float | None) -> str | None:
+    """The band id for a heat index, "lower_risk" below Caution, None without data."""
+    if heat_index_c is None:
+        return None
+    band = "lower_risk"
+    for b in HEAT_INDEX_BANDS:
+        if heat_index_c >= b.min_c:
+            band = b.id
+    return band
+
+
+def heat_bands_table() -> list[dict]:
+    return [asdict(b) for b in HEAT_INDEX_BANDS]
