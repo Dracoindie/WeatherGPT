@@ -128,7 +128,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       const ctrl = new AbortController()
       gridAbort.current = ctrl
       setGridStatus('loading')
-      const max = window.innerWidth < 640 ? 49 : 81
+      // 4 shared tiles of 25 points (backend/maps/tiles.py)
+      const max = 100
       fetchMapGrid(box, max, ctrl.signal)
         .then((g) => {
           setGrid(g)

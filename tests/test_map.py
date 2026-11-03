@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import maps.grid as grid_mod
+import maps.tiles as tiles_mod
 import maps.point as point_mod
 from air.service import AirQualityData, AirQualityHourly
 from main import app
@@ -25,6 +26,11 @@ from models.weather import CurrentWeather, HourlyWeather, WeatherResponse
 from thresholds import HEAT_INDEX_BANDS, heat_band
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def no_open_meteo_key(monkeypatch):
+    monkeypatch.delenv("OPEN_METEO_API_KEY", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -87,7 +93,7 @@ class TestPlanGrid:
 
     def test_too_large(self):
         with pytest.raises(grid_mod.GridSpecError):
-            plan_grid(-80, -179, 80, 179, 16)
+            plan_grid(-80, -179, 80, 179, 25)
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +140,7 @@ def open_meteo(monkeypatch):
         kwargs.pop("verify", None)
         return real(*args, transport=httpx.MockTransport(handler), **kwargs)
 
-    monkeypatch.setattr(grid_mod.httpx, "AsyncClient", factory)
+    monkeypatch.setattr(tiles_mod.httpx, "AsyncClient", factory)
     return calls, state
 
 
@@ -150,7 +156,7 @@ class TestGridEndpoint:
         assert len(calls) == 1
         assert len(calls[0].url.params["latitude"].split(",")) == body["rows"] * body["cols"] == len(body["points"])
         assert body["rows"] * body["cols"] <= 64
-        assert calls[0].url.params["forecast_hours"] == "72"
+        assert calls[0].url.params["forecast_hours"] == "73"  # one spare hour for tile alignment
         assert calls[0].url.params["timezone"] == "GMT"
 
     def test_values_flow_unchanged(self, open_meteo):

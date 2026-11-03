@@ -68,11 +68,12 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `alerts/engine.py` | Alert engine (advisory / watch / warning). `api/alerts.py` retries, serves stale data, then returns a clean 503. |
 | `climate/` | Open-Meteo archive: a period compared with the same dates over the previous 10 years |
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
-| `maps/` | `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `grid.py` (up to 100 points in ONE Open-Meteo request, 72 h, snapped step ladder, 15 min cache, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
+| `maps/` | `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `tiles.py` (fixed 5×5-point tiles per grid step, shared by all users, 15 min cache, only missing tiles fetched in ONE batched request, hours aligned across tiles), `grid.py` (up to 4 tiles = 100 points, 72 h, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
 | `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML), `demo_push.py` (signed-in test push; never writes `last_severity`) |
 | `auth/trusted_location.py` | Verifies the Supabase JWT, then reads `profiles` (`id=eq.<sub>`, RLS) |
+| `open_meteo_access.py` | Free or commercial Open-Meteo host per service (`OPEN_METEO_API_KEY`); `/health` shows the plan, never the key |
 | `http_tls.py` | Shared TLS context for all HTTP clients |
 | `env_check.py` | Startup warning when only `NEXT_PUBLIC_` Supabase names are set (never used as a fallback) |
 
@@ -206,6 +207,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`: alert job only
 - **Web Push:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `ALERT_JOB_TOKEN`. Key generation is in `docs/EARLY_WARNING.md`.
+- **Open-Meteo:** `OPEN_METEO_API_KEY` (optional, backend only; switches every client to the commercial `customer-` hosts via `open_meteo_access.py`). Without it the free endpoints are used: non-commercial only, 10,000 calls/day (`docs/OPEN_METEO.md`).
 - **Other backend:** `ALLOWED_ORIGINS`
 - **Frontend:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL`
 
@@ -217,6 +219,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
 - `docs/EARLY_WARNING.md`: push, CAP, WhatsApp, VAPID setup, the job
 - `docs/ROLE_ADVISORIES.md`: farmer and aviation thresholds
 - `docs/AUTH_LOCATION_ARCHITECTURE.md`: trusted location and RLS
+- `docs/OPEN_METEO.md`: free-tier limits, non-commercial terms, how calls are counted, the optional key
 - `docs/DEPLOYMENT.md`: Render/Railway (`backend/Dockerfile`, `render.yaml`), Vercel, Supabase auth URLs, GitHub secrets, smoke test
 
 **Not part of the repo:**

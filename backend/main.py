@@ -32,6 +32,7 @@ from api.dissemination import router as dissemination_router  # noqa: E402
 from api.air import router as air_router  # noqa: E402
 from api.geocode import router as geocode_router  # noqa: E402
 from api.map import router as map_router  # noqa: E402
+import open_meteo_access  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -132,6 +133,8 @@ def health():
         "status": "ok",
         "service": "WeatherGPT API",
         "nwp": nwp_router is not None,
+        # free (non-commercial) or commercial; never the key itself
+        "open_meteo": open_meteo_access.plan(),
     }
 
 

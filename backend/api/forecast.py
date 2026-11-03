@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timezone
 import httpx
+
+import open_meteo_access
 import logging
 from models.forecast import ForecastResponse, DailyForecast
 from http_tls import SSL_CONTEXT
@@ -28,7 +30,7 @@ async def _fetch_daily(latitude: float, longitude: float, days: int) -> dict:
     }
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
-            response = await client.get(OPEN_METEO_URL, params=params)
+            response = await client.get(open_meteo_access.url("forecast"), params=open_meteo_access.params(params))
     except httpx.RequestError as exc:
         logger.error("Open-Meteo request error: %s", exc)
         raise HTTPException(status_code=502, detail="Weather service request failed.")

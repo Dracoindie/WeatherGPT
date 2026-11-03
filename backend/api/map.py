@@ -9,10 +9,13 @@ Map data for /map (docs/VISION.md, step 1):
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from maps.grid import DEFAULT_POINTS, MAX_POINTS, MIN_POINTS, GridResponse, GridSpecError, fetch_grid
 from maps.point import PointWeather, point_weather
+
+# Same header as demo_replay.REPLAY_HEADER (not imported: demo_replay pulls in the chat stack).
+REPLAY_HEADER = "X-WeatherGPT-Replay"
 
 router = APIRouter(tags=["map"])
 
@@ -34,6 +37,7 @@ async def map_point(
     responses={422: {"description": "Bad or too large box"}, 503: {"description": "Weather unavailable"}},
 )
 async def map_grid(
+    response: Response,
     south: float = Query(..., ge=-85.0, le=85.0),
     west: float = Query(..., ge=-180.0, le=180.0),
     north: float = Query(..., ge=-85.0, le=85.0),
@@ -43,8 +47,11 @@ async def map_grid(
     if north <= south or east <= west:
         raise HTTPException(status_code=422, detail="The box must have north > south and east > west.")
     try:
-        return await fetch_grid(south, west, north, east, max_points)
+        grid = await fetch_grid(south, west, north, east, max_points)
     except GridSpecError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail="Map weather is temporarily unavailable.") from exc
+    if grid.recorded_at:
+        response.headers[REPLAY_HEADER] = grid.recorded_at
+    return grid

@@ -19,6 +19,7 @@ def disable_live_integrations(monkeypatch):
         "LLM_API_KEY",
         "SUPABASE_URL",
         "SUPABASE_ANON_KEY",
+        "OPEN_METEO_API_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
 

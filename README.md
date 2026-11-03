@@ -398,8 +398,9 @@ Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or der
 
 `GET /api/map/grid?south=&west=&north=&east=&max_points=64` returns 72 hourly values (UTC `times`) per grid point:
 - Variables: temperature, humidity, feels-like, rain, rain probability, wind speed and direction, and the computed `heat_index`.
-- **One batched Open-Meteo request** (comma-separated coordinates). There are at most 100 points (`max_points` 4–100).
-- The grid is snapped to a step ladder (0.08°–5°) so small pans reuse the 15-minute cache. A box too large for the cap is a 422; Open-Meteo down is a 503.
+- Built from fixed 5 × 5-point **tiles** shared by every user (`backend/maps/tiles.py`). Only missing tiles are fetched, in **one batched Open-Meteo request** (comma-separated coordinates). There are at most 4 tiles, so at most 100 points (`max_points`).
+- Tile points sit on multiples of a step from a ladder (0.08°–8°), so views at the same zoom band share the 15-minute tile cache. Tiles cached either side of an hour boundary are aligned on their common hours. A box too large for the cap is a 422; Open-Meteo down is a 503.
+- Optional `OPEN_METEO_API_KEY` switches all Open-Meteo calls to the commercial endpoints. Without it the free tier is used, which is non-commercial only (`docs/OPEN_METEO.md`).
 - The response carries `spacing_km`, `model_grid_km` (≈ 8 km: Open-Meteo's cell spacing over India, measured from its snapped coordinates), the `heat_index_bands` from `thresholds.py`, and a note that values are estimated and not official IMD data.
 
 **Heat index.** The NWS method (Rothfusz regression with the low/high humidity adjustments) in `backend/maps/heat_index.py`. The bands are the NWS categories (Caution 26.7 °C, Extreme caution 32.2 °C, Danger 39.4 °C, Extreme danger 51.7 °C) in `thresholds.py`. It is guidance for outdoor workers, assumes shade, and is not an official product.

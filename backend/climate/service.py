@@ -4,6 +4,8 @@ from datetime import date, datetime
 from typing import List, Optional
 
 import httpx
+
+import open_meteo_access
 from pydantic import ValidationError
 
 from models.climate import ClimateResponse, HistoricalDaily
@@ -44,7 +46,7 @@ async def fetch_historical_weather(
     }
     start = time.time()
     async with httpx.AsyncClient(verify=SSL_CONTEXT) as client:
-        resp = await client.get(BASE_URL, params=params, timeout=20.0)
+        resp = await client.get(open_meteo_access.url("archive"), params=open_meteo_access.params(params), timeout=20.0)
         resp.raise_for_status()
         data = resp.json()
     # Build list of HistoricalDaily entries

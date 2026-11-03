@@ -12,6 +12,8 @@ import logging
 from typing import Any
 
 import httpx
+
+import open_meteo_access
 from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
+# The free endpoint; open_meteo_access.url() picks the commercial one when a key is set.
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 # Fields requested from the Open-Meteo API
@@ -109,7 +112,7 @@ async def fetch_weather(latitude: float, longitude: float) -> dict[str, Any]:
 
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
-            response = await client.get(OPEN_METEO_URL, params=params)
+            response = await client.get(open_meteo_access.url("forecast"), params=open_meteo_access.params(params))
     except httpx.TimeoutException as exc:
         logger.error("Open-Meteo request timed out: %s", exc)
         raise RuntimeError(
