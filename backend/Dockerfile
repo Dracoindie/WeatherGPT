@@ -23,7 +23,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 # Production install: drop the test tools, and the NWP stack when WITH_NWP=0.
-RUN grep -vE '^(pytest|pytest-asyncio)==' requirements.txt > /tmp/req.txt \
+RUN grep -vE '^(pytest|pytest-asyncio|segno)==' requirements.txt > /tmp/req.txt \
     && if [ "$WITH_NWP" != "1" ]; then grep -vE '^(xarray|cfgrib|eccodes|eccodeslib)==' /tmp/req.txt > /tmp/req2.txt && mv /tmp/req2.txt /tmp/req.txt; fi \
     && pip install -r /tmp/req.txt \
     && rm /tmp/req.txt

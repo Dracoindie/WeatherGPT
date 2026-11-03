@@ -38,6 +38,18 @@ def test_lite_image_drops_every_nwp_requirement():
     assert all(re.match(pattern, line) for line in nwp)
 
 
+def test_image_drops_dev_only_requirements():
+    """pytest and the QR tool (segno, backend/scripts/make_qr.py) never go into the image."""
+    import re
+
+    text = (ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    pattern = re.search(r"grep -vE '(\^\([^']+\)==)' requirements.txt", text).group(1)
+    reqs = (ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").splitlines()
+    dev = [line for line in reqs if line.split("==")[0] in {"pytest", "pytest-asyncio", "segno"}]
+    assert len(dev) == 3
+    assert all(re.match(pattern, line) for line in dev)
+
+
 def test_dockerignore_keeps_secrets_and_venv_out():
     lines = set((ROOT / "backend" / ".dockerignore").read_text(encoding="utf-8").split())
     assert {".env", ".env.*", ".venv/", "data/"} <= lines
