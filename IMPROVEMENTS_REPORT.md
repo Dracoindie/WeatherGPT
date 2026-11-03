@@ -265,6 +265,82 @@ The roadmap is in `docs/VISION.md`: live 3D map, hazard hex map with road colour
   - particles drawn over the overlays
   - a squeezed forecast
 
+## Step 2: hazard map, plus shared tiles, keys and the offline map
+
+Your answers from step 1 came first, then the hazard map. Nothing was pushed, and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `5c2a42a` | **Shared fixed weather tiles and `OPEN_METEO_API_KEY`.**<br>- `backend/maps/tiles.py` cuts the world into 5 × 5-point tiles on multiples of each grid step. Every user whose view touches a tile shares its 15-minute cache entry.<br>- Only missing tiles are fetched, in one request.<br>- Tiles cached either side of an hour boundary are aligned on their common hours.<br>- With the key, every Open-Meteo client (forecast, tiles, air quality, archive) uses the commercial `customer-` hosts; without it, the free ones. `/health` shows the plan, never the key.<br>- `docs/OPEN_METEO.md` covers the free-tier limits, the non-commercial terms and how calls are counted. |
+| `9a7d0d0` | **Hazard map and one shared scorer.** Details below. |
+| `bc5f9ee` | **Optional MapTiler key and the offline demo map.**<br>- `NEXT_PUBLIC_MAPTILER_KEY` switches to MapTiler `dataviz-dark` and `terrain-rgb-v2`. It falls back to OpenFreeMap and AWS terrain if MapTiler answers 401/403/429 or the style fails.<br>- Replay serves the map from recorded weather tiles for Pune–Mumbai (`record_demo_fixtures.py --map`: 69 tiles, 35 tap points). A tap gets the nearest recorded point within 25 km, with that point's own coordinates.<br>- Settings → "Prepare offline map" saves the basemap, fonts, sprites and terrain for that region at zoom 6–10 (about 100 files) and the MapLibre worker. The service worker reads them only when the network fails.<br>- Also: a near-solid settings popover, since the page showed through it. |
+
+### What the hazard map does
+
+- **`GET /api/map/hazard`.** Returns the level per H3 cell for the 24 h from the slider hour (0–48).
+  - **Resolution, honestly.** Res 6 hexes are 6.5 km across (36 km²). That is the closest size to the ~8 km (64 km²) model cell that is not coarser, so a hex never claims more detail than about one model cell. Res 5 (17 km) would merge about four model cells.
+  - **Zoomed out**, samples are further apart, so the resolution drops to the finest hex at least 0.7 × the sample spacing.
+  - **Values.** Each hex takes its nearest sample's values. Nothing is interpolated for hazards.
+- **`GET /api/map/hazard/summary`.** Returns, within 25 km: cells per level, the most rain, the worst cell now, and the first window at the worst level in the next 72 h.
+- **One scorer (`backend/alerts/scoring.py`).** The alert engine (so `/api/alerts`, the risk board, push and CAP) and the hazard map all call it. Hour 0 includes the model's current values, exactly like alerts.
+  - `tests/test_hazard.py` runs 17 scenarios through the same mocked Open-Meteo data, covering every level and every hazard.
+  - For each, alerts, the risk board, the push level, the summary and the place's hex must agree on every hazard. They do.
+- **Levels: none < advisory < watch < warning < severe.**
+  - The **severe** rules use published bounds, cited in `thresholds.py` and `docs/EARLY_WARNING.md`:
+    - IMD "very heavy rainfall": 115.6 mm in 24 h
+    - IMD severe heat wave: 47 °C
+    - Beaufort 10: 89 km/h
+    - WMO 99: thunderstorm with heavy hail (96 stays a warning)
+  - **Heat stress** uses the NWS heat-index bands: Danger is a watch, Extreme danger a warning.
+- **Map.**
+  - A **Hazard** layer with type chips: all, rain, heat, wind, thunderstorm, cold.
+  - **Tapping a hex** (or "Weather at map centre") shows the level, each triggering value vs its threshold ("45 mm ≥ 15 mm"), the window, the facts, and "estimated · model grid ≈ 8 km · not official IMD".
+  - The **72 h slider** moves the window.
+  - A **summary panel** ("Within 25 km of Pune: 3 warning cells, most rain 72 mm, worst in 4 h") with **Show me the worst**, which flies there and sets the hour.
+- **Roads like traffic colours.**
+  - **Source.** Lines come from the basemap's own `transportation` vectors: motorway and trunk when zoomed out, then primary, then secondary. Each road is cut where it enters a new cell and takes that cell's level. Nothing is drawn outside the data.
+  - **Readability.** A dark casing goes under every road, and a light one under severe roads so dark red stays visible.
+  - **Cost control.** A 30,000-vertex budget, recomputed only when the view, hour or type changes.
+  - **Legend.** It reads "Road colour = weather hazard on that road. It is NOT traffic."
+- **Four languages.** The chips, legend, card, summary, the new rule names and the threshold windows are in all four (the windows used to show in English everywhere).
+- **Reduced motion and lite mode.** Fly-tos don't animate. Hazard mode has no particles in any mode, because they hid the levels.
+
+### Behaviour changes to know about
+
+1. **Alert windows start at the current hour.** The engine's "next 24 h" used to be the first 24 entries of Open-Meteo's series, which starts at local midnight. In the evening, that was mostly the past. Alerts and the risk board's 24 h numbers now use the 24 h from the current hour.
+2. **Traffic colours on every surface.**
+   - Advisory was blue and is now yellow. Watch is orange, warning red, severe dark red.
+   - Adjacent levels pass the dataviz validator's normal-vision (16.2) and colour-blind (12.2) separation on the map surface. Severe is below 3:1 there, so it always has a light outline or its word.
+   - The text shades still pass `e2e/contrast.spec.ts` over every sky. Severe text needed red-100.
+   - The risk board's map now reads the tokens instead of hard-coded hex values.
+3. **Push escalation.** Push now also fires when a warning escalates to severe, and still never repeats at the same level. CAP maps severe to "Extreme".
+4. **New alerts.** Heat-stress alerts can appear where temperature alone would not fire.
+
+### Bugs found by looking at screenshots
+
+- **Fly-to landing off target.** The camera stopped 0.63° short of the picked place whenever the page grew mid-flight, which happens every time a place is picked. MapLibre eases in pixels, so a resize moves the end point.
+  - `flyToSteady` finishes the trip if a flight ends off target. A test now checks the map ends on the place.
+  - The first version re-flew on every resize and broke the broadcast tilt. The final version only corrects at the end and backs off if the user moves the map.
+- **Particles over the hazard view.** Wind particles hid the hazard hexes in broadcast mode.
+
+### Performance (headless Chromium, software WebGL)
+
+- 178 hexes and 13 road pieces render at 60 fps (17 ms frames).
+- Switching hazard type costs about 0.45 s once.
+- Hazard e2e tests take 6–11 s each with one worker, and more with two because both browsers share the CPU.
+- **Not measured on a mid-range laptop with a GPU.**
+
+### Tests
+
+- **Backend: 794 passed.**
+  - Tiles, the API key, every rule at its boundary, H3 resolution, endpoints, 17 agreement scenarios, and map replay.
+- **E2E: 184 passed, 26 skipped.**
+  - Hazard: chips, legend, the card with value vs threshold, roads present plus the not-traffic note, summary and "Show me the worst", the slider window, Hindi.
+  - The map ends centred on the place with motion on.
+  - Offline map: the pack is saved, the service worker serves it offline, and browsing never adds tiles.
+  - Source selection.
+- **Screenshots: 18 passed. Design audit: 6 passed.**
+
 ## Needs your input
 
 1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
@@ -283,9 +359,23 @@ The roadmap is in `docs/VISION.md`: live 3D map, hazard hex map with road colour
    - AQI is modelled, not CPCB stations
    - smart-city feature only partial
    - with `npm run dev` running, use `npx playwright test --workers=1`
-10. **Look at `/map` on a real GPU with live tiles.** Tests use a blank stand-in style and flat terrain, so screenshots cannot show the OpenFreeMap roads, labels or real hillshade. Run the backend and `npm run dev`, enter demo, open `/map`, try broadcast mode, and tell me what to tune: tint, opacity, column height, particle density.
-11. **Open-Meteo limits.** Each grid point counts as one Open-Meteo call (81 per grid on desktop; the free tier is 10,000 a day, 600 a minute). The 15-minute snapped cache keeps a demo well inside that, but public traffic would not be. Should I add an optional `OPEN_METEO_API_KEY` (their commercial endpoint), or lower the point cap?
-12. **Free tile services have no SLA.** OpenFreeMap and the AWS terrain bucket are keyless and free. For production, consider self-hosting, or a keyed provider such as MapTiler, which I would read from env with this as the fallback.
-13. **The map is online-only.** Demo replay has no `/api/map/*` fixtures, and tiles need the internet. The rest of the app still replays offline, and `/map` shows "Map weather is unavailable" instead of failing.
-14. **`h3-js` is installed but not used yet.** It is approved and reserved for the step 2 hex grid, so it is in no bundle.
-15. **Next step.** Step 2 (hazard hex grid and road colouring) is ready to start when you say so.
+10. **Look at `/map` with live tiles on a real GPU.**
+    - Tests use a stand-in style, a three-line road network and flat terrain.
+    - Please check the hazard hexes over real OpenFreeMap roads and labels: hex opacity, road widths, and whether res 6 hexes look right at zoom 9–11.
+11. **Run the map recorder once, the morning of the demo.**
+    - Command: `record_demo_fixtures.py --map` (about 1,800 Open-Meteo location-calls). Then click "Prepare offline map" on the demo laptop.
+    - I have not run it against the live services, so neither the map tiles nor the tap points are recorded yet.
+12. **MapTiler.**
+    - If you want it, create a key, restrict it to your domains, and set `NEXT_PUBLIC_MAPTILER_KEY`. It is a public browser key by design.
+    - The switch and fallback were not tested against live MapTiler; only the source selection is tested.
+    - The offline pack always uses the keyless sources. MapTiler's terms on offline caching would need checking before caching theirs.
+13. **Open-Meteo terms.**
+    - Free use is non-commercial. Set `OPEN_METEO_API_KEY` before any commercial or high-traffic deployment (`docs/OPEN_METEO.md`).
+    - Read their current terms yourself; my doc summarises them.
+14. **Review the severe thresholds.**
+    - The values are 115.6 mm, 47 °C, 89 km/h and WMO 99, with heat-stress watch and warning at heat index 39.4 / 51.7 °C. They are borrowed from IMD, Beaufort and the NWS.
+    - Confirm they suit your judges' framing; they change alerts, push and the risk board too.
+15. **Behaviour changes** (above): alert windows now start at the current hour, advisory is yellow, push fires on escalation to severe, and heat-stress alerts are new. Tell me if any should be reverted.
+16. **Hex → chat link** from `docs/VISION.md` step 2 is not built: the card explains the level itself. Say if you still want "Ask about this area".
+17. **Half-hour time zones.** India's local hours fall on UTC :30. Alerts use local hours from the place's forecast; the map uses UTC hours from the tiles. The two 24 h windows can differ by 30 minutes. In practice this hardly changes a 24 h total, but it is not zero.
+18. **Next step.** Step 3 (weather-safe routes) needs a routing engine (OSRM or Valhalla, public or self-hosted). That is a dependency decision for you.

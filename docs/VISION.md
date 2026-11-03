@@ -12,7 +12,7 @@ These come from the ground rules in `CLAUDE.md` and are not optional:
 - **One threshold table.** Hazard colours and levels come from `backend/thresholds.py` (via `/api/alerts/thresholds` in the UI). Nothing re-defines a threshold.
 - **Four languages.** All new text exists in en, hi, hinglish and mr.
 
-## 1. Live 3D weather map *(Step 1, in progress)*
+## 1. Live 3D weather map *(done: `79fecb2`, `3624e30`)*
 
 - MapLibre GL + deck.gl on `/map`, styled like Living Sky (dark basemap, gold and cyan accents), free keyless tiles (OpenFreeMap vector tiles, AWS open terrain tiles in terrarium encoding).
 - **Tap anywhere** for point weather: temperature, feels-like, humidity, wind with direction, rain chance, AQI, UV, local time, with an animated 3D pin and a glass card.
@@ -21,11 +21,18 @@ These come from the ground rules in `CLAUDE.md` and are not optional:
 - **Time slider** over the next 72 hours that drives every layer.
 - **Heat-stress layer:** a documented heat index from temperature and humidity, with categories and advice for outdoor workers, labelled as guidance.
 
-## 2. Hazard map
+## 2. Hazard map *(done: `5c2a42a`, `9a7d0d0`, `bc5f9ee`)*
 
 - An H3 hex grid over the visible area. Each cell is scored with the rules in `backend/thresholds.py` (rain, heat, cold, wind, storm) for the selected time window and coloured green → yellow → orange → red → dark red.
 - **Roads coloured by hazard**, like traffic colouring: each road segment takes the worst level of the cells it crosses. Road geometry comes from the vector tiles; nothing is drawn where there is no data.
-- Every cell links to the chat (`askHref`) for an explanation in words.
+- Every cell links to the chat (`askHref`) for an explanation in words. *(Not done yet: the tap card explains the level itself.)*
+
+**As built (step 2):**
+- `GET /api/map/hazard`: H3 res 6 (6.5 km hexes, the closest size to the ~8 km model cell that is not coarser), coarser when zoomed out. Each hex takes its nearest sample point's values; nothing is interpolated.
+- **One scorer** (`backend/alerts/scoring.py`) for alerts, the risk board, push, CAP and the map. `tests/test_hazard.py` checks they agree in 17 scenarios.
+- **Levels** none < advisory < watch < warning < severe. The severe rules borrow published bounds: IMD very heavy rain, IMD severe heat wave, Beaufort 10, WMO 99. Heat stress uses the NWS heat-index bands.
+- **Roads** are coloured from the basemap's own `transportation` vectors, major classes only. The legend says it is not traffic.
+- **Shared tiles and limits.** Shared fixed weather tiles keep Open-Meteo calls low, plus an optional `OPEN_METEO_API_KEY` and `NEXT_PUBLIC_MAPTILER_KEY`. There is an offline demo map for Pune–Mumbai.
 
 ## 3. Weather-safe routes
 
