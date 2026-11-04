@@ -125,6 +125,7 @@ async def fetch_validated_weather(latitude: float, longitude: float) -> WeatherR
         latitude=raw["latitude"],
         longitude=raw["longitude"],
         timezone=raw["timezone"],
+        utc_offset_seconds=raw.get("utc_offset_seconds"),
         # Always UTC, for /api/weather and /api/chat alike.
         retrieved_at=datetime.now(tz=timezone.utc),
         current=current,

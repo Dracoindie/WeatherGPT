@@ -62,3 +62,16 @@ def reset_map_tile_hooks():
     tiles.fixture_loader = None
     tiles.fixture_saver = None
     tiles.clear_cache()
+
+
+@pytest.fixture(autouse=True)
+def fixture_clock(monkeypatch):
+    """Fixtures carry fixed dates, so the wall clock would land anywhere in (or
+    outside) their series. By default the window rule's clock is far outside
+    every fixture, so windows start at the model's own current time (the
+    fallback in window_rule.window_start). Tests of the clock set it themselves."""
+    from datetime import datetime, timezone
+
+    import window_rule
+
+    monkeypatch.setattr(window_rule, "now_utc", lambda: datetime(2000, 1, 1, tzinfo=timezone.utc))

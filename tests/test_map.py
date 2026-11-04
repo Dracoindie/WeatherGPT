@@ -157,7 +157,9 @@ class TestGridEndpoint:
         assert len(calls[0].url.params["latitude"].split(",")) == body["rows"] * body["cols"] == len(body["points"])
         assert body["rows"] * body["cols"] <= 64
         assert calls[0].url.params["forecast_hours"] == "73"  # one spare hour for tile alignment
-        assert calls[0].url.params["timezone"] == "GMT"
+        # each point on its own local hours, with true instants (window_rule)
+        assert calls[0].url.params["timezone"] == "auto"
+        assert calls[0].url.params["timeformat"] == "unixtime"
 
     def test_values_flow_unchanged(self, open_meteo):
         body = client.get(f"/api/map/grid?{BOX}").json()

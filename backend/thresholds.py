@@ -99,11 +99,13 @@ class Rule:
 
 HEAVY_RAIN = Rule("heavy_rain", "rain", "watch", "Heavy rain", "precipitation", ">=", 15.0, "mm", "24 h total")
 EXTREME_RAIN = Rule("extreme_rain", "rain", "warning", "Extreme rain", "precipitation", ">=", 50.0, "mm", "24 h total")
-# IMD "very heavy rainfall" starts at 115.6 mm in 24 h.
+# IMD "very heavy rainfall" is 115.6-204.4 mm in 24 h (IMD rainfall intensity
+# categories; sources in docs/EARLY_WARNING.md, "Sources of the severe rules").
 VERY_HEAVY_RAIN = Rule("very_heavy_rain", "rain", "severe", "Very heavy rain", "precipitation", ">=", 115.6, "mm", "24 h total")
 HIGH_HEAT = Rule("high_heat", "heat", "advisory", "High heat", "temperature", ">=", 35.0, "°C", "24 h maximum")
 EXTREME_HEAT = Rule("extreme_heat", "heat", "warning", "Extreme heat", "temperature", ">=", 40.0, "°C", "24 h maximum")
-# IMD declares a severe heat wave when the actual maximum reaches 47 °C.
+# IMD declares a severe heat wave (plains) when the actual maximum reaches 47 °C
+# (IMD heat wave FAQ; docs/EARLY_WARNING.md, "Sources of the severe rules").
 SEVERE_HEAT = Rule("severe_heat", "heat", "severe", "Severe heat", "temperature", ">=", 47.0, "°C", "24 h maximum")
 # Heat stress: the NWS "Danger" and "Extreme danger" heat index bands.
 HEAT_STRESS = Rule("heat_stress", "heat", "watch", "Heat stress", "heat_index", ">=", HEAT_DANGER, "°C", "24 h maximum heat index")

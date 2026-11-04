@@ -13,22 +13,39 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Callable, List, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from alerts.scoring import WINDOW_HOURS, Current, Hit, score, window_facts
 from models.alerts import WeatherAlert
 from models.weather import WeatherResponse
+from window_rule import utc_instant, window_start
 
 # Alert order on every surface (unchanged from before the shared scorer).
 _ORDER = ("rain", "heat", "cold", "wind", "storm")
 
 
+def utc_offset_seconds(weather: WeatherResponse) -> int:
+    """The place's UTC offset: Open-Meteo's own, else from the IANA zone."""
+    if weather.utc_offset_seconds is not None:
+        return weather.utc_offset_seconds
+    try:
+        off = datetime.now(ZoneInfo(weather.timezone)).utcoffset()
+    except (ZoneInfoNotFoundError, ValueError):
+        return 0
+    return int(off.total_seconds()) if off else 0
+
+
 def current_hour_index(weather: WeatherResponse) -> int:
-    """Index of the current hour in the hourly series (Open-Meteo starts at local midnight)."""
-    hour = (weather.current.time or "")[:13]
-    for i, ts in enumerate(weather.hourly.time or []):
-        if ts[:13] == hour:
-            return i
-    return 0
+    """Index of the current local hour in the hourly series (Open-Meteo starts
+    at local midnight). The rule is window_rule.window_start, shared with the
+    hazard map, the grid layers and routes."""
+    off = utc_offset_seconds(weather)
+    try:
+        instants = [utc_instant(t, off) for t in weather.hourly.time or []]
+        model_now = utc_instant(weather.current.time, off) if weather.current.time else None
+    except ValueError:
+        return 0
+    return window_start(instants, off, model_now=model_now)
 
 
 def assess(weather: WeatherResponse) -> dict[str, Optional[Hit]]:

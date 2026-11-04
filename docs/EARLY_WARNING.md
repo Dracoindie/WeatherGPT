@@ -194,6 +194,29 @@ Levels: none < advisory < watch < warning < severe. They are shown as green, yel
 
 These are WeatherGPT's rules. Where a number is borrowed from a published category it says so above. That does not make them IMD warnings.
 
+### Sources of the severe rules
+
+Approved for use on 2026-11-04. Borrowing a number does not make an alert an IMD warning.
+
+- **Very heavy rain, 115.6 mm in 24 h.** IMD's 24 h rainfall categories: heavy 64.5–115.5 mm, **very heavy 115.6–204.4 mm**, extremely heavy ≥ 204.5 mm.
+  - Ministry of Earth Sciences (IMD's ministry), Rajya Sabha reply listing the categories: <https://www.moes.gov.in/sites/default/files/RS-in-25-27-07-2023.pdf>
+  - Used in IMD's national bulletins, e.g. RSMC New Delhi National Bulletin No. 15, 11 Sept 2024: <https://rsmcnewdelhi.imd.gov.in/uploads/archive/1/1_0cbf6a_15.National%20Bulletin%20No%2015-11th%20Sept2024_0830%20IST.pdf>
+  - Some IMD pages print the lower bound as 115.5 mm. WeatherGPT uses 115.6 mm, the value in the bulletins.
+- **Severe heat, 47 °C.** IMD heat wave criteria, "based on actual maximum temperature" (plains): heat wave ≥ 45 °C, **severe heat wave ≥ 47 °C**. IMD also requires the criteria at two stations in a sub-division, and has departure-from-normal criteria; WeatherGPT checks only the one model point, so its "severe heat" is not an IMD heat wave declaration.
+  - IMD, FAQ on heat wave: <https://internal.imd.gov.in/section/nhac/dynamic/FAQ_heat_wave.pdf>
+- **Storm-force wind, 89 km/h.** Beaufort force 10 ("storm") starts at 48 knots (89 km/h).
+- **Heavy hail, WMO 99.** WMO code table 4677: 99 is "thunderstorm, heavy, with hail" (Open-Meteo reports 96 and 99 for thunderstorm with slight / heavy hail).
+- **Heat stress.** US National Weather Service heat index (Rothfusz regression) and its Danger (39.4 °C, 103 °F) and Extreme danger (51.7 °C, 125 °F) bands.
+
+### One window rule
+
+Every surface starts its "next 24 h" at the **start of the place's current local hour** (`backend/window_rule.py`): alerts, the risk board, push, CAP, the hazard map and its summary, the grid layers and routes.
+
+- Open-Meteo puts a place's hourly samples on its local hours. In Asia/Kolkata (UTC+5:30) the sample labelled 14:00 IST is the instant 08:30Z.
+- Map tiles are requested with `timezone=auto&timeformat=unixtime`, so every tile point carries its own UTC offset and true instants. The map therefore scores the same samples as alerts, also in half-hour and 45-minute zones.
+- Before this, tiles were requested in GMT and started at the current UTC hour. Between :30 and :59 UTC (the first half of each IST hour, e.g. 14:00–14:29 IST), the map's window started one sample earlier than alerts.
+- `tests/test_window_rule.py` freezes the clock at 14:20 IST and puts rain on each edge of the window, in Asia/Kolkata, Asia/Kathmandu (UTC+5:45) and a whole-hour zone, with tiles fetched now and an hour ago. Alerts, the risk board, push, the hazard hex and the hazard summary must all agree, and they do.
+
 **Agreement.** `tests/test_hazard.py` runs 17 scenarios through the same mocked Open-Meteo data, covering every level and hazard. `/api/alerts`, the risk board, the push job's level, the hazard summary and the hazard map's hex for the place must give identical levels for every hazard.
 
 **Alerts vs chat advisories:**

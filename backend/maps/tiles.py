@@ -7,9 +7,15 @@ tile's key is (step, row, col), so two people looking at overlapping areas ask
 for the same tiles and share the cache. Only missing tiles go to Open-Meteo, in
 ONE batched request (comma-separated coordinates).
 
-Each tile keeps 72 hourly values (UTC) plus the model's current values, for:
+Each tile keeps 72 hourly values plus the model's current values, for:
 temperature, humidity, feels-like, rain, rain probability, wind speed and
 direction, and the WMO weather code. Every number is Open-Meteo's.
+
+Times. Tiles are requested with ``timezone=auto`` and ``timeformat=unixtime``:
+each point's samples sit on ITS local hours (08:30Z, 09:30Z ... for
+Asia/Kolkata), with true UTC instants and the point's UTC offset. ``assemble``
+starts every point at its current local hour with window_rule.window_start, the
+same rule the alert engine uses, so the map and alerts score the same samples.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ import httpx
 import open_meteo_access
 from http_tls import SSL_CONTEXT
 from weather.open_meteo import TIMEOUT
+from window_rule import from_unix, utc_instant, window_start
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +72,24 @@ class TilePoint:
     elevation: Optional[float]
     hourly: dict[str, list[Optional[float]]]
     current: dict[str, Optional[float]]
+    t0: int = 0  # UTC instant (unix seconds) of the first hourly sample
+    utc_offset: int = 0  # the point's UTC offset (seconds), from Open-Meteo
+    now: Optional[int] = None  # the model's current time (unix seconds)
+
+    def instants(self) -> list[datetime]:
+        n = len(self.hourly.get("temperature_2m") or [])
+        return [from_unix(self.t0 + 3600 * i) for i in range(n)]
+
+    def base(self, now: Optional[datetime] = None) -> int:
+        """Index of this point's current local hour (window_rule)."""
+        model_now = from_unix(self.now) if self.now is not None else None
+        return window_start(self.instants(), self.utc_offset, now=now, model_now=model_now)
 
 
 @dataclass
 class Tile:
     key: TileKey
-    times: list[str]  # UTC hours, "YYYY-MM-DDTHH:MM" (no zone suffix)
+    times: list[str]  # first point's samples, UTC "YYYY-MM-DDTHH:MM" (no zone suffix)
     points: list[TilePoint]  # row-major, south to north, west to east
     fetched_at: datetime
     recorded_at: Optional[str] = None  # set when served from a demo-replay fixture
@@ -138,7 +157,9 @@ async def _fetch(lats: list[float], lons: list[float]) -> list[dict[str, Any]]:
         "current": ",".join(CURRENT),
         # one spare hour so tiles fetched either side of an hour boundary still share 72 h
         "forecast_hours": HOURS + 1,
-        "timezone": "GMT",
+        # each point on its own local hours, with true instants (window_rule)
+        "timezone": "auto",
+        "timeformat": "unixtime",
     }
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
@@ -164,15 +185,30 @@ def _series(block: dict, key: str, n: int) -> list[Optional[float]]:
     return [values[i] if i < len(values) else None for i in range(n)]
 
 
+def _unix(value: Any, utc_offset: int) -> int:
+    """Open-Meteo time: unix seconds (timeformat=unixtime) or an ISO label."""
+    if isinstance(value, (int, float)):
+        return int(value)
+    return int(utc_instant(str(value), utc_offset).timestamp())
+
+
+def _fmt(ts: int) -> str:
+    return from_unix(ts).strftime("%Y-%m-%dT%H:%M")
+
+
 def _build(key: TileKey, items: list[dict[str, Any]]) -> Tile:
     lats, lons = tile_coords(key)
     try:
-        times = list(items[0]["hourly"]["time"])
-        n = len(times)
+        times: list[str] = []
         points = []
         for lat, lon, item in zip(lats, lons, items):
             block = item["hourly"]
+            off = int(item.get("utc_offset_seconds") or 0)
+            stamps = [_unix(t, off) for t in block["time"]]
+            n = len(stamps)
             cur = item.get("current") or {}
+            if not times:
+                times = [_fmt(t) for t in stamps]
             points.append(
                 TilePoint(
                     latitude=lat,
@@ -180,6 +216,9 @@ def _build(key: TileKey, items: list[dict[str, Any]]) -> Tile:
                     elevation=item.get("elevation"),
                     hourly={k: _series(block, k, n) for k in HOURLY},
                     current={k: cur.get(k) for k in CURRENT},
+                    t0=stamps[0],
+                    utc_offset=off,
+                    now=_unix(cur["time"], off) if cur.get("time") is not None else None,
                 )
             )
     except (KeyError, TypeError, IndexError) as exc:
@@ -224,28 +263,31 @@ async def get_tiles(keys: list[TileKey]) -> dict[TileKey, Tile]:
     return out
 
 
-def common_hours(tiles: list[Tile]) -> tuple[list[str], dict[TileKey, int]]:
-    """The hours every tile has (tiles may be cached from either side of an
-    hour boundary), and each tile's index of the first one."""
-    start = max(t.times[0] for t in tiles)
-    offsets = {t.key: t.times.index(start) if start in t.times else 0 for t in tiles}
-    n = min(len(t.times) - offsets[t.key] for t in tiles)
-    first = tiles[0]
-    times = first.times[offsets[first.key] : offsets[first.key] + min(n, HOURS)]
-    return times, offsets
+def assemble(
+    p: TilePlan, tiles: dict[TileKey, Tile], now: Optional[datetime] = None
+) -> tuple[list[str], list[tuple[TilePoint, int]]]:
+    """(times, points) for the whole plan, row-major south to north.
 
+    Each point comes with the index of its current local hour (window_rule),
+    so tiles cached either side of an hour boundary line up. ``times`` are the
+    first point's UTC instants from there, at most HOURS of them, and only as
+    many as every point has. If the clock is past the data (recorded tiles),
+    a point starts as late as still leaves a full 24 h window."""
+    from alerts.scoring import WINDOW_HOURS
 
-def assemble(p: TilePlan, tiles: dict[TileKey, Tile]) -> tuple[list[str], list[tuple[TilePoint, int]]]:
-    """(times, points) for the whole plan, row-major south to north, each
-    point with the offset of its tile's first common hour."""
-    times, offsets = common_hours(list(tiles.values()))
     out: list[tuple[TilePoint, int]] = []
     for r in range(p.row0, p.row1 + 1):
         for i in range(TILE_POINTS):
             for c in range(p.col0, p.col1 + 1):
                 tile = tiles[(p.step, r, c)]
                 for j in range(TILE_POINTS):
-                    out.append((tile.points[i * TILE_POINTS + j], offsets[tile.key]))
+                    tp = tile.points[i * TILE_POINTS + j]
+                    n = len(tp.hourly.get("temperature_2m") or [])
+                    out.append((tp, max(0, min(tp.base(now), n - WINDOW_HOURS))))
+    n = min((len(tp.hourly.get("temperature_2m") or []) - b for tp, b in out), default=0)
+    n = max(0, min(n, HOURS))
+    tp0, b0 = out[0]
+    times = [_fmt(tp0.t0 + 3600 * (b0 + i)) for i in range(n)]
     return times, out
 
 

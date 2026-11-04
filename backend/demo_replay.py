@@ -239,7 +239,11 @@ class TileFixtureStore:
             "recorded_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
             "times": tile.times,
             "points": [
-                {"latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation, "hourly": p.hourly, "current": p.current}
+                {
+                    "latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation,
+                    "hourly": p.hourly, "current": p.current,
+                    "t0": p.t0, "utc_offset": p.utc_offset, "now": p.now,
+                }
                 for p in tile.points
             ],
         }
@@ -260,7 +264,13 @@ class TileFixtureStore:
             return Tile(
                 key=tuple(d["key"]),
                 times=d["times"],
-                points=[TilePoint(p["latitude"], p["longitude"], p.get("elevation"), p["hourly"], p["current"]) for p in d["points"]],
+                points=[
+                    TilePoint(
+                        p["latitude"], p["longitude"], p.get("elevation"), p["hourly"], p["current"],
+                        t0=int(p["t0"]), utc_offset=int(p.get("utc_offset") or 0), now=p.get("now"),
+                    )
+                    for p in d["points"]
+                ],
                 fetched_at=datetime.fromisoformat(d["recorded_at"].replace("Z", "+00:00")),
                 recorded_at=d["recorded_at"],
             )

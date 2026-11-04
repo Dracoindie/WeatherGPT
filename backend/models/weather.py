@@ -100,6 +100,7 @@ class WeatherResponse(BaseModel):
     latitude: float = Field(..., description="Resolved latitude")
     longitude: float = Field(..., description="Resolved longitude")
     timezone: str = Field(..., description="IANA timezone")
+    utc_offset_seconds: Optional[int] = Field(None, description="Open-Meteo's UTC offset for the place (seconds)")
     retrieved_at: datetime = Field(
         ..., description="UTC timestamp when this response was assembled"
     )
