@@ -10,6 +10,7 @@ straight north from 18.50 N to 19.40 N along 73.80 E: 100 segments of 1 km and
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
@@ -426,6 +427,118 @@ def test_record_then_replay_offline(services, tmp_path):
     far = c.get("/api/route", params={"from_lat": 21.0, "from_lon": 79.0, "to_lat": 22.0, "to_lon": 79.0})
     assert far.status_code == 503
     assert len(services["osrm_calls"]) == calls_before + 1
+
+
+def test_replay_keeps_line_colours_report_and_suggestion(services, tmp_path):
+    """A rainy route recorded, then replayed offline: the coloured line, the
+    findings and the departure suggestion come back exactly as recorded."""
+    from fastapi import FastAPI
+
+    import demo_replay
+    from api.route import router as route_router
+
+    services["field"] = rain_band(19.0, 19.1, {1})
+    params = {"from_lat": A[0], "from_lon": A[1], "to_lat": B[0], "to_lon": B[1]}
+
+    rec = FastAPI()
+    demo_replay.install(rec, replay=False, record=True, store=demo_replay.FixtureStore(tmp_path))
+    rec.include_router(route_router)
+    live = TestClient(rec).get("/api/route", params=params).json()
+    assert live["worst"] == "watch" and live["suggestion"]
+
+    osrm.clear_cache()
+    T.clear_cache()
+    services["osrm"] = httpx.ConnectError("offline")
+
+    play = FastAPI()
+    demo_replay.install(play, replay=True, record=False, store=demo_replay.FixtureStore(tmp_path))
+    play.include_router(route_router)
+    tiles_before = services["tile_calls"]
+    resp = TestClient(play).get("/api/route", params=params)
+    assert resp.status_code == 200 and resp.headers.get(demo_replay.REPLAY_HEADER)
+    d = resp.json()
+    assert services["tile_calls"] == tiles_before  # weather from the recorded tiles
+    assert d["recorded_at"]
+    for key in ("distance_km", "worst", "worst_km", "segments", "findings", "suggestion", "departures"):
+        assert d[key] == live[key], key
+    assert [s["level"] for s in d["samples"]] == [s["level"] for s in live["samples"]]
+    assert any(s["level"] == "watch" for s in d["segments"])
+    assert d["findings"][0]["rule_id"] == "heavy_rain_hour"
+    assert d["suggestion"]["avoids"] == ["rain"]
+
+
+RECORDED_ROUTES = sorted((Path(__file__).resolve().parents[1] / "backend" / "data" / "demo_fixtures" / "routes").glob("route_*.json"))
+
+
+@pytest.mark.skipif(len(RECORDED_ROUTES) < 3, reason="demo routes not recorded (record_demo_fixtures.py --routes)")
+@pytest.mark.parametrize("path", RECORDED_ROUTES, ids=lambda p: p.stem)
+def test_recorded_demo_routes_replay_offline(path, monkeypatch):
+    """The committed demo routes (Pune-Mumbai, Mumbai-Nashik, Pune-Nashik) replay
+    with no network: the line, a level for every sample, the report and the
+    departure options, all from the recorded OSRM answer and weather tiles."""
+    import json
+
+    from fastapi import FastAPI
+
+    import demo_replay
+    from api.route import router as route_router
+
+    real = httpx.AsyncClient
+
+    def offline(*args, **kwargs):
+        kwargs.pop("verify", None)
+
+        def handler(request):
+            raise httpx.ConnectError(f"offline: {request.url.host}")
+
+        return real(*args, transport=httpx.MockTransport(handler), **kwargs)
+
+    async def no_place(lat, lon):
+        return None
+
+    monkeypatch.setattr(httpx, "AsyncClient", offline)
+    monkeypatch.setattr(RW.geocoding, "reverse_geocode", no_place)
+    rec = json.loads(path.read_text(encoding="utf-8"))
+    recorded_at = datetime.fromisoformat(rec["recorded_at"].replace("Z", "+00:00"))
+    monkeypatch.setattr(W, "now_utc", lambda: recorded_at)  # demo morning = the recording time
+    osrm.clear_cache()
+    T.clear_cache()
+
+    app_ = FastAPI()
+    demo_replay.install(app_, replay=True, record=False, store=demo_replay.FixtureStore(path.parents[1]))
+    app_.include_router(route_router)
+    (a_lat, a_lon), (b_lat, b_lon) = rec["from"], rec["to"]
+    resp = TestClient(app_).get("/api/route", params={"from_lat": a_lat, "from_lon": a_lon, "to_lat": b_lat, "to_lon": b_lon})
+    assert resp.status_code == 200, resp.text
+    assert resp.headers.get(demo_replay.REPLAY_HEADER)
+    d = resp.json()
+    assert d["recorded_at"] == rec["recorded_at"]
+
+    # the line: OSRM's distance, samples every 5 km, segments end to end
+    osrm_km = rec["osrm"]["routes"][0]["distance"] / 1000
+    assert abs(d["distance_km"] - osrm_km) < 0.1
+    assert len(d["samples"]) >= int(osrm_km // 5)
+    segs = d["segments"]
+    assert segs[0]["from_km"] == 0 and abs(segs[-1]["to_km"] - d["distance_km"]) < 0.1
+    assert all(x["to_km"] == y["from_km"] for x, y in zip(segs, segs[1:]))
+
+    # hazard colours: a real level for every sample (recorded tiles cover the trip), worst = max
+    levels = [s["level"] for s in d["samples"]]
+    assert "unknown" not in levels and d["beyond_forecast_km"] in (None, 0, 0.0)
+    assert all(lv in LEVEL_RANK for lv in levels)
+    assert d["worst"] == max(levels, key=lambda lv: LEVEL_RANK[lv])
+
+    # the report: a finding for every hazard that fired, none when calm
+    fired = {h for s in d["samples"] for h, lv in s["levels"].items() if lv != "none"}
+    assert {f["hazard"] for f in d["findings"]} == fired
+    assert "Not official IMD" in d["note"]
+
+    # departure options over the next 12 h; a suggestion only when strictly better
+    assert d["departures"]
+    if d["suggestion"] is None:
+        assert d["best_already"] is True
+    else:
+        assert LEVEL_RANK[d["suggestion"]["worst"]] <= LEVEL_RANK[d["worst"]]
 
 
 def test_demo_routes_are_in_the_demo_region():

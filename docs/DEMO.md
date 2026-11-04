@@ -41,8 +41,10 @@ PowerShell, from the repo root:
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
-backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --clean
+backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --clean --map --routes
 ```
+
+**Re-record the routes on demo morning, together with the other fixtures.** A replayed route is scored at the time you ask, against the recorded weather tiles (72 hours from the recording). Routes recorded on an earlier day are scored against stale weather, and once the trip falls past the recorded hours the line turns grey ("beyond the forecast"). `--clean` also removes the old routes and tiles, so record all of them in one run.
 
 - It runs the app in-process (no server needed) against the live services. It sends the same requests the UI sends for each step: the chat answer, then the sky/timeline, air quality, alerts and role panels.
 - It takes 1 to 3 minutes. Nominatim is limited to 1 request per second, and GFS downloads take a while.
@@ -113,7 +115,7 @@ backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map --rou
 
 - **Weather tiles.** It saves the weather tiles (`backend/data/demo_fixtures/map_tiles/`) for every grid step used between about zoom 8 and 11 over the region: 99 tiles of 25 points, 72 hours each.
 - **Tap points.** It also saves `/api/map/point` answers on a 0.25° lattice (63 points).
-- **Routes (`--routes`).** Pune → Mumbai, Mumbai → Nashik and Pune → Nashik: one OSRM request each (the public demo server allows at most 1 request/s) into `demo_fixtures/routes/`, plus the weather tiles along them. Replay serves a route whose start and destination are each within 10 km of a recorded one's; other routes need the internet (`docs/ROUTES.md`).
+- **Routes (`--routes`).** Pune → Mumbai, Mumbai → Nashik and Pune → Nashik: one OSRM request each (the public demo server allows at most 1 request/s) into `demo_fixtures/routes/`, plus the weather tiles along them. Replay serves a route whose start and destination are each within 10 km of a recorded one's; other routes need the internet (`docs/ROUTES.md`). Record them the same morning as the rest (see above); `tests/test_routes.py` checks that the committed routes replay offline with a level for every sample, the report and the departure options.
 - **Cost.** That is about 2,550 Open-Meteo location-calls, in 4-tile batches. Run it once, not in a loop (`docs/OPEN_METEO.md`).
 
 With `DEMO_REPLAY=1`:
