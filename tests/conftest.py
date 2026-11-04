@@ -55,13 +55,21 @@ def reset_map_tile_hooks():
     """demo_replay.install() sets the tile layer's replay/record hooks; never leak them."""
     from maps import tiles
 
+    from routing import osrm
+
     tiles.fixture_loader = None
     tiles.fixture_saver = None
     tiles.clear_cache()
+    osrm.fixture_loader = None
+    osrm.fixture_saver = None
+    osrm.clear_cache()
     yield
     tiles.fixture_loader = None
     tiles.fixture_saver = None
     tiles.clear_cache()
+    osrm.fixture_loader = None
+    osrm.fixture_saver = None
+    osrm.clear_cache()
 
 
 @pytest.fixture(autouse=True)

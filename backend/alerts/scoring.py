@@ -11,7 +11,9 @@ Callers:
 - ``alerts/engine.py`` (alerts, risk board, push, CAP): the place's forecast,
   the 24 h from the current hour, with current values;
 - ``maps/hazard.py`` (the hazard map): each grid point, the 24 h from the
-  slider hour, with current values only for hour 0.
+  slider hour, with current values only for hour 0;
+- ``routing/weather.py`` (routes): each route sample, the ONE forecast hour
+  when the traveller passes, with thresholds.ROUTE_RULES.
 
 The same inputs therefore give the same levels on every surface
 (tests/test_hazard.py checks this end to end).
@@ -157,10 +159,11 @@ def _fires(rule: Rule, value: float) -> bool:
     return int(value) in rule.codes
 
 
-def score(facts: WindowFacts) -> dict[str, Optional[Hit]]:
-    """The highest-level rule that fires for each hazard (None when none does)."""
+def score(facts: WindowFacts, rules: Sequence[Rule] = RULES) -> dict[str, Optional[Hit]]:
+    """The highest-level rule that fires for each hazard (None when none does).
+    ``rules`` is RULES (24 h windows) or thresholds.ROUTE_RULES (one hour, routes)."""
     best: dict[str, Optional[Hit]] = {h: None for h in HAZARDS}
-    for rule in RULES:
+    for rule in rules:
         value = facts.value(rule)
         if value is None or not _fires(rule, value):
             continue

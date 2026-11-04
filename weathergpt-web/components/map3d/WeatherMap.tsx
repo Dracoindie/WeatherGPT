@@ -14,6 +14,9 @@
  *   Under prefers-reduced-motion or lite mode it stays 2D and still: no
  *   terrain, no flyover, no particles (wind arrows instead).
  *
+ * - Route mode: weather along a driving route at the hour the traveller
+ *   passes each point (GET /api/route, components/map3d/route.tsx).
+ *
  * Every number drawn comes from the API. The map always says the model grid
  * size and that values are estimated and not official IMD data.
  */
@@ -49,6 +52,7 @@ import {
   type HexPick,
 } from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
+import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
 
@@ -72,9 +76,9 @@ interface Props {
 }
 
 type GridStatus = 'idle' | 'loading' | 'ready' | 'error' | 'too-large'
-/** A weather surface, or the hazard hexes and roads. */
-type MapMode = LayerId | 'hazard'
-const MODES: MapMode[] = [...LAYERS, 'hazard']
+/** A weather surface, the hazard hexes and roads, or weather along a route. */
+type MapMode = LayerId | 'hazard' | 'route'
+const MODES: MapMode[] = [...LAYERS, 'hazard', 'route']
 
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
 
@@ -107,7 +111,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [grid, setGrid] = useState<MapGrid | null>(null)
   const [gridStatus, setGridStatus] = useState<GridStatus>('idle')
   const [layer, setLayer] = useState<MapMode>('temperature')
-  const surface: LayerId | null = layer === 'hazard' ? null : layer
+  const surface: LayerId | null = layer === 'hazard' || layer === 'route' ? null : layer
   const [hazardType, setHazardType] = useState<HazardType>('overall')
   const [hexPick, setHexPick] = useState<HexPick | null>(null)
   const [mapObj, setMapObj] = useState<MapLibreMap | null>(null)
@@ -124,8 +128,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [mobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
 
   const broadcast3d = broadcast && motion
-  // no particles over the hazard hexes and roads: they would hide the levels
-  const particlesOn = motion && layer !== 'hazard' && (broadcast || layer === 'wind')
+  // no particles over the hazard hexes, roads or a route: they would hide the levels
+  const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && (broadcast || layer === 'wind')
   const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
 
   // -------------------------------------------------------------- hazard ---
@@ -144,6 +148,11 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const maxHour = hazardOn && hazard ? hazard.max_hour : maxGridHour
   const hourShown = Math.min(hour, maxHour)
   const pickedHex = hazard && hexPick && hexPick.point < hazard.points.length ? hexPick : null
+
+  // --------------------------------------------------------------- route ---
+  const routeOn = layer === 'route'
+  const rt = useRoute()
+  const routeReport = routeOn ? rt.report : null
 
   // ---------------------------------------------------------------- grid ---
   const gridAbort = useRef<AbortController | null>(null)
@@ -431,6 +440,17 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       out.push(...hazardLayers({ hazard, hexes, roads: hz.roads, type: hazardType, colors: hazardColors(), big: broadcast }))
     }
 
+    if (routeOn) {
+      out.push(
+        ...routeLayers({
+          report: routeReport,
+          from: rt.from,
+          to: rt.to,
+          colors: { ...hazardColors(), unknown: tokenRgb('--sev-unknown', [148, 163, 184]), marker: colors.gold },
+        })
+      )
+    }
+
     if (place) {
       out.push(
         new ScatterplotLayer({
@@ -448,7 +468,14 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       )
     }
     return out
-  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType])
+  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to])
+
+  // Show the whole route when a new report arrives.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !routeReport || routeReport.segments.length === 0) return
+    map.fitBounds(routeBounds(routeReport), { padding: mobile ? 32 : 60, maxZoom: 11, animate: motion, duration: motion ? 900 : 0 })
+  }, [routeReport, motion, mobile])
 
   // Particles live outside React state: the frame loop advances them and
   // pushes layers to deck directly.
@@ -572,7 +599,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     return z ? formatLocalTime(z.full.replace(' ', 'T'), language) : ''
   }, [grid, hourShown, tz, language])
 
-  const resolution = hazard
+  // in route mode the report states the grid and the sample spacing; the
+  // (hidden) weather grid's point spacing would only mislead next to a route
+  const resolution = routeOn
+    ? routeReport
+      ? null
+      : grid
+        ? fill(t('map.resolutionShort'), { km: grid.model_grid_km })
+        : null
+    : hazard
     ? fill(t('map.hazard.resolution'), { km: hazard.model_grid_km, hex: hazard.hex_km, res: hazard.h3_resolution })
     : grid
     ? fill(t('map.resolution'), { km: grid.model_grid_km, spacing: grid.spacing_km })
@@ -586,8 +621,18 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     setPlaying(next && motion)
   }
 
+  const { picking: routePicking, setPicking: setRoutePicking, setFrom: setRouteFrom, setTo: setRouteTo, clear: clearRoute } = rt
   const handleTap = useCallback(
     (x: number, y: number, lat: number, lon: number) => {
+      if (routeOn && routePicking) {
+        // "Pick on map": this tap sets the start or the destination
+        const end = { latitude: lat, longitude: lon, name: fill(t('route.mapPoint'), { lat: lat.toFixed(3), lon: lon.toFixed(3) }) }
+        if (routePicking === 'from') setRouteFrom(end)
+        else setRouteTo(end)
+        setRoutePicking(null)
+        clearRoute()
+        return
+      }
       if (hazardOn && overlayRef.current) {
         const info = overlayRef.current.pickObject({ x, y, radius: 2, layerIds: ['hazard-hex'] })
         const d = info?.object as { cell: string; point: number } | undefined
@@ -600,7 +645,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       setHexPick(null)
       showPoint(lat, lon)
     },
-    [hazardOn, showPoint]
+    [hazardOn, showPoint, routeOn, routePicking, setRouteFrom, setRouteTo, setRoutePicking, clearRoute, t]
   )
   useEffect(() => {
     clickRef.current = handleTap
@@ -633,6 +678,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           onClick={() => {
             setLayer(id)
             setHexPick(null)
+            // the picked place is a natural start
+            if (id === 'route' && !rt.from && place) rt.setFrom(place)
+            if (id !== 'route') rt.setPicking(null)
           }}
           className={cn(
             'rounded-full border px-3 py-1.5 text-xs transition-colors',
@@ -700,7 +748,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const placeShort = place?.name.split(',')[0]
 
   const legend = (big: boolean) =>
-    hazardOn ? (
+    routeOn ? null : hazardOn ? (
       hazard ? <HazardLegend hazard={hazard} roadsShown={hz.roads.length > 0} tz={tz} big={big} /> : null
     ) : grid && surface ? (
       <MapLegend grid={grid} layer={surface} big={big} />
@@ -779,6 +827,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-hazard-type={hazardOn ? hazardType : undefined}
       data-hazard-cells={hazard ? hazard.cells.length : 0}
       data-road-pieces={hz.roads.length}
+      data-route-segments={routeReport ? routeReport.segments.length : 0}
+      data-route-worst={routeReport ? routeReport.worst : undefined}
+      data-route-picking={routeOn && rt.picking ? rt.picking : undefined}
       data-center={viewCentre ? `${viewCentre.latitude.toFixed(3)},${viewCentre.longitude.toFixed(3)}` : undefined}
       className="flex h-full flex-col gap-3"
     >
@@ -796,6 +847,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       </div>
 
       {hazardOn && <HazardTypeChips type={hazardType} onChange={setHazardType} />}
+      {routeOn && !broadcast && <RoutePlanner r={rt} />}
 
       <div className="relative min-h-[380px] flex-1 overflow-hidden rounded-xl sm:min-h-[460px] lg:min-h-[580px]">
         {!broadcast && <div ref={setSlot} className="absolute inset-0 z-0" />}
@@ -830,13 +882,17 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       {point && mobile && !broadcast && <MapPointCard point={point} onClose={() => setPoint(null)} />}
       {mobile && !broadcast && hazardCard()}
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
-        <div className="min-w-0 space-y-2">
-          {!broadcast && slider}
-          <p className="text-xs text-hud-dim">{t('map.tapHint')}</p>
+      {routeOn ? (
+        routeReport && !broadcast && <RouteReportPanel report={routeReport} tz={tz} onDepart={rt.departAt} />
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+          <div className="min-w-0 space-y-2">
+            {!broadcast && slider}
+            <p className="text-xs text-hud-dim">{t('map.tapHint')}</p>
+          </div>
+          {!broadcast && legend(false) && <div className="min-w-0">{legend(false)}</div>}
         </div>
-        {!broadcast && legend(false) && <div className="min-w-0">{legend(false)}</div>}
-      </div>
+      )}
       {hazardOn && hz.summary && !broadcast && (
         <HazardSummaryPanel summary={hz.summary} placeName={placeShort ?? null} tz={tz} onShowWorst={showWorst} />
       )}

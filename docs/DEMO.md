@@ -98,9 +98,9 @@ So the UI opens with no internet once the site has been loaded once (open it on 
 
 **Running everything on the laptop** (`localhost` backend and frontend) does not need Wi-Fi at all apart from the live services, and replay covers those.
 
-## The map offline (Pune–Mumbai)
+## The map offline (Pune–Mumbai–Nashik)
 
-`/map` needs two things offline: the **weather** (backend replay) and the **map tiles** (browser cache). Both cover one demo region, Pune to Mumbai, defined once in `backend/maps/demo.py` (`GET /api/map/demo-region`).
+`/map` needs two things offline: the **weather** (backend replay) and the **map tiles** (browser cache). Both cover one demo region, Pune, Mumbai and Nashik (18.2–20.2 N, 72.7–74.3 E), defined once in `backend/maps/demo.py` (`GET /api/map/demo-region`). It reaches Nashik so the recorded demo routes have their basemap offline.
 
 **1. Record the map weather (backend, needs internet), the morning of the demo:**
 
@@ -108,11 +108,13 @@ So the UI opens with no internet once the site has been loaded once (open it on 
 $env:PYTHONIOENCODING = "utf-8"
 backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map          # with the chat questions
 backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map-only     # only the map
+backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map --routes  # plus the 3 demo routes
 ```
 
-- **Weather tiles.** It saves the weather tiles (`backend/data/demo_fixtures/map_tiles/`) for every grid step used between about zoom 8 and 11 over the region: 69 tiles of 25 points, 72 hours each.
-- **Tap points.** It also saves `/api/map/point` answers on a 0.25° lattice (35 points).
-- **Cost.** That is about 1,800 Open-Meteo location-calls, in 4-tile batches. Run it once, not in a loop (`docs/OPEN_METEO.md`).
+- **Weather tiles.** It saves the weather tiles (`backend/data/demo_fixtures/map_tiles/`) for every grid step used between about zoom 8 and 11 over the region: 99 tiles of 25 points, 72 hours each.
+- **Tap points.** It also saves `/api/map/point` answers on a 0.25° lattice (63 points).
+- **Routes (`--routes`).** Pune → Mumbai, Mumbai → Nashik and Pune → Nashik: one OSRM request each (the public demo server allows at most 1 request/s) into `demo_fixtures/routes/`, plus the weather tiles along them. Replay serves a route whose start and destination are each within 10 km of a recorded one's; other routes need the internet (`docs/ROUTES.md`).
+- **Cost.** That is about 2,550 Open-Meteo location-calls, in 4-tile batches. Run it once, not in a loop (`docs/OPEN_METEO.md`).
 
 With `DEMO_REPLAY=1`:
 - **The weather layers come from the recorded tiles.** These are the temperature, humidity, wind, rain and heat surfaces, plus the hazard hexes, hazard roads and the 25 km summary. Every response carries the recording time, so the amber "Replay" badge shows.
@@ -121,7 +123,7 @@ With `DEMO_REPLAY=1`:
 
 **2. Save the map tiles (browser, needs internet), once on the demo laptop:**
 
-- Open the site, then **Settings → Offline demo map → Prepare offline map**. It saves about 100 files (a few MB) into the browser's cache:
+- Open the site, then **Settings → Offline demo map → Prepare offline map**. It saves about 130 files (a few MB) into the browser's cache:
   - the OpenFreeMap style, sprites and fonts (Latin and Devanagari)
   - vector tiles and AWS terrain tiles for the region at zoom 6–10
   - MapLibre's worker

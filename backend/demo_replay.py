@@ -28,6 +28,9 @@ The map is different, because every pan asks for a new box:
 - /api/map/point answers a tap with the nearest recorded point within
   POINT_RADIUS_KM, with that point's own coordinates (never relabelled as the
   tapped spot).
+- /api/route replays the recorded OSRM answer (demo_fixtures/routes/) when the
+  start and destination are each within ROUTE_RADIUS_KM of a recorded route's;
+  its weather comes from the recorded tiles (docs/ROUTES.md).
 """
 
 from __future__ import annotations
@@ -61,10 +64,13 @@ _SKIP_PREFIXES = ("/api/push", "/api/alerts/check")
 _COORD_KEYS = {"latitude", "longitude", "lat", "lon"}
 _CONTEXT_KEYS = ("intent", "location_name", "date_reference", "weather_parameter", "climate_period")
 # Map endpoints built from weather tiles: the tile layer replays them (see above).
-_TILE_PATHS = ("/api/map/grid", "/api/map/hazard", "/api/map/hazard/summary", "/api/map/demo-region")
+_TILE_PATHS = ("/api/map/grid", "/api/map/hazard", "/api/map/hazard/summary", "/api/map/demo-region", "/api/route")
 POINT_PATH = "/api/map/point"
 POINT_RADIUS_KM = 25.0
 TILE_DIR_NAME = "map_tiles"
+ROUTE_DIR_NAME = "routes"
+# A route is replayed when its start and destination are each this close to a recorded one's.
+ROUTE_RADIUS_KM = 10.0
 
 OFFLINE_CHAT = {
     "en": "Offline demo: only the prepared demo questions are available right now (no internet connection).",
@@ -242,7 +248,7 @@ class TileFixtureStore:
                 {
                     "latitude": p.latitude, "longitude": p.longitude, "elevation": p.elevation,
                     "hourly": p.hourly, "current": p.current,
-                    "t0": p.t0, "utc_offset": p.utc_offset, "now": p.now,
+                    "t0": p.t0, "utc_offset": p.utc_offset, "now": p.now, "timezone": p.timezone,
                 }
                 for p in tile.points
             ],
@@ -268,6 +274,7 @@ class TileFixtureStore:
                     TilePoint(
                         p["latitude"], p["longitude"], p.get("elevation"), p["hourly"], p["current"],
                         t0=int(p["t0"]), utc_offset=int(p.get("utc_offset") or 0), now=p.get("now"),
+                        timezone=p.get("timezone"),
                     )
                     for p in d["points"]
                 ],
@@ -311,6 +318,48 @@ def offline_chat_response(message: str) -> dict:
     }
 
 
+class RouteFixtureStore:
+    """Recorded OSRM answers (routing/osrm.py), one JSON file per start/destination."""
+
+    def __init__(self, directory: Path):
+        self.directory = directory
+        self.routes: list[dict] = []
+        if directory.is_dir():
+            for path in sorted(directory.glob("route_*.json")):
+                try:
+                    self.routes.append(json.loads(path.read_text(encoding="utf-8")))
+                except (OSError, ValueError) as exc:
+                    logger.warning("Demo replay: skipping unreadable route %s: %s", path.name, exc)
+
+    def count(self) -> int:
+        return len(self.routes)
+
+    def save(self, a_lat: float, a_lon: float, b_lat: float, b_lon: float, data: dict) -> Path:
+        self.directory.mkdir(parents=True, exist_ok=True)
+        record = {
+            "from": [round(a_lat, 5), round(a_lon, 5)],
+            "to": [round(b_lat, 5), round(b_lon, 5)],
+            "recorded_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+            "osrm": data,
+        }
+        target = self.directory / f"route_{a_lat:.3f}_{a_lon:.3f}_{b_lat:.3f}_{b_lon:.3f}.json"
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record) + "\n", encoding="utf-8")
+        tmp.replace(target)
+        self.routes = [r for r in self.routes if (r["from"], r["to"]) != (record["from"], record["to"])] + [record]
+        return target
+
+    def load(self, a_lat: float, a_lon: float, b_lat: float, b_lon: float) -> Optional[tuple[dict, str]]:
+        """The recorded route whose ends are both within ROUTE_RADIUS_KM (closest first)."""
+        best, best_km = None, None
+        for r in self.routes:
+            d1 = _km(a_lat, a_lon, *r["from"])
+            d2 = _km(b_lat, b_lon, *r["to"])
+            if d1 <= ROUTE_RADIUS_KM and d2 <= ROUTE_RADIUS_KM and (best_km is None or d1 + d2 < best_km):
+                best, best_km = r, d1 + d2
+        return (best["osrm"], best["recorded_at"]) if best else None
+
+
 # ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
@@ -331,16 +380,22 @@ def install(app: FastAPI, *, replay: Optional[bool] = None, record: Optional[boo
 
     map_tiles.fixture_loader = tile_store.load if replay else None
     map_tiles.fixture_saver = tile_store.save if record else None
+    route_store = RouteFixtureStore(store.directory / ROUTE_DIR_NAME)
+    from routing import osrm
+
+    osrm.fixture_loader = route_store.load if replay else None
+    osrm.fixture_saver = route_store.save if record else None
     logger.warning(
-        "Demo mode: replay=%s record=%s, %d fixture(s) and %d map tile(s) in %s",
-        replay, record, len(store.fixtures), tile_store.count(), store.directory,
+        "Demo mode: replay=%s record=%s, %d fixture(s), %d map tile(s) and %d route(s) in %s",
+        replay, record, len(store.fixtures), tile_store.count(), route_store.count(), store.directory,
     )
 
     @app.middleware("http")
     async def demo_replay_middleware(request: Request, call_next):
         method, path = request.method, request.url.path
         if not replayable(method, path) or path in _TILE_PATHS:
-            # map grids and hazards replay through the tile layer (recorded tiles)
+            # map grids, hazards and routes replay through the tile layer and
+            # the routing client (recorded tiles and OSRM answers)
             return await call_next(request)
         query = dict(request.query_params)
         body: Any = None

@@ -90,7 +90,8 @@ def test_region_tiles_cover_the_region_at_every_step():
         assert max(rows) * span + (T.TILE_POINTS - 1) * step >= DEMO_REGION["north"] - 1e-6
         assert min(cols) * span <= DEMO_REGION["west"] + 1e-6
         assert max(cols) * span + (T.TILE_POINTS - 1) * step >= DEMO_REGION["east"] - 1e-6
-    assert len(point_lattice()) == 35
+    # 18.2-20.2 N x 72.7-74.3 E every 0.25 deg: 9 rows x 7 columns
+    assert len(point_lattice()) == 63
 
 
 def test_tile_store_round_trip(tmp_path):

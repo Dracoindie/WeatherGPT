@@ -144,6 +144,22 @@ RULES: tuple[Rule, ...] = (
     THUNDERSTORM_HEAVY_HAIL,
 )
 
+# ---------------------------------------------------------------------------
+# Route rules (routing/weather.py): one forecast HOUR at the point a traveller
+# passes, not a 24 h window. The instant rules above apply unchanged; the 24 h
+# rain totals cannot be compared with one hour of rain, so on routes rain comes
+# from the model's WMO weather code for that hour (WMO code table 4677, as
+# published by Open-Meteo: 61/63/65 rain slight/moderate/heavy, 80/81/82 rain
+# showers slight/moderate/violent). No mm-per-hour threshold is invented.
+# ---------------------------------------------------------------------------
+MODERATE_RAIN_HOUR = Rule(
+    "moderate_rain_hour", "rain", "advisory", "Moderate rain", "weather_code", "in", 63.0, "WMO code", "that hour", (63, 81)
+)
+HEAVY_RAIN_HOUR = Rule(
+    "heavy_rain_hour", "rain", "watch", "Heavy rain", "weather_code", "in", 65.0, "WMO code", "that hour", (65, 82)
+)
+ROUTE_RULES: tuple[Rule, ...] = tuple(r for r in RULES if r.parameter != "precipitation") + (MODERATE_RAIN_HOUR, HEAVY_RAIN_HOUR)
+
 # Chat advisory severity for a rule's level.
 ADVISORY_SEVERITY: dict[Level, str] = {"severe": "high", "warning": "high", "watch": "moderate", "advisory": "moderate"}
 
@@ -158,11 +174,16 @@ STORM_WIND_KMH = GALE.value
 STORM_WMO_CODES = frozenset(THUNDERSTORM.codes + THUNDERSTORM_HAIL.codes + THUNDERSTORM_HEAVY_HAIL.codes)
 
 
-def as_table() -> list[dict]:
-    """JSON-ready rows for GET /api/alerts/thresholds."""
+def rules_table(rules: tuple[Rule, ...]) -> list[dict]:
+    """JSON-ready rows for a set of rules."""
     rows = []
-    for r in RULES:
+    for r in rules:
         row = asdict(r)
         row["codes"] = list(r.codes)
         rows.append(row)
     return rows
+
+
+def as_table() -> list[dict]:
+    """JSON-ready rows for GET /api/alerts/thresholds."""
+    return rules_table(RULES)

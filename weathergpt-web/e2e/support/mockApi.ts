@@ -512,6 +512,70 @@ function nwpResponse() {
 /** Returns a chat body, or { status, body } for an error response. */
 export type ChatHandler = (body: Record<string, unknown>) => object
 
+/**
+ * GET /api/route: a straight line between the requested points, 120 km in
+ * 120 min, a sample every 5 km. Leaving "now" (no depart): heavy rain (watch)
+ * at km 60-70 near Kasara, and the suggestion "leave 15 min later" avoids it.
+ * Any explicit departure: dry all the way, already the lowest hazard.
+ */
+export function mapRoute(q: URLSearchParams) {
+  const a = { latitude: Number(q.get('from_lat')), longitude: Number(q.get('from_lon')) }
+  const b = { latitude: Number(q.get('to_lat')), longitude: Number(q.get('to_lon')) }
+  const now = new Date()
+  now.setSeconds(0, 0)
+  const departParam = q.get('depart')
+  const depart = departParam ? new Date(departParam) : now
+  depart.setSeconds(0, 0)
+  const wet = !departParam
+  const total = 120
+  const at = (km: number): [number, number] => {
+    const f = km / total
+    return [a.longitude + f * (b.longitude - a.longitude), a.latitude + f * (b.latitude - a.latitude)]
+  }
+  const iso = (d: Date) => d.toISOString().slice(0, 19) + 'Z'
+  const eta = (km: number) => iso(new Date(depart.getTime() + km * 60_000))
+  const levelAt = (km: number) => (wet && km >= 60 && km <= 70 ? 'watch' : 'none')
+  const samples = Array.from({ length: total / 5 + 1 }, (_, i) => {
+    const km = i * 5
+    const [lon, lat] = at(km)
+    const level = levelAt(km)
+    return {
+      km, latitude: lat, longitude: lon, eta: eta(km), level,
+      levels: { rain: level, heat: 'none', wind: 'none', storm: 'none', cold: 'none' },
+      facts: { rain_mm: level === 'watch' ? 8 : 0, temp_max: 27, temp_min: 27, wind_max: 12, heat_index_max: 28, weather_code: level === 'watch' ? 65 : 3 },
+      triggers: level === 'watch' ? [{ hazard: 'rain', level: 'watch', rule_id: 'heavy_rain_hour', label: 'Heavy rain', value: 65, threshold: 65, comparator: 'in', unit: 'WMO code', window: 'that hour' }] : [],
+      grid_latitude: Number(lat.toFixed(2)), grid_longitude: Number(lon.toFixed(2)),
+    }
+  })
+  const seg = (from: number, to: number, level: string) => ({ from_km: from, to_km: to, level, path: [at(from), at((from + to) / 2), at(to)] })
+  const segments = wet ? [seg(0, 57.5, 'none'), seg(57.5, 72.5, 'watch'), seg(72.5, total, 'none')] : [seg(0, total, 'none')]
+  const departures = Array.from({ length: 49 }, (_, k) => ({
+    depart: iso(new Date(depart.getTime() + k * 15 * 60_000)),
+    worst: wet && k === 0 ? 'watch' : 'none',
+    worst_km: wet && k === 0 ? 15 : total,
+    complete: true,
+  }))
+  const [flon, flat] = at(65)
+  return {
+    origin: a, destination: b, distance_km: total, duration_min: total,
+    depart: iso(depart), arrive: eta(total), timezone: 'Asia/Kolkata',
+    worst: wet ? 'watch' : 'none', worst_km: wet ? 15 : total,
+    samples, segments,
+    findings: wet
+      ? [{ hazard: 'rain', level: 'watch', rule_id: 'heavy_rain_hour', label: 'Heavy rain', value: 65, threshold: 65, comparator: 'in', unit: 'WMO code', from_km: 60, to_km: 70, km: 65, eta: eta(65), latitude: flat, longitude: flon, place: 'Kasara', road: 'NH160' }]
+      : [],
+    departures,
+    current_rank_key: wet ? [2, 15, 30] : [0, total, 0],
+    suggestion: wet ? { depart: departures[1].depart, worst: 'none', worst_km: total, minutes_later: 15, avoids: ['rain'], lowers: [] } : null,
+    best_already: !wet,
+    beyond_forecast_km: 0,
+    sample_km: 5, step_deg: 0.08, spacing_km: 8.9, model_grid_km: 8,
+    routing: 'OSRM', routing_host: 'router.project-osrm.org', routing_public_demo: true,
+    rules: [], retrieved_at: new Date().toISOString(), recorded_at: null,
+    note: 'Estimated from Open-Meteo model data (model grid ≈ 8 km) for the hour you are expected to pass each point, using OSRM travel times. Lower estimated weather hazard does not mean safe. Not official IMD warnings.',
+  }
+}
+
 export interface MockOptions {
   chat?: ChatHandler
   weatherCode?: number
@@ -617,6 +681,8 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
         return json(route, mapHazard(new URL(req.url()).searchParams))
       case '/api/map/hazard/summary':
         return json(route, mapHazardSummary(new URL(req.url()).searchParams))
+      case '/api/route':
+        return json(route, mapRoute(new URL(req.url()).searchParams))
       default:
         return json(route, { detail: `Not mocked: ${pathname}` }, 404)
     }

@@ -75,6 +75,7 @@ class TilePoint:
     t0: int = 0  # UTC instant (unix seconds) of the first hourly sample
     utc_offset: int = 0  # the point's UTC offset (seconds), from Open-Meteo
     now: Optional[int] = None  # the model's current time (unix seconds)
+    timezone: Optional[str] = None  # IANA zone from Open-Meteo (for clock labels)
 
     def instants(self) -> list[datetime]:
         n = len(self.hourly.get("temperature_2m") or [])
@@ -219,6 +220,7 @@ def _build(key: TileKey, items: list[dict[str, Any]]) -> Tile:
                     t0=stamps[0],
                     utc_offset=off,
                     now=_unix(cur["time"], off) if cur.get("time") is not None else None,
+                    timezone=item.get("timezone"),
                 )
             )
     except (KeyError, TypeError, IndexError) as exc:

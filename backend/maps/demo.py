@@ -1,5 +1,7 @@
 """
-The offline map demo region (docs/DEMO.md): Pune to Mumbai.
+The offline map demo region (docs/DEMO.md): Pune, Mumbai and Nashik, so the
+recorded demo routes (Pune -> Mumbai, Mumbai -> Nashik, Pune -> Nashik;
+docs/ROUTES.md) also have their basemap offline.
 
 The one place the demo box is defined. The recorder
 (scripts/record_demo_fixtures.py --map) saves the weather tiles and a lattice
@@ -14,7 +16,11 @@ import math
 
 from maps import tiles as T
 
-DEMO_REGION = {"name": "Pune–Mumbai", "south": 18.2, "west": 72.7, "north": 19.4, "east": 74.3}
+DEMO_REGION = {"name": "Pune–Mumbai–Nashik", "south": 18.2, "west": 72.7, "north": 20.2, "east": 74.3}
+
+# Demo routes recorded for replay (record_demo_fixtures.py --routes). Places are
+# geocoded at record time; these are names, not coordinates.
+DEMO_ROUTES: tuple[tuple[str, str], ...] = (("Pune", "Mumbai"), ("Mumbai", "Nashik"), ("Pune", "Nashik"))
 
 # Grid steps a view of the region uses between about zoom 8 and zoom 11.
 DEMO_STEPS: tuple[float, ...] = (0.08, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0)

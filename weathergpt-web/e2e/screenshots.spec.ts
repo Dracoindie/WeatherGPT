@@ -184,3 +184,22 @@ test('@screens map: hazard hexes, roads, card and summary', async ({ page }, inf
   await page.waitForTimeout(4000)
   await shot(page, info.project.name, 'map-hazard-broadcast', false)
 })
+
+test('@screens map: weather along a route, report and departure suggestion', async ({ page }, info) => {
+  await mockBackend(page)
+  await enterDemo(page)
+  await navigate(page, '/map')
+  await pickLocation(page)
+  const map = page.getByTestId('weather-map')
+  await map.locator('canvas.maplibregl-canvas').waitFor({ timeout: 30_000 })
+  await page.waitForTimeout(3000)
+  await page.getByTestId('map-layer-route').click()
+  await page.getByTestId('route-to-input').fill('Mumbai')
+  await page.getByTestId('route-to-search').click()
+  await page.getByTestId('route-to-name').waitFor({ timeout: 10_000 })
+  await page.getByTestId('route-go').click()
+  await page.getByTestId('route-report').waitFor({ timeout: 15_000 })
+  // let fitBounds finish
+  await page.waitForTimeout(2500)
+  await shot(page, info.project.name, 'map-route')
+})

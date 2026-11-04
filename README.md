@@ -409,9 +409,14 @@ Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or der
 - **Response:** `points` (per sample: `levels` per hazard, `overall`, the window's `facts`, and `triggers`: rule, value vs threshold, unit, window), `cells` (`[h3, point index]`), `counts` per level, the `worst` cell, and the rules table.
 - **Same scorer as alerts:** scored by `alerts/scoring.py`, the scorer the alert engine, risk board, push and CAP use.
 
-`GET /api/map/demo-region` returns the offline demo region (Pune–Mumbai) and the zoom levels the web app precaches (`docs/DEMO.md`).
+`GET /api/map/demo-region` returns the offline demo region (Pune–Mumbai–Nashik) and the zoom levels the web app precaches (`docs/DEMO.md`).
 
 `GET /api/map/hazard/summary?latitude=&longitude=&radius_km=25&hour=0` returns the cells per level within the radius, the most rain (24 h), the worst cell now, and the first window (hours from now) at the worst level in the next 72 h.
+
+`GET /api/route?from_lat=&from_lon=&to_lat=&to_lon=[&depart=ISO with zone]` returns the estimated weather hazard along a driving route at the hour the traveller passes each point (`docs/ROUTES.md`):
+- **Routing:** OSRM, called only by the backend (`ROUTING_URL`, default the public OSRM demo server: no uptime guarantee, at most 1 request/s). Cached 6 h, 12 s read timeout; 503 with a clear message when it does not answer, 422 for no road route or a departure outside the next 72 h.
+- **Scoring:** a sample every 5 km; arrival time from OSRM's own durations; the nearest grid point of the shared map tiles and the forecast hour nearest the arrival; `alerts/scoring.py` with `thresholds.ROUTE_RULES` (the instant rules, plus rain from that hour's WMO code).
+- **Response:** `samples`, coloured `segments`, `findings` (hazard, level, value vs threshold, km, clock time, nearby town or road), 49 `departures` over 12 h, the `suggestion` (lowest worst level) and the honesty fields. Never "safe": only "lower estimated weather hazard".
 
 **Heat index.** The NWS method (Rothfusz regression with the low/high humidity adjustments) in `backend/maps/heat_index.py`. The bands are the NWS categories (Caution 26.7 °C, Extreme caution 32.2 °C, Danger 39.4 °C, Extreme danger 51.7 °C) in `thresholds.py`. It is guidance for outdoor workers, assumes shade, and is not an official product.
 

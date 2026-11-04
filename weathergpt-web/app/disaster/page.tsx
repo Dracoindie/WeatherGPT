@@ -24,7 +24,18 @@ import {
   type RiskLevel,
 } from '@/lib/api/roles'
 
-const RiskMap = dynamic(() => import('@/components/map/RiskMap'), {
+/** Offline (or a failed deploy), the map's lazy chunk may be missing: say so
+ * instead of crashing the page; the district list below still works. */
+function MapUnavailable() {
+  const { t } = useI18n()
+  return (
+    <div className="flex h-full min-h-[320px] items-center justify-center rounded-xl bg-white/[0.03] p-6 text-center text-sm text-hud-dim" role="note" data-testid="risk-map-unavailable">
+      {t('disaster.mapOffline')}
+    </div>
+  )
+}
+
+const RiskMap = dynamic(() => import('@/components/map/RiskMap').catch(() => MapUnavailable), {
   ssr: false,
   loading: () => <div className="h-full min-h-[320px] animate-pulse rounded-xl bg-white/[0.03]" />,
 })

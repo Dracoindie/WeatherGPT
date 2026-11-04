@@ -18,8 +18,12 @@ Options:
     --map       also record the offline map for the demo region (maps/demo.py):
                 the weather tiles for every grid step used between about zoom 8
                 and 11 (one Open-Meteo request per 4 tiles) and a 0.25° lattice
-                of tap points. About 1,800 Open-Meteo location-calls: run once.
+                of tap points. About 2,550 Open-Meteo location-calls: run once.
     --map-only  record only the map
+    --routes    also record the demo routes (maps/demo.py DEMO_ROUTES: Pune ->
+                Mumbai, Mumbai -> Nashik, Pune -> Nashik): one OSRM request
+                each (public demo server: at most 1 request/s) plus the weather
+                tiles along them. docs/ROUTES.md
 """
 
 from __future__ import annotations
@@ -82,6 +86,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--map", action="store_true")
     ap.add_argument("--map-only", action="store_true")
+    ap.add_argument("--routes", action="store_true")
     args = ap.parse_args()
     if args.map_only:
         args.map = True
@@ -92,6 +97,10 @@ def main() -> int:
 
             n = sum(len(region_tile_keys(s)) for s in DEMO_STEPS)
             print(f"map: {DEMO_REGION['name']}, {n} tiles over {len(DEMO_STEPS)} steps, {len(point_lattice())} tap points")
+        if args.routes:
+            from maps.demo import DEMO_ROUTES
+
+            print("routes:", ", ".join(f"{a} -> {b}" for a, b in DEMO_ROUTES))
         for m, role, fu in DEMO_CHAT:
             print(f"chat [{role}{', follow-up' if fu else ''}] {m}")
         print("alerts:", ", ".join(ALERT_PLACES))
@@ -107,6 +116,8 @@ def main() -> int:
         for f in demo_replay.FIXTURE_DIR.glob("*.json"):
             f.unlink()
         for f in (demo_replay.FIXTURE_DIR / demo_replay.TILE_DIR_NAME).glob("tile_*.json"):
+            f.unlink()
+        for f in (demo_replay.FIXTURE_DIR / demo_replay.ROUTE_DIR_NAME).glob("route_*.json"):
             f.unlink()
 
     failures: list[str] = []
@@ -129,6 +140,8 @@ def main() -> int:
 
     if args.map:
         record_map(get, failures)
+    if args.routes:
+        record_routes(get, failures)
     if args.map_only:
         return report(failures)
 
@@ -195,12 +208,28 @@ def record_map(get, failures: list[str]) -> None:
     print(f"map points: {len(points)} in {DEMO_REGION['name']}")
 
 
+def record_routes(get, failures: list[str]) -> None:
+    """The demo routes: OSRM answers (saved by routing/osrm.py while DEMO_RECORD=1)
+    and the weather tiles along them (saved by the tile layer)."""
+    from maps.demo import DEMO_ROUTES
+
+    for a, b in DEMO_ROUTES:
+        ga, gb = get("/api/geocode", q=a), get("/api/geocode", q=b)
+        if not ga or not gb:
+            failures.append(f"route {a} -> {b}: geocoding failed")
+            continue
+        r = get("/api/route", from_lat=ga["latitude"], from_lon=ga["longitude"], to_lat=gb["latitude"], to_lon=gb["longitude"])
+        if r:
+            print(f"route {a} -> {b}: {r['distance_km']} km, {len(r['samples'])} samples, worst {r['worst']}")
+
+
 def report(failures: list[str]) -> int:
     import demo_replay
 
     count = len(list(demo_replay.FIXTURE_DIR.glob("*.json")))
     tiles = len(list((demo_replay.FIXTURE_DIR / demo_replay.TILE_DIR_NAME).glob("tile_*.json")))
-    print(f"\n{count} fixture file(s) and {tiles} map tile(s) in {demo_replay.FIXTURE_DIR}")
+    routes = len(list((demo_replay.FIXTURE_DIR / demo_replay.ROUTE_DIR_NAME).glob("route_*.json")))
+    print(f"\n{count} fixture file(s), {tiles} map tile(s) and {routes} route(s) in {demo_replay.FIXTURE_DIR}")
     if failures:
         print("\nNot recorded (check the internet connection, then run again):")
         for f in failures:

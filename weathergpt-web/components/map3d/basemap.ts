@@ -1,0 +1,67 @@
+/**
+ * Shared basemap helpers for every MapLibre map (/map, the risk board map and
+ * the console's mini map), so they all look and behave the same.
+ */
+
+import type { Map as MapLibreMap, StyleSpecification } from 'maplibre-gl'
+
+export function cssVar(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+}
+
+/** Living Sky tint on the OpenFreeMap dark style: navy land, deep-blue water. */
+export function tintBasemap(map: MapLibreMap): void {
+  const base = cssVar('--map-base', 'black')
+  const water = cssVar('--map-water', 'black')
+  const style = map.getStyle() as StyleSpecification | undefined
+  for (const l of style?.layers ?? []) {
+    try {
+      if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', base)
+      else if (l.id === 'water' && l.type === 'fill') map.setPaintProperty(l.id, 'fill-color', water)
+    } catch {
+      // a layer the style does not have: nothing to tint
+    }
+  }
+}
+
+/** A small neutral dot (12 x 12 px at pixel ratio 2) for icons the style's sprite lacks. */
+function fallbackIcon(): { width: number; height: number; data: Uint8ClampedArray } {
+  const size = 12
+  const data = new Uint8ClampedArray(size * size * 4)
+  const c = (size - 1) / 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot(x - c, y - c)
+      const o = (y * size + x) * 4
+      if (d <= 3.2) {
+        // light slate dot with a dark rim, readable on the dark basemap
+        const rim = d > 2.2
+        data[o] = rim ? 15 : 203
+        data[o + 1] = rim ? 23 : 213
+        data[o + 2] = rim ? 42 : 225
+        data[o + 3] = 230
+      }
+    }
+  }
+  return { width: size, height: size, data }
+}
+
+/**
+ * Some basemap styles reference icons their sprite does not contain (the
+ * OpenFreeMap dark style asks for "circle-11"), and MapLibre warns on every
+ * tile. Answer `styleimagemissing` with a small neutral dot instead.
+ */
+export function addMissingImageFallback(map: MapLibreMap): void {
+  map.on('styleimagemissing', (e: { id: string }) => {
+    if (!e.id || map.hasImage(e.id)) return
+    try {
+      map.addImage(e.id, fallbackIcon(), { pixelRatio: 2 })
+    } catch {
+      // added meanwhile by another tile: fine
+    }
+  })
+}
+
+/** The worker URL every MapLibre map shares (copied by scripts/copy-maplibre-worker.mjs). */
+export const MAPLIBRE_WORKER = '/vendor/maplibre-gl-worker.mjs'

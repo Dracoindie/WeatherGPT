@@ -70,6 +70,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 | `alerts/engine.py` | Alert engine: the scorer on the place's forecast for the 24 h from the current hour, plus alert texts. `api/alerts.py` retries, serves stale data, then returns a clean 503. |
 | `climate/` | Open-Meteo archive: a period compared with the same dates over the previous 10 years |
 | `nwp/` | GFS from NOMADS via the GRIB filter. Decoding runs in a worker thread. |
+| `routing/` | Weather along a route (`docs/ROUTES.md`): `osrm.py` (OSRM through the backend only, `ROUTING_URL`, default public demo server with no uptime guarantee; 1 request/s, 6 h cache, timeout, replay hooks) and `weather.py` (a sample every 5 km, arrival time from OSRM durations, nearest tile point and forecast hour, the one scorer with `thresholds.ROUTE_RULES`, findings, departure suggestion over 12 h). Never says "safe". |
 | `maps/` | `hazard.py` (hazard per H3 cell, res 6 at the ~8 km model grid, coarser when samples are sparser; nearest-sample values; summary within a radius) and `/map` data: `point.py` (tapped point: shared Open-Meteo client + CAMS AQI + heat index, 10 min cache), `tiles.py` (fixed 5×5-point tiles per grid step, shared by all users, 15 min cache, only missing tiles fetched in ONE batched request, hours aligned across tiles), `grid.py` (up to 4 tiles = 100 points, 72 h, `MODEL_GRID_KM`), `heat_index.py` (NWS method; bands in `thresholds.py`) |
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
@@ -81,7 +82,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
 
 **Endpoints:**
 - `/api/chat`, `/api/weather`, `/api/forecast`, `/api/alerts`, `/api/alerts/thresholds`, `/api/alerts/cap`, `/api/climate`, `/api/nwp`
-- `/api/map/point`, `/api/map/grid`, `/api/map/hazard`, `/api/map/hazard/summary`
+- `/api/map/point`, `/api/map/grid`, `/api/map/hazard`, `/api/map/hazard/summary`, `/api/route`
 - `/api/air-quality`, `/api/farm`, `/api/aviation`, `/api/risk`, `/api/compare`
 - `/api/push/config`, `POST /api/alerts/check` (needs the `X-Job-Token` header), `POST /api/push/test` (signed-in demo push to the caller's own subscriptions, 1/min)
 
@@ -92,6 +93,7 @@ weathergpt-web/ (Next.js, "Living Sky" UI)  ──HTTP──▶  backend/ (FastA
   - `/`: the Living Sky chat console, with a 3D sky scene driven by real codes and wind
   - `/dashboard`, `/alerts`, `/climate`, `/map`, `/disaster` (district board), `/login`, `/signup`, `/offline`
   - `/map` is `components/map3d/` (MapLibre GL + deck.gl, loaded only there). Basemap: OpenFreeMap `dark` style; terrain: AWS terrarium tiles; both keyless (`components/map3d/sources.ts`). With `NEXT_PUBLIC_MAPTILER_KEY`: MapTiler `dataviz-dark` and `terrain-rgb-v2`, falling back to keyless at runtime on 401/403/429 or a failed style. MapLibre's worker is copied to `public/vendor/` by `scripts/copy-maplibre-worker.mjs` (`predev`/`prebuild`, git-ignored). Broadcast mode renders through a portal on `<body>`; the map container node is moved, never rebuilt. Map colours are the `--map-*` tokens in `globals.css` (validated one-hue ramps). Every map shows "Model grid ≈ 8 km · estimated · not official IMD". Roadmap: `docs/VISION.md`.
+  - Route mode (`components/map3d/route.tsx`): start and destination by search (`/api/geocode`), tap ("Pick on map") or "My location", departure now or within 72 h; the line coloured by `/api/route` levels, a timeline strip (km and clock time), findings, and "Leaving at … avoids …" with "Use this departure". Grey = beyond the forecast.
   - Hazard mode (`components/map3d/hazard.tsx`, `roads.ts`): H3 hexes by level from `/api/map/hazard` (h3-js for the boundaries), hazard-type chips, a tap card with value vs threshold, a 25 km summary with "Show me the worst". Roads are coloured by the cells they cross, using the basemap's own `transportation` vectors (major classes only, a vertex budget, recomputed only on view, hour or type change); the legend says road colour is NOT traffic. No wind particles in hazard mode. Fly-tos use `flyToSteady` (a resize mid-flight would shift the end point).
 - **Shared code:**
   - `context/`: `I18nContext` (UI dictionary: EN / हि / Hinglish / मरा), `AuthContext`, `DemoContext`
@@ -198,7 +200,7 @@ npm run dev               # http://localhost:3000
 - Playwright mocks the backend, Nominatim and Supabase (`e2e/support/mockApi.ts`).
 - If `npm run dev` is also running, use `--workers=1`, or WebGL-heavy tests may time out.
 - Headless Chromium draws WebGL in software (SwiftShader), so lite mode's auto setting picks the CSS sky in e2e (`lib/liteMode.ts`, reason `software-renderer`). That is the CI fix. A test that needs the WebGL sky sets `localStorage['wgpt:lite-mode'] = 'off'`, as the screenshot and audit specs do.
-- Demo replay for offline judging: `docs/DEMO.md` (`DEMO_REPLAY=1`, fixtures in `backend/data/demo_fixtures/`). The map replays from recorded weather tiles (`demo_fixtures/map_tiles/`, `record_demo_fixtures.py --map`) for the Pune–Mumbai region in `backend/maps/demo.py`; taps get the nearest recorded point within 25 km with its own coordinates. Settings -> "Prepare offline map" (`lib/offlineMap.ts`, dynamic import) saves basemap and terrain tiles for that region at zoom 6-10; `public/sw.js` serves them only when the network fails.
+- Demo replay for offline judging: `docs/DEMO.md` (`DEMO_REPLAY=1`, fixtures in `backend/data/demo_fixtures/`). The map replays from recorded weather tiles (`demo_fixtures/map_tiles/`, `record_demo_fixtures.py --map`) for the Pune–Mumbai–Nashik region in `backend/maps/demo.py`; taps get the nearest recorded point within 25 km with its own coordinates. `--routes` records the 3 demo routes (`demo_fixtures/routes/`; replayed when both ends are within 10 km). Settings -> "Prepare offline map" (`lib/offlineMap.ts`, dynamic import) saves basemap and terrain tiles for that region at zoom 6-10; `public/sw.js` serves them only when the network fails.
 - On Windows, set `PYTHONIOENCODING=utf-8` when printing Devanagari from Python.
 
 ## Environment variables
@@ -211,6 +213,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
   - `SUPABASE_SERVICE_ROLE_KEY`: alert job only
 - **Web Push:** `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `ALERT_JOB_TOKEN`. Key generation is in `docs/EARLY_WARNING.md`.
 - **Open-Meteo:** `OPEN_METEO_API_KEY` (optional, backend only; switches every client to the commercial `customer-` hosts via `open_meteo_access.py`). Without it the free endpoints are used: non-commercial only, 10,000 calls/day (`docs/OPEN_METEO.md`).
+- **Routing:** `ROUTING_URL` (optional; OSRM base URL, default `https://router.project-osrm.org`, the public demo server with no uptime guarantee; set a self-hosted OSRM for real use)
 - **Other backend:** `ALLOWED_ORIGINS`
 - **Frontend:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE_URL`, and optionally `NEXT_PUBLIC_MAPTILER_KEY` (MapTiler basemap and terrain for `/map`; a public browser key, so restrict it by domain; without it, or if MapTiler refuses it, the keyless OpenFreeMap and AWS sources are used)
 
@@ -222,6 +225,7 @@ Backend variables go in `backend/.env` (python-dotenv; real environment variable
 - `docs/EARLY_WARNING.md`: push, CAP, WhatsApp, VAPID setup, the job
 - `docs/ROLE_ADVISORIES.md`: farmer and aviation thresholds
 - `docs/AUTH_LOCATION_ARCHITECTURE.md`: trusted location and RLS
+- `docs/ROUTES.md`: weather along a route, OSRM, fair use, scoring at arrival time, departure suggestion, replay
 - `docs/OPEN_METEO.md`: free-tier limits, non-commercial terms, how calls are counted, the optional key
 - `docs/DEPLOYMENT.md`: Render/Railway (`backend/Dockerfile`, `render.yaml`), Vercel, Supabase auth URLs, GitHub secrets, smoke test
 
