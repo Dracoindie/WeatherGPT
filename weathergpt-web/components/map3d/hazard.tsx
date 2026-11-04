@@ -12,12 +12,13 @@
 
 import type { Layer } from '@deck.gl/core'
 import { PathLayer, PolygonLayer } from '@deck.gl/layers'
-import { cellToBoundary } from 'h3-js'
-import { Crosshair, X } from 'lucide-react'
+import { cellToBoundary, cellToLatLng } from 'h3-js'
+import { Crosshair, MessageCircle, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { askHref } from '@/components/console/AskCard'
 import { SeverityBadge } from '@/components/ui/SeverityBadge'
-import { SkyButton } from '@/components/ui/SkyButton'
+import { SkyButton, SkyLinkButton } from '@/components/ui/SkyButton'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import {
   fetchHazardSummary,
@@ -42,6 +43,24 @@ export const HAZARD_TYPES: HazardType[] = ['overall', 'rain', 'heat', 'wind', 's
 export interface HexPick {
   cell: string
   point: number
+}
+
+/** The day word for a window start: today, tomorrow or the day after (local). */
+export function dayKey(windowStartIso: string, tz: string, nowMs: number = Date.now()): 'today' | 'tomorrow' | 'dayAfter' {
+  const day = (ms: number) => {
+    const z = zonedClock(new Date(ms).toISOString(), 0, tz)
+    return z ? Date.parse(`${z.full.slice(0, 10)}T00:00:00Z`) : NaN
+  }
+  const start = Date.parse(/[zZ]$/.test(windowStartIso) ? windowStartIso : `${windowStartIso}Z`)
+  const diff = Math.round((day(start) - day(nowMs)) / 86_400_000)
+  return diff <= 0 || Number.isNaN(diff) ? 'today' : diff === 1 ? 'tomorrow' : 'dayAfter'
+}
+
+/** The focus of the question: the hazard with the highest firing rule here (or the chosen type). */
+export function askFocus(p: HazardPoint, type: HazardType): HazardKind | 'none' {
+  if (type !== 'overall') return p.levels[type] !== 'none' ? type : 'none'
+  const top = [...p.triggers].sort((a, b) => HAZARD_LEVELS.indexOf(b.level) - HAZARD_LEVELS.indexOf(a.level))[0]
+  return top ? top.hazard : 'none'
 }
 
 /** The level a hex shows for the chosen hazard type. */
@@ -356,6 +375,12 @@ export function HazardCard({
   const level = levelFor(p, type)
   const triggers = type === 'overall' ? p.triggers : p.triggers.filter((tr) => tr.hazard === type)
   const f = p.facts
+  // "Ask about this area": the hex centre, the window's day, the main hazard, in the UI language
+  const [hexLat, hexLon] = cellToLatLng(pick.cell)
+  const question = fill(t(`ask.area.${askFocus(p, type)}` as TranslationKey), {
+    day: t(`ask.day.${dayKey(hazard.window_start, tz)}` as TranslationKey),
+  })
+  const askText = question.charAt(0).toUpperCase() + question.slice(1)
 
   return (
     <section className={cn('sky-glass map-overlay p-4', className)} data-testid="map-hazard-card" aria-live="polite" aria-label={t('map.hazard.card')}>
@@ -421,6 +446,14 @@ export function HazardCard({
         <br />
         {fill(t('map.hazard.hex'), { km: hazard.hex_km, res: hazard.h3_resolution, lat: p.latitude.toFixed(2), lon: p.longitude.toFixed(2) })}
       </p>
+      <SkyLinkButton
+        href={askHref(askText, { latitude: Number(hexLat.toFixed(4)), longitude: Number(hexLon.toFixed(4)) })}
+        variant="subtle"
+        className="mt-3 w-full justify-center"
+        data-testid="map-hazard-ask"
+      >
+        <MessageCircle className="h-4 w-4" aria-hidden /> {t('map.hazard.ask')}
+      </SkyLinkButton>
     </section>
   )
 }

@@ -117,6 +117,42 @@ test('the time slider moves the hazard window', async ({ page }) => {
   await expect(page.getByTestId('map-time-slider')).toHaveAttribute('max', '48')
 })
 
+test('"Ask about this area" opens the console with a question for that hex, time and language', async ({ page, isMobile }) => {
+  await openHazard(page)
+  await page.getByTestId('map-centre').click()
+  const card = page.getByTestId('map-hazard-card')
+  await expect(card).toBeVisible({ timeout: 15_000 })
+  const ask = card.getByTestId('map-hazard-ask')
+  await expect(ask).toContainText('Ask about this area')
+
+  // the Pune hex has a heavy-rain watch, so the question is about rain; hour 0 is today
+  const url = new URL((await ask.getAttribute('href'))!, 'http://x')
+  expect(url.pathname).toBe('/')
+  expect(url.searchParams.get('q')).toBe('Will there be heavy rain here today?')
+  // the hex centre, not the map centre: within one res-5 hex (~10 km) of Pune
+  expect(Math.abs(Number(url.searchParams.get('lat')) - 18.52)).toBeLessThan(0.15)
+  expect(Math.abs(Number(url.searchParams.get('lon')) - 73.86)).toBeLessThan(0.15)
+
+  // the window two days ahead is asked about as a later day, never as "today"
+  await page.getByTestId('map-time-slider').fill('48')
+  await expect.poll(async () => new URL((await ask.getAttribute('href'))!, 'http://x').searchParams.get('q')).toMatch(/^Will there be heavy rain here (tomorrow|the day after tomorrow)\?$/)
+
+  await page.getByTestId('map-time-slider').fill('0')
+  await expect.poll(async () => new URL((await ask.getAttribute('href'))!, 'http://x').searchParams.get('q')).toBe('Will there be heavy rain here today?')
+  if (!isMobile) {
+    // the question follows the UI language
+    await page.getByRole('button', { name: 'हिं', exact: true }).first().click()
+    await expect(card.getByTestId('map-hazard-ask')).toContainText('इस इलाक़े के बारे में पूछें')
+    const hi = new URL((await card.getByTestId('map-hazard-ask').getAttribute('href'))!, 'http://x')
+    expect(hi.searchParams.get('q')).toBe('क्या आज यहाँ भारी बारिश होगी?')
+  }
+
+  // the console receives it and asks it
+  await card.getByTestId('map-hazard-ask').click()
+  await page.waitForURL((u) => u.pathname === '/')
+  await expect(page.getByText(/heavy rain here today|यहाँ भारी बारिश/).first()).toBeVisible({ timeout: 15_000 })
+})
+
 test('hazard words follow the UI language', async ({ page, isMobile }) => {
   test.skip(isMobile, 'language buttons sit in the desktop nav')
   await openHazard(page)
