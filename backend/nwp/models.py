@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 class NwpMetadata(BaseModel):
@@ -17,3 +17,6 @@ class NwpForecast(BaseModel):
 class NwpResponse(BaseModel):
     metadata: NwpMetadata = Field(..., description="Metadata about the model source")
     forecasts: List[NwpForecast] = Field(..., description="Hourly forecast entries")
+    retrievedAt: Optional[datetime] = Field(None, description="When this GFS data was fetched from NOMADS (UTC)")
+    stale: bool = Field(False, description="True when NOMADS failed and this is the last good result")
+    staleReason: Optional[str] = Field(None, description="Why fresh GFS data could not be fetched (when stale)")

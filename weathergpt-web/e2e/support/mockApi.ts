@@ -492,7 +492,7 @@ function climateResponse() {
   }
 }
 
-function nwpResponse() {
+export function nwpResponse() {
   return {
     metadata: {
       model: 'GFS',

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { enterDemo, mockBackend, PUNE } from './support/mockApi'
+import { enterDemo, mockBackend, nwpResponse, PUNE } from './support/mockApi'
 import { AVIATION } from './support/roleFixtures'
 
 /**
@@ -131,4 +131,27 @@ test('console mini map: the MapLibre canvas fills its panel', async ({ page }) =
       return Math.abs(c.height - b.height) <= 2 && Math.abs(c.width - b.width) <= 2 && b.height >= 250
     }, { timeout: 10_000 })
     .toBe(true)
+})
+
+test('GFS down (NOMADS did not answer): a friendly message, never the raw error', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page, { fail: { '/api/nwp': 503 } })
+  await enterDemo(page)
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect(page.getByTestId('gfs-temporary')).toHaveText(/GFS model temporarily unavailable/)
+  await expect(page.getByText(/503|NOMADS returned|Traceback/)).toHaveCount(0)
+})
+
+test('GFS stale: the last good data, with a note saying when it was fetched', async ({ page, context }) => {
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  const stale = { ...nwpResponse(), stale: true, staleReason: 'NOMADS did not answer in time', retrievedAt: '2026-11-01T03:00:00Z' }
+  await mockBackend(page, { routes: { '/api/nwp': stale } })
+  await enterDemo(page)
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  // 03:00 UTC is 08:30 in Asia/Kolkata
+  await expect(page.getByTestId('gfs-stale')).toContainText('Showing the last GFS data, fetched')
+  await expect(page.getByTestId('gfs-stale')).toContainText('08:30')
+  await expect(page.getByTestId('gfs-run')).toBeVisible()
 })

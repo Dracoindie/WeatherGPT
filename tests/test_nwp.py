@@ -24,7 +24,11 @@ def patch_nwp(monkeypatch):
         return FAKE_HOUR_DATA
 
     monkeypatch.setattr("nwp.service._fetch_hour_grib", fake_fetch)
+    from nwp import service
+
+    service.clear_cache()  # results are cached per point and hours
     yield
+    service.clear_cache()
 
 
 def test_nwp_endpoint_basic():
@@ -56,8 +60,8 @@ def test_nwp_endpoint_basic():
     assert abs(first["windMs"] - 5.0) < 0.01
 
 
-def test_nwp_endpoint_502_on_upstream_failure(monkeypatch):
-    """When _fetch_hour_grib raises, endpoint should return 502."""
+def test_nwp_endpoint_503_on_upstream_failure_with_nothing_cached(monkeypatch):
+    """NOMADS fails and there is no last good result: a clean 503 with a reason, never a 502."""
 
     async def fail_fetch(client, run, hour_offset, lat, lon):
         raise RuntimeError("NOMADS unavailable")
@@ -65,8 +69,119 @@ def test_nwp_endpoint_502_on_upstream_failure(monkeypatch):
     monkeypatch.setattr("nwp.service._fetch_hour_grib", fail_fetch)
 
     resp = client.get("/api/nwp?latitude=18.5204&longitude=73.8567&hours=1")
-    assert resp.status_code == 502
-    assert "unavailable" in resp.json()["detail"].lower()
+    assert resp.status_code == 503
+    detail = resp.json()["detail"]
+    assert detail.startswith("GFS model temporarily unavailable: ")
+    assert "nomads.ncep" not in detail and "://" not in detail  # never a URL
+
+
+class _Clock:
+    def __init__(self):
+        self.t = 1_000.0
+
+    def __call__(self):
+        return self.t
+
+
+def _counting_fetch(calls, fail=None):
+    async def fetch(client, run, hour_offset, lat, lon):
+        calls.append(hour_offset)
+        if fail is not None:
+            raise fail
+        return FAKE_HOUR_DATA
+
+    return fetch
+
+
+def test_nwp_result_is_cached_for_an_hour(monkeypatch):
+    from nwp import service
+
+    clock = _Clock()
+    monkeypatch.setattr(service.time, "monotonic", clock)
+    calls: list[int] = []
+    monkeypatch.setattr(service, "_fetch_hour_grib", _counting_fetch(calls))
+
+    url = "/api/nwp?latitude=18.5204&longitude=73.8567&hours=2"
+    assert client.get(url).status_code == 200
+    first = len(calls)
+    assert first >= 2
+    clock.t += service.FRESH_S - 1
+    body = client.get(url).json()
+    assert len(calls) == first  # served from the cache, NOMADS not asked again
+    assert body["stale"] is False
+    assert body["retrievedAt"]
+    clock.t += 2  # past FRESH_S: fetched again
+    assert client.get(url).status_code == 200
+    assert len(calls) > first
+
+
+def test_nwp_serves_last_good_result_marked_stale_when_nomads_fails(monkeypatch):
+    import httpx
+
+    from nwp import service
+
+    clock = _Clock()
+    monkeypatch.setattr(service.time, "monotonic", clock)
+    monkeypatch.setattr(service, "_fetch_hour_grib", _counting_fetch([]))
+    url = "/api/nwp?latitude=18.5204&longitude=73.8567&hours=2"
+    good = client.get(url).json()
+
+    clock.t += service.FRESH_S + 60
+    monkeypatch.setattr(service, "_fetch_hour_grib", _counting_fetch([], fail=httpx.ConnectTimeout("slow")))
+    resp = client.get(url)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["stale"] is True
+    assert body["staleReason"] == "NOMADS did not answer in time"
+    assert body["forecasts"] == good["forecasts"]  # the same numbers, never invented
+    assert body["retrievedAt"] == good["retrievedAt"]  # says when it was really fetched
+
+
+def test_nwp_last_good_result_expires_after_a_day(monkeypatch):
+    import httpx
+
+    from nwp import service
+
+    clock = _Clock()
+    monkeypatch.setattr(service.time, "monotonic", clock)
+    monkeypatch.setattr(service, "_fetch_hour_grib", _counting_fetch([]))
+    url = "/api/nwp?latitude=18.5204&longitude=73.8567&hours=2"
+    assert client.get(url).status_code == 200
+
+    clock.t += service.STALE_MAX_S + 1
+    request = httpx.Request("GET", "https://nomads.ncep.noaa.gov/x")
+    err = httpx.HTTPStatusError("bad", request=request, response=httpx.Response(502, request=request))
+    monkeypatch.setattr(service, "_fetch_hour_grib", _counting_fetch([], fail=err))
+    resp = client.get(url)
+    assert resp.status_code == 503
+    assert resp.json()["detail"] == "GFS model temporarily unavailable: NOMADS returned HTTP 502."
+
+
+@pytest.mark.parametrize(
+    "exc, reason",
+    [
+        ("timeout", "NOMADS did not answer in time"),
+        ("connect", "NOMADS could not be reached"),
+        ("runs", "no recent GFS run is fully published yet"),
+        ("other", "GFS data could not be decoded"),
+    ],
+)
+def test_nwp_failure_reasons_are_short_and_safe(exc, reason):
+    import asyncio
+
+    import httpx
+
+    from nwp import service
+
+    request = httpx.Request("GET", "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?secret")
+    errors = {
+        "timeout": asyncio.TimeoutError(),
+        "connect": httpx.ConnectError("refused", request=request),
+        "runs": RuntimeError("No GFS runs available in the last 24 h"),
+        "other": ValueError("cfgrib: bad message at offset 12"),
+    }
+    assert service._reason(errors[exc]) == reason
+
 
 
 def test_nwp_endpoint_invalid_hours():
@@ -115,3 +230,33 @@ async def test_grib_decoding_does_not_block_the_event_loop(monkeypatch):
         task.cancel()
     # 0.8 s of decoding; a blocked loop would tick ~0 times.
     assert ticks >= 15
+
+
+@pytest.mark.asyncio
+async def test_nomads_requests_are_capped_at_max_concurrent(monkeypatch):
+    """24 forecast hours = 48 GRIB filter requests: they queue, at most MAX_CONCURRENT at once."""
+    import asyncio
+
+    from nwp import service
+
+    monkeypatch.setattr(service, "_decode_grib", lambda content: {"TMP": 300.0})
+    in_flight = 0
+    peak = 0
+
+    async def get(url):
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        resp = MagicMock()
+        resp.content = b"grib"
+        resp.raise_for_status = MagicMock()
+        return resp
+
+    http = MagicMock()
+    http.get = get
+    http._wgpt_gate = asyncio.Semaphore(service.MAX_CONCURRENT)
+    run = service._latest_run_timestamp()
+    await asyncio.gather(*(_REAL_FETCH_HOUR_GRIB(http, run, h, 19.4, 72.8) for h in range(24)))
+    assert peak == service.MAX_CONCURRENT

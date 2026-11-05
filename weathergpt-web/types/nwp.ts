@@ -15,4 +15,9 @@ export interface NwpMetadata {
 export interface NwpResponse {
   metadata: NwpMetadata;
   forecasts: NwpForecast[];
+  /** When this GFS data was fetched from NOAA NOMADS (UTC ISO) */
+  retrievedAt?: string | null;
+  /** NOMADS failed just now; this is the last good result */
+  stale?: boolean;
+  staleReason?: string | null;
 }

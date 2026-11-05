@@ -4,6 +4,7 @@ import logging
 import os
 import tempfile
 import threading
+import time
 from datetime import datetime, timezone, timedelta
 from typing import List
 import xarray as xr
@@ -14,6 +15,33 @@ logger = logging.getLogger(__name__)
 
 # NOMADS GRIB filter – current operational GFS 0.25° endpoint
 GRIB_FILTER_URL = "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl"
+
+# A GFS cycle runs every 6 h: one fetch per point and hour count per hour is
+# plenty. After that the result is kept as "last good" for STALE_MAX_S and
+# served, marked stale, when NOMADS fails.
+FRESH_S = 60 * 60
+STALE_MAX_S = 24 * 60 * 60
+CACHE_MAX = 200
+# NOMADS throttles bursts: at most this many GRIB filter requests at once
+# (24 forecast hours = 48 requests, so they queue instead of firing together).
+MAX_CONCURRENT = 6
+# The whole fetch, including falling back to older runs.
+TOTAL_TIMEOUT_S = 90.0
+
+
+class NwpUnavailable(RuntimeError):
+    """GFS could not be fetched and there is no last good result. ``reason`` says why."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+_cache: dict[tuple, tuple[float, "NwpResponse"]] = {}
+
+
+def clear_cache() -> None:
+    _cache.clear()
 
 
 def _latest_run_timestamp() -> datetime:
@@ -107,10 +135,15 @@ async def _fetch_hour_grib(
     surface_url = _build_surface_url(run, hour_offset, latitude, longitude)
     wind_url = _build_wind_url(run, hour_offset, latitude, longitude)
 
-    surf_resp, wind_resp = await asyncio.gather(
-        client.get(surface_url),
-        client.get(wind_url),
-    )
+    gate = getattr(client, "_wgpt_gate", None)
+    if gate is None:
+        surf_resp, wind_resp = await asyncio.gather(client.get(surface_url), client.get(wind_url))
+    else:
+        async def get(url: str) -> httpx.Response:
+            async with gate:
+                return await client.get(url)
+
+        surf_resp, wind_resp = await asyncio.gather(get(surface_url), get(wind_url))
     surf_resp.raise_for_status()
     wind_resp.raise_for_status()
 
@@ -125,18 +158,45 @@ async def _fetch_hour_grib(
 
 
 
+def _reason(exc: BaseException) -> str:
+    """A short, safe reason for the UI and logs (never a URL or a stack)."""
+    if isinstance(exc, (httpx.TimeoutException, asyncio.TimeoutError, TimeoutError)):
+        return "NOMADS did not answer in time"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"NOMADS returned HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.RequestError):
+        return "NOMADS could not be reached"
+    if isinstance(exc, RuntimeError) and "GFS runs" in str(exc):
+        return "no recent GFS run is fully published yet"
+    return "GFS data could not be decoded"
+
+
 async def get_nwp_forecast(latitude: float, longitude: float, hours: int = 24) -> NwpResponse:
-    """Fetch GFS NWP data via NOMADS GRIB filter for a point.
-
-    Parameters
-    ----------
-    latitude, longitude: float – requested location.
-    hours: int – number of forecast hours (max 48).
-
-    Raises on upstream failure; the API layer converts this to HTTP 502.
-    """
+    """GFS for a point: cached for FRESH_S; on a NOMADS failure the last good
+    result (up to STALE_MAX_S old) marked ``stale``; otherwise NwpUnavailable."""
     if not (1 <= hours <= 48):
         raise ValueError("hours must be between 1 and 48")
+    key = (round(latitude, 2), round(longitude, 2), hours)
+    now = time.monotonic()
+    hit = _cache.get(key)
+    if hit and now - hit[0] < FRESH_S:
+        return hit[1]
+    try:
+        fresh = await asyncio.wait_for(_fetch_nwp_forecast(latitude, longitude, hours), TOTAL_TIMEOUT_S)
+    except Exception as exc:  # any upstream or decoding failure
+        reason = _reason(exc)
+        logger.warning("GFS fetch failed for %s: %s (%s)", key, reason, type(exc).__name__)
+        if hit and now - hit[0] < STALE_MAX_S:
+            return hit[1].model_copy(update={"stale": True, "staleReason": reason})
+        raise NwpUnavailable(reason) from exc
+    if len(_cache) >= CACHE_MAX and key not in _cache:
+        _cache.pop(next(iter(_cache)))
+    _cache[key] = (now, fresh)
+    return fresh
+
+
+async def _fetch_nwp_forecast(latitude: float, longitude: float, hours: int) -> NwpResponse:
+    """Fetch GFS NWP data via NOMADS GRIB filter for a point (no cache). Raises on failure."""
 
     now = datetime.utcnow().replace(tzinfo=timezone.utc)
     hour = (now.hour // 6) * 6
@@ -146,6 +206,7 @@ async def get_nwp_forecast(latitude: float, longitude: float, hours: int = 24) -
     results = None
 
     async with httpx.AsyncClient(timeout=45.0, verify=SSL_CONTEXT) as client:
+        client._wgpt_gate = asyncio.Semaphore(MAX_CONCURRENT)  # type: ignore[attr-defined]
         # Try up to 4 recent cycles (last 24 hours)
         for _ in range(4):
             if candidate_run > now:
@@ -205,5 +266,5 @@ async def get_nwp_forecast(latitude: float, longitude: float, hours: int = 24) -
         latitude=latitude,
         longitude=longitude,
     )
-    return NwpResponse(metadata=metadata, forecasts=forecasts)
+    return NwpResponse(metadata=metadata, forecasts=forecasts, retrievedAt=datetime.now(timezone.utc))
 

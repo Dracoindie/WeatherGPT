@@ -23,22 +23,24 @@ interface NwpPanelProps {
 export function NwpPanel({ latitude, longitude, hours = 12, timezone }: NwpPanelProps) {
   const { t, language } = useI18n()
   const [data, setData] = useState<NwpResponse | null>(null)
-  const [error, setError] = useState('')
-  const [unavailable, setUnavailable] = useState(false)
+  // 'temporary': NOMADS did not answer (or the request failed); 'unsupported': no GFS on this server
+  const [problem, setProblem] = useState<'temporary' | 'unsupported' | null>(null)
 
   useEffect(() => {
     if (latitude === undefined || longitude === undefined) return
     fetchNwp(latitude, longitude)
       .then((resp) => setData(resp))
-      .catch((e) => {
-        if (e instanceof NwpUnavailableError) setUnavailable(true)
-        else setError(e.message)
-      })
+      .catch((e) => setProblem(e instanceof NwpUnavailableError && !e.temporary ? 'unsupported' : 'temporary'))
   }, [latitude, longitude])
 
   let body: React.ReactNode
-  if (unavailable) body = <p className="text-sm text-hud-dim">{t('gfs.unavailable')}</p>
-  else if (error) body = <p className="text-sm text-hud-dim">{t('gfs.error')}</p>
+  if (problem === 'unsupported') body = <p className="text-sm text-hud-dim">{t('gfs.unavailable')}</p>
+  else if (problem === 'temporary')
+    body = (
+      <p className="text-sm text-hud-dim" role="status" data-testid="gfs-temporary">
+        {t('gfs.temporary')}
+      </p>
+    )
   else if (!data) body = <p className="text-sm text-hud-dim">{t('gfs.loading')}</p>
   else {
     const run = data.metadata.generationTime.replace(/\+00:00$|Z$/, '')
@@ -51,6 +53,18 @@ export function NwpPanel({ latitude, longitude, hours = 12, timezone }: NwpPanel
     }
     body = (
       <>
+        {data.stale && (
+          <p className="mb-2 text-xs text-sev-watch-text" role="status" data-testid="gfs-stale">
+            {fill(t('gfs.stale'), {
+              time: data.retrievedAt
+                ? (() => {
+                    const z = zonedClock(data.retrievedAt, 0, timezone ?? 'UTC')
+                    return z ? formatLocalTime(z.full.replace(' ', 'T'), language) : ''
+                  })()
+                : '',
+            })}
+          </p>
+        )}
         <p className="text-xs text-hud-dim" data-testid="gfs-run">
           {fill(t('gfs.run'), { time: formatLocalTime(run, language) })}
           {timezone && <> · {fill(t('gfs.localTimes'), { tz: timezone })}</>}
