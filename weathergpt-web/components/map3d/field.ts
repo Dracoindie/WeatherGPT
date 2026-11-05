@@ -1,9 +1,10 @@
 /**
  * Grid helpers for the /map layers. Pure functions over GET /api/map/grid.
  *
- * The surface between grid points is bilinear interpolation, labelled as such
- * on the map; every value at a grid point is the API's. Colours are the
- * validated --map-* ramps from app/globals.css.
+ * The surface between grid points is a smooth (bicubic, clamped) interpolation,
+ * labelled as such on the map; every value at a grid point is the API's.
+ * Colours are the validated --map-* ramps from app/globals.css, scaled by
+ * scaleRange (the legend shows the same range and says which scale).
  */
 
 import type { GridPoint, HeatBand, MapGrid } from '@/lib/api/map'
@@ -83,6 +84,31 @@ export function seriesRange(grid: MapGrid, layer: LayerId): { min: number; max: 
   return Number.isFinite(min) ? { min, max } : null
 }
 
+/** Min and max over every point at one hour: the colour scale of that hour's surface and legend.
+ * (The 72 h range would be dominated by the day-night swing, so one hour's
+ * spatial differences used only a sliver of the ramp and looked like one colour.) */
+export function hourRange(grid: MapGrid, layer: LayerId, hour: number): { min: number; max: number } | null {
+  let min = Infinity
+  let max = -Infinity
+  for (const v of valuesAt(grid, layer, hour)) {
+    if (v == null) continue
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  return Number.isFinite(min) ? { min, max } : null
+}
+
+/**
+ * The colour scale of the surface and its legend. Paused: the range at the
+ * hour shown, so one hour's spatial differences use the whole ramp. Playing
+ * (fixed): the range over all hours, held still, so a colour change while
+ * the hours run is a real change and not the scale moving. Rain always uses
+ * the full range (one dry hour would have no range at all).
+ */
+export function scaleRange(grid: MapGrid, layer: LayerId, hour: number, fixed: boolean): { min: number; max: number } | null {
+  return fixed || layer === 'rain' ? seriesRange(grid, layer) : hourRange(grid, layer, hour)
+}
+
 /** Bilinear interpolation at (lat, lon); null outside the grid or next to a missing value. */
 export function sample(grid: MapGrid, values: Array<number | null>, lat: number, lon: number): number | null {
   const fr = (lat - grid.south) / grid.step_deg
@@ -99,6 +125,35 @@ export function sample(grid: MapGrid, values: Array<number | null>, lat: number,
   const d = at(r0 + 1, c0 + 1)
   if (a == null || b == null || c == null || d == null) return null
   return (a * (1 - tc) + b * tc) * (1 - tr) + (c * (1 - tc) + d * tc) * tr
+}
+
+const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number) =>
+  0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t)
+
+/**
+ * Smooth interpolation at (lat, lon): bicubic (Catmull-Rom) through the 4 x 4
+ * nearest grid points, clamped to the four surrounding values so it never
+ * shows a value outside the data around it. Falls back to bilinear next to a
+ * missing value; null outside the grid.
+ */
+export function sampleSmooth(grid: MapGrid, values: Array<number | null>, lat: number, lon: number): number | null {
+  const fr = (lat - grid.south) / grid.step_deg
+  const fc = (lon - grid.west) / grid.step_deg
+  if (fr < 0 || fc < 0 || fr > grid.rows - 1 || fc > grid.cols - 1) return null
+  const r0 = Math.min(Math.floor(fr), grid.rows - 2)
+  const c0 = Math.min(Math.floor(fc), grid.cols - 2)
+  const tr = fr - r0
+  const tc = fc - c0
+  const at = (r: number, c: number) => values[Math.max(0, Math.min(grid.rows - 1, r)) * grid.cols + Math.max(0, Math.min(grid.cols - 1, c))]
+  const rows: number[] = []
+  for (let dr = -1; dr <= 2; dr++) {
+    const p = [at(r0 + dr, c0 - 1), at(r0 + dr, c0), at(r0 + dr, c0 + 1), at(r0 + dr, c0 + 2)]
+    if (p.some((v) => v == null)) return sample(grid, values, lat, lon)
+    rows.push(catmullRom(p[0]!, p[1]!, p[2]!, p[3]!, tc))
+  }
+  const v = catmullRom(rows[0], rows[1], rows[2], rows[3], tr)
+  const corners = [at(r0, c0)!, at(r0, c0 + 1)!, at(r0 + 1, c0)!, at(r0 + 1, c0 + 1)!]
+  return Math.max(Math.min(...corners), Math.min(Math.max(...corners), v))
 }
 
 export function rampColor(ramp: RGB[], t: number): RGB {
@@ -131,10 +186,11 @@ export function fieldPixels(
   ramp: RGB[],
   width: number,
   height: number,
-  alpha = 150
+  alpha = 255,
+  fixed = false
 ): Uint8ClampedArray {
   const values = valuesAt(grid, layer, hour)
-  const range = seriesRange(grid, layer)
+  const range = scaleRange(grid, layer, hour, fixed)
   const out = new Uint8ClampedArray(width * height * 4)
   if (!range) return out
   const span = range.max - range.min || 1
@@ -144,7 +200,7 @@ export function fieldPixels(
     const lat = north - ((north - grid.south) * y) / (height - 1)
     for (let x = 0; x < width; x++) {
       const lon = grid.west + ((east - grid.west) * x) / (width - 1)
-      const v = sample(grid, values, lat, lon)
+      const v = sampleSmooth(grid, values, lat, lon)
       if (v == null) continue
       let rgb: RGB
       if (layer === 'heat') {
@@ -165,6 +221,17 @@ export function fieldPixels(
     }
   }
   return out
+}
+
+/** How many distinct colours (to 1/16 per channel) the opaque pixels use: a
+ * surface where every cell got the same colour has 1. */
+export function distinctColors(px: Uint8ClampedArray): number {
+  const seen = new Set<number>()
+  for (let o = 0; o < px.length; o += 4) {
+    if (px[o + 3] === 0) continue
+    seen.add(((px[o] >> 4) << 8) | ((px[o + 1] >> 4) << 4) | (px[o + 2] >> 4))
+  }
+  return seen.size
 }
 
 /** Wind as a vector the air moves TOWARD (km/h east, km/h north). Direction is "from", meteorological. */

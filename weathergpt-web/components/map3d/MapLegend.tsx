@@ -2,18 +2,34 @@
 
 /**
  * Legend for the active /map layer. The min and max are the data's own range
- * over the 72 hours shown (GET /api/map/grid); heat bands and their lower
- * bounds come from backend/thresholds.py through the same response.
+ * at the hour shown (GET /api/map/grid), the same scale the surface uses; heat
+ * bands and their lower bounds come from backend/thresholds.py through the
+ * same response.
  */
 
-import { useI18n, type TranslationKey } from '@/context/I18nContext'
+import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import type { MapGrid } from '@/lib/api/map'
 import { cn } from '@/lib/utils'
-import { LAYER_UNIT, rampCss, seriesRange, type LayerId } from './field'
+import { LAYER_UNIT, rampCss, scaleRange, type LayerId } from './field'
 
 const fmt = (v: number) => String(Math.round(v * 10) / 10)
 
-export function MapLegend({ grid, layer, big = false }: { grid: MapGrid; layer: LayerId; big?: boolean }) {
+export function MapLegend({
+  grid,
+  layer,
+  hour,
+  fixed,
+  timeLabel,
+  big = false,
+}: {
+  grid: MapGrid
+  layer: LayerId
+  hour: number
+  /** playing: one scale for all hours */
+  fixed: boolean
+  timeLabel: string
+  big?: boolean
+}) {
   const { t } = useI18n()
   const title = t(`map.layer.${layer}` as TranslationKey)
   const unit = LAYER_UNIT[layer]
@@ -39,7 +55,8 @@ export function MapLegend({ grid, layer, big = false }: { grid: MapGrid; layer: 
     )
   }
 
-  const range = seriesRange(grid, layer)
+  const range = scaleRange(grid, layer, hour, fixed)
+  const fixedScale = fixed || layer === 'rain'
   return (
     <div data-testid="map-legend" data-layer={layer}>
       <p className={cn('sky-label', big && 'text-sm')}>
@@ -55,6 +72,13 @@ export function MapLegend({ grid, layer, big = false }: { grid: MapGrid; layer: 
       <p className={cn('mt-1 text-hud-dim', big ? 'text-xs' : 'text-[11px]')}>
         {layer === 'rain' ? `${t('map.rainDry')} · ` : ''}
         {t('map.interpolated')}
+      </p>
+      <p
+        className={cn('mt-1 text-hud', big ? 'text-xs' : 'text-[11px]')}
+        data-testid="map-legend-scale"
+        data-scale={fixedScale ? 'fixed' : 'hour'}
+      >
+        {fixedScale ? t('map.scale.fixed') : fill(t('map.scale.hour'), { time: timeLabel })}
       </p>
     </div>
   )

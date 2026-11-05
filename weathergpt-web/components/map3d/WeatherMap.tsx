@@ -7,7 +7,9 @@
  *
  * - Tap anywhere: GET /api/map/point, a gold pin and a glass card.
  * - Layers: GET /api/map/grid for the visible box (one batched Open-Meteo
- *   request), drawn as a surface interpolated between the grid points.
+ *   request), drawn as a semi-transparent surface interpolated between the
+ *   grid points: a MapLibre raster UNDER the basemap's roads and labels, so
+ *   place names stay readable; its colours span the values at the hour shown.
  * - Time slider over the next 72 hours drives every layer.
  * - Broadcast mode: 3D terrain, tilt, extruded rain columns, wind particles
  *   that follow the real wind, a slow flyover and a big title and legend.
@@ -22,12 +24,12 @@
  */
 
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { COORDINATE_SYSTEM, type Layer } from '@deck.gl/core'
-import { BitmapLayer, ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
+import type { Layer } from '@deck.gl/core'
+import { ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useReducedMotion } from 'framer-motion'
 import { Crosshair, Pause, Play, Tv, X } from 'lucide-react'
-import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type FlyToOptions, type StyleSpecification } from 'maplibre-gl'
+import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type CanvasSource, type FlyToOptions, type StyleSpecification } from 'maplibre-gl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SkyButton } from '@/components/ui/SkyButton'
@@ -36,7 +38,7 @@ import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
 import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useLiteMode } from '@/lib/liteMode'
 import { cn } from '@/lib/utils'
-import { fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
+import { distinctColors, fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
 import { MapLegend } from './MapLegend'
 import { MapPointCard, type PointState } from './MapPointCard'
 import {
@@ -82,6 +84,10 @@ type MapMode = LayerId | 'hazard' | 'route'
 const MODES: MapMode[] = [...LAYERS, 'hazard', 'route']
 
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
+
+/** The weather surface's opacity: the basemap (and its labels, drawn above) stays readable. */
+const FIELD_OPACITY = 0.4
+const FIELD_ID = 'wx-field'
 
 export function WeatherMap({ place: placeProp, conditionLabel, statusText, statusTone = 'none', timezone }: Props) {
   // The page passes a new object each render; only a real move counts.
@@ -373,24 +379,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   const staticLayers = useMemo<Layer[]>(() => {
     const out: Layer[] = []
+    // the surface itself is a MapLibre raster under the roads and labels (see the effect below)
     if (grid && gridStatus !== 'too-large' && surface) {
-      const ramp = rampFor(surface)
-      const w = Math.min(192, grid.cols * 16)
-      const h = Math.min(192, grid.rows * 16)
-      const px = fieldPixels(grid, surface, hour, ramp, w, h, broadcast ? 150 : 115)
-      const north = grid.south + (grid.rows - 1) * grid.step_deg
-      const east = grid.west + (grid.cols - 1) * grid.step_deg
-      out.push(
-        new BitmapLayer({
-          id: 'field',
-          image: new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h),
-          bounds: [grid.west, grid.south, east, north],
-          _imageCoordinateSystem: COORDINATE_SYSTEM.LNGLAT,
-          opacity: 0.85,
-          pickable: false,
-        })
-      )
-
       if (broadcast || layer === 'rain') {
         const rain = valuesAt(grid, 'rain', hour)
         const ramp = rampFor('rain')
@@ -500,6 +490,83 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     if (!map || !routeReport || routeReport.segments.length === 0) return
     map.fitBounds(routeBounds(routeReport), { padding: mobile ? 32 : 60, maxZoom: 11, animate: motion, duration: motion ? 900 : 0 })
   }, [routeReport, motion, mobile])
+
+  // The weather surface: a MapLibre canvas source and raster layer inserted
+  // under the basemap's first road or label layer, semi-transparent. deck.gl's
+  // (non-interleaved) overlay always draws on top of the whole basemap, which
+  // hid the place names. A canvas source, not an image source: MapLibre 5's
+  // ImageSource.load() reads its AbortController after an await, so an
+  // updateImage() (hour change) or removal (navigation) in between queued a
+  // request with a null controller and its image queue threw on "signal".
+  const rootRef = useRef<HTMLDivElement>(null)
+  const fieldCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    const apply = () => {
+      const root = rootRef.current
+      if (!grid || gridStatus === 'too-large' || !surface) {
+        if (map.getLayer(FIELD_ID)) map.removeLayer(FIELD_ID)
+        if (map.getSource(FIELD_ID)) map.removeSource(FIELD_ID)
+        root?.removeAttribute('data-field-before')
+        root?.removeAttribute('data-field-colors')
+        return
+      }
+      const w = Math.min(256, grid.cols * 24)
+      const h = Math.min(256, grid.rows * 24)
+      const px = fieldPixels(grid, surface, hour, rampFor(surface), w, h, 255, playing)
+      const canvas = (fieldCanvasRef.current ??= document.createElement('canvas'))
+      if (canvas.width !== w) canvas.width = w
+      if (canvas.height !== h) canvas.height = h
+      canvas.getContext('2d')?.putImageData(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0)
+      const north = grid.south + (grid.rows - 1) * grid.step_deg
+      const east = grid.west + (grid.cols - 1) * grid.step_deg
+      const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
+        [grid.west, north],
+        [east, north],
+        [east, grid.south],
+        [grid.west, grid.south],
+      ]
+      const src = map.getSource(FIELD_ID) as CanvasSource | undefined
+      if (src) {
+        src.setCoordinates(coordinates)
+        // animate: false uploads the canvas once; play for one frame to upload the redraw
+        src.play()
+        map.off('render', pauseField)
+        pauseField = () => src.pause()
+        map.once('render', pauseField)
+      } else {
+        map.addSource(FIELD_ID, { type: 'canvas', canvas, coordinates, animate: false })
+      }
+      const before = firstOverlayLayer(map)
+      if (!map.getLayer(FIELD_ID)) {
+        map.addLayer(
+          {
+            id: FIELD_ID,
+            type: 'raster',
+            source: FIELD_ID,
+            paint: { 'raster-opacity': FIELD_OPACITY, 'raster-resampling': 'linear', 'raster-fade-duration': 0 },
+          },
+          before
+        )
+      }
+      root?.setAttribute('data-field-before', before ?? '')
+      root?.setAttribute('data-field-colors', String(distinctColors(px)))
+      root?.setAttribute('data-field-opacity', String(FIELD_OPACITY))
+    }
+    let pauseField = () => {}
+    const retry = () => apply()
+    try {
+      apply()
+    } catch {
+      // the style is (re)loading, e.g. after the MapTiler fallback: try again when it settles
+      map.once('idle', retry)
+    }
+    return () => {
+      map.off('idle', retry)
+      map.off('render', pauseField)
+    }
+  }, [grid, gridStatus, surface, hour, playing, mapReady, basemap])
 
   // Particles live outside React state: the frame loop advances them and
   // pushes layers to deck directly.
@@ -788,7 +855,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     routeOn ? null : hazardOn ? (
       hazard ? <HazardLegend hazard={hazard} roadsShown={hz.roads.length > 0} tz={tz} big={big} /> : null
     ) : grid && surface ? (
-      <MapLegend grid={grid} layer={surface} big={big} />
+      <MapLegend grid={grid} layer={surface} hour={hourShown} fixed={playing} timeLabel={timeLabel} big={big} />
     ) : null
 
   const hazardCard = (className?: string) =>
@@ -855,6 +922,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   return (
     <div
+      ref={rootRef}
       data-testid="weather-map"
       data-broadcast={broadcast ? (broadcast3d ? '3d' : '2d') : 'off'}
       data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}

@@ -185,3 +185,35 @@ test('the map ends centred on the picked place, even when the page grows mid-fli
   await page.getByRole('button', { name: /use my current location/i }).first().click()
   await expect(page.getByTestId('weather-map')).toHaveAttribute('data-center', '18.520,73.857', { timeout: 10_000 })
 })
+
+test('weather surface: under the roads and labels, semi-transparent, coloured by the hour shown, fixed scale while playing', async ({ page }) => {
+  const map = await openMap(page)
+  // a MapLibre raster inserted below the basemap's first road/label layer ('roads-base' in the test style)
+  await expect(map).toHaveAttribute('data-field-before', 'roads-base', { timeout: 15_000 })
+  const opacity = Number(await map.getAttribute('data-field-opacity'))
+  expect(opacity).toBeGreaterThanOrEqual(0.35)
+  expect(opacity).toBeLessThanOrEqual(0.45)
+  // the fixture varies across the view, so the surface must use many colours, not one
+  await expect.poll(async () => Number(await map.getAttribute('data-field-colors')), { timeout: 10_000 }).toBeGreaterThan(8)
+
+  // the scale (and legend) is the range at the hour shown: fixture temperature is
+  // 24 + 0.8 row + 0.4 col + 4 sin(2 pi h / 24), so the minimum is 24 at hour 0 and 28 at hour 6
+  await expect(page.getByTestId('map-legend-min')).toHaveText('24')
+  await page.getByTestId('map-time-slider').fill('6')
+  await expect(page.getByTestId('map-legend-min')).toHaveText('28')
+  await expect(page.getByTestId('map-legend-scale')).toHaveAttribute('data-scale', 'hour')
+
+  // playing: one fixed scale for all hours (the 72 h minimum is 24 - 4 = 20 at hour 18), said in the legend
+  await page.getByTestId('map-play').click()
+  await expect(page.getByTestId('map-legend-scale')).toHaveAttribute('data-scale', 'fixed')
+  await expect(page.getByTestId('map-legend-scale')).toHaveText(/fixed scale for all 72 hours/)
+  await expect(page.getByTestId('map-legend-min')).toHaveText('20')
+  await page.waitForTimeout(2000) // the hours advance; the scale does not
+  await expect(page.getByTestId('map-legend-min')).toHaveText('20')
+  await page.getByTestId('map-play').click()
+  await expect(page.getByTestId('map-legend-scale')).toHaveAttribute('data-scale', 'hour')
+
+  // hazard mode has no surface
+  await page.getByTestId('map-layer-hazard').click()
+  await expect(map).not.toHaveAttribute('data-field-before', /.*/)
+})
