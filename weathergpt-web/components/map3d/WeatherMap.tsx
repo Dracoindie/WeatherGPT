@@ -165,6 +165,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   // ---------------------------------------------------------------- grid ---
   const gridAbort = useRef<AbortController | null>(null)
   const gridTimer = useRef<number | null>(null)
+  // The loaded grid's coverage and the zoom it was asked for: a pan or small
+  // zoom that stays inside it needs no new request (Open-Meteo free tier).
+  const gridCover = useRef<{ south: number; west: number; north: number; east: number; zoom: number } | null>(null)
+  const [gridRequests, setGridRequests] = useState(0)
   const loadGrid = useCallback(() => {
     const map = mapRef.current
     if (!map) return
@@ -178,20 +182,34 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         east: Math.min(179.9, b.getEast()),
       }
       if (box.north <= box.south || box.east <= box.west) return
+      const zoom = map.getZoom()
+      const cover = gridCover.current
+      if (
+        cover &&
+        Math.abs(zoom - cover.zoom) < 0.5 &&
+        box.south >= cover.south &&
+        box.north <= cover.north &&
+        box.west >= cover.west &&
+        box.east <= cover.east
+      )
+        return
       gridAbort.current?.abort()
       const ctrl = new AbortController()
       gridAbort.current = ctrl
       setGridStatus('loading')
       // 4 shared tiles of 25 points (backend/maps/tiles.py)
       const max = 100
+      setGridRequests((n) => n + 1)
       fetchMapGrid(box, max, ctrl.signal)
         .then((g) => {
+          gridCover.current = { south: g.south, west: g.west, north: g.north, east: g.east, zoom }
           setGrid(g)
           setGridStatus('ready')
           setHour((h) => Math.min(h, Math.max(0, g.times.length - 1)))
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') return
+          gridCover.current = null
           setGridStatus(err instanceof Error && /422/.test(err.message) ? 'too-large' : 'error')
         })
     }, 450)
@@ -963,6 +981,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-broadcast={broadcast ? (broadcast3d ? '3d' : '2d') : 'off'}
       data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
       data-layer={layer}
+      data-grid-requests={gridRequests}
       data-pitch={pitch}
       data-terrain={terrainOn ? 'on' : 'off'}
       data-basemap={basemap}

@@ -3,13 +3,11 @@ import time
 from datetime import date, datetime
 from typing import List, Optional
 
-import httpx
 
 import open_meteo_access
 from pydantic import ValidationError
 
 from models.climate import ClimateResponse, HistoricalDaily
-from http_tls import SSL_CONTEXT
 
 BASE_URL = "https://archive-api.open-meteo.com/v1/archive"
 
@@ -45,10 +43,9 @@ async def fetch_historical_weather(
         "timezone": timezone,
     }
     start = time.time()
-    async with httpx.AsyncClient(verify=SSL_CONTEXT) as client:
-        resp = await client.get(open_meteo_access.url("archive"), params=open_meteo_access.params(params), timeout=20.0)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = await open_meteo_access.fetch("archive", params, timeout=20.0)
+    resp.raise_for_status()
+    data = resp.json()
     # Build list of HistoricalDaily entries
     daily_raw = data.get("daily", {})
     dates: List[str] = daily_raw.get("time", [])

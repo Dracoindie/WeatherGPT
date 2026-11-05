@@ -30,7 +30,6 @@ from typing import Any, Callable, Optional
 import httpx
 
 import open_meteo_access
-from http_tls import SSL_CONTEXT
 from weather.open_meteo import TIMEOUT
 from window_rule import from_unix, utc_instant, window_start
 
@@ -163,8 +162,7 @@ async def _fetch(lats: list[float], lons: list[float]) -> list[dict[str, Any]]:
         "timeformat": "unixtime",
     }
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
-            resp = await client.get(open_meteo_access.url("forecast"), params=open_meteo_access.params(base))
+        resp = await open_meteo_access.fetch("forecast", base, timeout=TIMEOUT)
     except httpx.RequestError as exc:
         logger.error("Open-Meteo tile request failed: %s", type(exc).__name__)
         raise RuntimeError("Weather service did not respond.") from exc

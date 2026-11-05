@@ -217,3 +217,28 @@ test('weather surface: under the roads and labels, semi-transparent, coloured by
   await page.getByTestId('map-layer-hazard').click()
   await expect(map).not.toHaveAttribute('data-field-before', /.*/)
 })
+
+test('grid: a pan or small zoom inside the loaded grid sends no new request; leaving it does', async ({ page }) => {
+  const map = await openMap(page)
+  await expect(map).toHaveAttribute('data-center', `${PUNE.latitude.toFixed(3)},${PUNE.longitude.toFixed(3)}`, { timeout: 15_000 })
+  await expect(page.getByTestId('map-legend')).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1500) // let the fly-to and its request settle
+  const before = Number(await map.getAttribute('data-grid-requests'))
+  expect(before).toBeGreaterThan(0)
+
+  // a small drag stays inside the loaded grid (it reaches a step past every edge)
+  const canvas = map.locator('canvas.maplibregl-canvas')
+  const box = (await canvas.boundingBox())!
+  const cx = box.x + box.width / 2
+  const cy = box.y + box.height / 2
+  await page.mouse.move(cx, cy)
+  await page.mouse.down()
+  await page.mouse.move(cx + 12, cy + 8, { steps: 4 })
+  await page.mouse.up()
+  await page.waitForTimeout(1200)
+  expect(Number(await map.getAttribute('data-grid-requests'))).toBe(before)
+
+  // zooming out leaves it: one new request after the move settles
+  await page.getByRole('button', { name: /zoom out/i }).click()
+  await expect.poll(async () => Number(await map.getAttribute('data-grid-requests')), { timeout: 10_000 }).toBe(before + 1)
+})

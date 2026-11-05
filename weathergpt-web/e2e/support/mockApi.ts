@@ -124,14 +124,16 @@ export const MAP_POINT = {
 
 /** GET /api/map/grid: 6 rows over the requested box (columns to cover its width), 72 UTC hours. */
 export function mapGrid(q: URLSearchParams) {
-  const rows = 6
-  const south = Number(q.get('south') ?? 18.2)
-  const west = Number(q.get('west') ?? 73.5)
-  const north = Number(q.get('north') ?? south + 1)
-  const east = Number(q.get('east') ?? west + 1)
-  const step = Math.round(Math.max(0.08, (north - south) / (rows - 1)) * 1000) / 1000
-  // like the backend, the grid covers the whole box: more columns when it is wide
-  const cols = Math.max(2, Math.min(12, Math.ceil((east - west) / step) + 1))
+  const boxSouth = Number(q.get('south') ?? 18.2)
+  const boxWest = Number(q.get('west') ?? 73.5)
+  const boxNorth = Number(q.get('north') ?? boxSouth + 1)
+  const boxEast = Number(q.get('east') ?? boxWest + 1)
+  const step = Math.round(Math.max(0.08, (boxNorth - boxSouth) / 5) * 1000) / 1000
+  // like the backend's tile-aligned grid, it covers the whole box and a step beyond each edge
+  const south = Math.round((boxSouth - step) * 1e4) / 1e4
+  const west = Math.round((boxWest - step) * 1e4) / 1e4
+  const rows = 8
+  const cols = Math.max(4, Math.min(14, Math.ceil((boxEast - boxWest) / step) + 3))
   const start = new Date()
   start.setUTCMinutes(0, 0, 0)
   const times = Array.from({ length: 72 }, (_, h) => new Date(start.getTime() + h * 3600_000).toISOString().slice(0, 16) + 'Z')

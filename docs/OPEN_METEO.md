@@ -26,6 +26,11 @@ WeatherGPT gets its weather, archive and air-quality data from [Open-Meteo](http
 - Panning fetches only the tiles that are new, in one request.
 - A busy demo region therefore costs about the same as a single viewer.
 
+**When the limit is hit anyway (HTTP 429).** A real-tile test on 2026-11-05 hit the minutely limit from one session: the map grid, the 72 h slider, broadcast mode and then a 150 km route, back to back. Every Open-Meteo call now goes through `open_meteo_access.fetch` (forecast, air quality, archive, map tiles):
+- **Retry with backoff** on 429, 502, 503 and 504: at most 2 retries, 0.5 s then 1.5 s (±25 % jitter). A `Retry-After` header (seconds or an HTTP date) is honoured up to 5 s. A longer one, such as the minutely limit's "try again in one minute", is not waited out: the caller fails fast and serves its cache or a stale answer, or a clean 503 (the route shows "try again in a minute"). A 500 is not retried. A dropped connection gets one more try; a timeout does not.
+- **One call per identical request in flight.** Concurrent requests with the same service and parameters share one upstream call (the API key is never part of the sharing key).
+- **The map asks less.** Pans and zooms are debounced (450 ms for the grid, 250 ms for hazards), and a pan or small zoom (under half a level) that stays inside the loaded grid sends no request at all (`data-grid-requests` on the map counts them).
+
 **Recording the offline map demo** (`backend/scripts/record_demo_fixtures.py --map`, `docs/DEMO.md`) fetches 69 tiles (about 1,700 location-calls) in 4-tile requests, plus 35 tap points. Run it once on the morning of the demo, not in a loop.
 
 ## The optional key: `OPEN_METEO_API_KEY`

@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 
 import open_meteo_access
 from air.aqi import indian_aqi
-from http_tls import SSL_CONTEXT
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +57,7 @@ async def fetch_air_quality(latitude: float, longitude: float) -> AirQualityData
         "timezone": "auto",
     }
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, verify=SSL_CONTEXT) as client:
-            resp = await client.get(open_meteo_access.url("air-quality"), params=open_meteo_access.params(params))
+        resp = await open_meteo_access.fetch("air-quality", params, timeout=TIMEOUT)
     except httpx.RequestError as exc:
         raise RuntimeError("Air quality service did not respond.") from exc
     if resp.status_code != 200:
