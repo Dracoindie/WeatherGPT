@@ -324,37 +324,71 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   }, [place, motion])
 
   // ------------------------------------------------------ broadcast mode ---
+  // The view when broadcast began, restored when it ends.
+  const preBroadcastView = useRef<{ center: [number, number]; zoom: number } | null>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
-    map.resize()
-    if (broadcast3d) {
-      if (!map.getSource('terrain')) {
-        const dem = sourcesRef.current.terrain
-        map.addSource('terrain', { type: 'raster-dem', ...dem })
-        map.addSource('terrain-shade', { type: 'raster-dem', ...dem, attribution: undefined })
+    // Entering or leaving broadcast moves the container node through a portal:
+    // for a moment it is 0x0, and a resize and camera move made at that size
+    // land hundreds of km off (MapLibre keeps a centre from the 0x0 view and
+    // eases from it). Remember the view now, while it is still right, and move
+    // the camera only once the container has its real size.
+    if (broadcast && !preBroadcastView.current) {
+      const c = map.getCenter()
+      preBroadcastView.current = { center: [c.lng, c.lat], zoom: map.getZoom() }
+    }
+    const view = preBroadcastView.current
+    if (!broadcast) preBroadcastView.current = null
+
+    const apply = () => {
+      map.resize()
+      if (view) map.jumpTo({ center: view.center, zoom: view.zoom })
+      if (broadcast3d) {
+        if (!map.getSource('terrain')) {
+          const dem = sourcesRef.current.terrain
+          map.addSource('terrain', { type: 'raster-dem', ...dem })
+          map.addSource('terrain-shade', { type: 'raster-dem', ...dem, attribution: undefined })
+        }
+        if (!map.getLayer('terrain-hillshade')) {
+          // under the roads and labels, so place names stay on top of the relief
+          map.addLayer(
+            {
+              id: 'terrain-hillshade',
+              type: 'hillshade',
+              source: 'terrain-shade',
+              paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
+            },
+            firstOverlayLayer(map)
+          )
+        }
+        // Real 3D terrain. Needs MapLibre 5: deck.gl 9.4's overlay reads
+        // map.transform.elevation when terrain is set, which MapLibre 6 removed
+        // (it threw on every frame). scripts/copy-maplibre-worker.mjs
+        map.setTerrain({ source: 'terrain', exaggeration: 1.6 })
+        // the centre is explicit: the tilt must not walk the place off screen
+        const center = view?.center ?? map.getCenter()
+        map.easeTo({ center, pitch: 58, bearing: -18, zoom: Math.max(map.getZoom(), 6.5), duration: 1800 })
+      } else {
+        if (map.getTerrain()) map.setTerrain(null)
+        if (map.getLayer('terrain-hillshade')) map.removeLayer('terrain-hillshade')
+        if (map.getPitch() !== 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: motion ? 900 : 0 })
       }
-      if (!map.getLayer('terrain-hillshade')) {
-        // under the roads and labels, so place names stay on top of the relief
-        map.addLayer(
-          {
-            id: 'terrain-hillshade',
-            type: 'hillshade',
-            source: 'terrain-shade',
-            paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
-          },
-          firstOverlayLayer(map)
-        )
-      }
-      // Real 3D terrain. Needs MapLibre 5: deck.gl 9.4's overlay reads
-      // map.transform.elevation when terrain is set, which MapLibre 6 removed
-      // (it threw on every frame). scripts/copy-maplibre-worker.mjs
-      map.setTerrain({ source: 'terrain', exaggeration: 1.6 })
-      map.easeTo({ pitch: 58, bearing: -18, zoom: Math.max(map.getZoom(), 6.5), duration: 1800 })
-    } else {
-      if (map.getTerrain()) map.setTerrain(null)
-      if (map.getLayer('terrain-hillshade')) map.removeLayer('terrain-hillshade')
-      if (map.getPitch() !== 0 || map.getBearing() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: motion ? 900 : 0 })
+    }
+
+    const el = map.getContainer()
+    if (el.clientWidth > 0 && el.clientHeight > 0) {
+      apply()
+      return
+    }
+    const onResize = () => {
+      if (el.clientWidth === 0 || el.clientHeight === 0) return
+      map.off('resize', onResize)
+      apply()
+    }
+    map.on('resize', onResize)
+    return () => {
+      map.off('resize', onResize)
     }
   }, [broadcast3d, broadcast, mapReady, motion])
 

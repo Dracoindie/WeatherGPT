@@ -56,3 +56,40 @@ test('/classic is gone', async ({ page }) => {
   const resp = await page.goto('/classic')
   expect(resp?.status()).toBe(404)
 })
+
+test('daily forecast: no holes when the API returns fewer than 7 days', async ({ page, context }) => {
+  // Live /api/forecast returned 5 days; the grid was built for 7 and left a hole.
+  await context.grantPermissions(['geolocation'])
+  await context.setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page)
+  const daily = Array.from({ length: 5 }, (_, i) => ({
+    date: new Date(Date.now() + i * 86400_000).toISOString().slice(0, 10),
+    weather_code: 2,
+    max_temperature: 31,
+    min_temperature: 21,
+    precipitation_sum: 0,
+    precipitation_probability_max: 0,
+    max_wind_speed: 12,
+  }))
+  await page.route('**/api/forecast**', (route) =>
+    route.fulfill({ json: { source: 'open-meteo', latitude: PUNE.latitude, longitude: PUNE.longitude, timezone: 'Asia/Kolkata', retrieved_at: new Date().toISOString(), daily } })
+  )
+  await enterDemo(page)
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  const list = page.getByTestId('forecast-days')
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect(list.locator('li')).toHaveCount(5, { timeout: 15_000 })
+    // every row ends at the list's right edge
+    const holes = await list.evaluate((ul) => {
+      const right = ul.getBoundingClientRect().right
+      const rows = new Map<number, number>()
+      for (const li of Array.from(ul.children)) {
+        const r = li.getBoundingClientRect()
+        rows.set(Math.round(r.top), Math.max(rows.get(Math.round(r.top)) ?? 0, r.right))
+      }
+      return [...rows.values()].filter((r) => right - r > 2).length
+    })
+    expect(holes, `row with a hole at ${width} px`).toBe(0)
+  }
+})

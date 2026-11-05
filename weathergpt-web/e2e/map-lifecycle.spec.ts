@@ -112,3 +112,30 @@ test('icons missing from the basemap sprite get a fallback, without warnings', a
   await page.waitForTimeout(2000)
   expect(warnings).toEqual([])
 })
+
+test('broadcast keeps the place in view and exit restores the view', async ({ page }) => {
+  // Regression: the portal move made the container 0x0 for a moment, and the
+  // resize + tilt computed at that size moved the centre ~330 km from Pune.
+  await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
+  await page.context().grantPermissions(['geolocation'])
+  await page.context().setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/map"]').first().dispatchEvent('click')
+  await page.waitForURL('**/map')
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  const map = page.getByTestId('weather-map')
+  await expect(map.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 30_000 })
+  const at = `${PUNE.latitude.toFixed(3)},${PUNE.longitude.toFixed(3)}`
+  await expect(map).toHaveAttribute('data-center', at, { timeout: 15_000 })
+
+  await page.getByTestId('map-broadcast').click()
+  await expect(map).toHaveAttribute('data-pitch', '58', { timeout: 15_000 })
+  await page.waitForTimeout(1000)
+  await expect(map).toHaveAttribute('data-center', at)
+
+  await page.getByRole('button', { name: /exit broadcast/i }).click()
+  await expect(map).toHaveAttribute('data-pitch', '0', { timeout: 15_000 })
+  await page.waitForTimeout(1000)
+  await expect(map).toHaveAttribute('data-center', at)
+})

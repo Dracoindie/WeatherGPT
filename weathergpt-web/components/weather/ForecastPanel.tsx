@@ -4,12 +4,27 @@ import type { DataState, WeatherResponse } from '@/components/weather/forecastTy
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { useI18n } from '@/context/I18nContext'
 import { formatDay } from '@/lib/format'
+import { fillRows } from '@/lib/gridFill'
 import { useDescribeWeather } from '@/lib/i18n/weather'
 
+// Literal class names so Tailwind generates them.
+const BASE_SPAN: Record<number, string> = { 1: 'col-span-1', 2: 'col-span-2' }
+const SM_SPAN: Record<number, string> = { 1: 'sm:col-span-1', 2: 'sm:col-span-2', 3: 'sm:col-span-3', 4: 'sm:col-span-4' }
+const XL_COLS: Record<number, string> = {
+  1: 'xl:grid-cols-1',
+  2: 'xl:grid-cols-2',
+  3: 'xl:grid-cols-3',
+  4: 'xl:grid-cols-4',
+  5: 'xl:grid-cols-5',
+  6: 'xl:grid-cols-6',
+  7: 'xl:grid-cols-7',
+}
+
 /**
- * 7-day forecast as a balanced grid of day cards: 2 per row on phones, 4 on
- * tablets, all 7 in one row on wide screens. No horizontal scroller (it
- * widened the mobile layout viewport in Chrome).
+ * The daily forecast as a balanced grid of day cards: 2 per row on phones, 4 on
+ * tablets, all days in one row on wide screens, with no holes for any number
+ * of days. No horizontal scroller (it widened the mobile layout viewport in
+ * Chrome).
  */
 export function ForecastPanel({ state }: { state: DataState<WeatherResponse> }) {
   const { status, data, error } = state
@@ -28,11 +43,15 @@ export function ForecastPanel({ state }: { state: DataState<WeatherResponse> }) 
   } else if (!data?.forecast?.length) {
     body = <p className="text-sm text-hud-dim">{t('forecast.empty')}</p>
   } else {
+    // No holes for any number of days (the API may return fewer than 7):
+    // balanced spans on the 2- and 4-column grids, one row of n on wide screens.
+    const slots = data.forecast.map((d) => ({ key: d.date, span: 1 }))
+    const base = fillRows(slots, 2)
+    const sm = fillRows(slots, 4)
     body = (
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+      <ul data-testid="forecast-days" className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${XL_COLS[Math.min(7, data.forecast.length)]}`}>
         {data.forecast.map((day, i) => (
-          // 7 cards, no holes: today spans two columns on 2- and 4-column grids (1+2+2+2, 2+2 / 4).
-          <li key={day.date} className={`min-w-0 rounded-xl border border-white/10 bg-black/25 p-3 ${i === 0 && data.forecast.length === 7 ? 'col-span-2 xl:col-span-1' : ''}`}>
+          <li key={day.date} className={`min-w-0 rounded-xl border border-white/10 bg-black/25 p-3 ${BASE_SPAN[base[i]]} ${SM_SPAN[sm[i]]} xl:col-span-1`}>
             <p className="text-sm font-medium text-hud">{formatDay(day.date, language)}</p>
             <p className="mt-1 font-readout text-sm tabular-nums text-hud">
               {day.temperatureMaxC}° <span className="text-hud-dim">/ {day.temperatureMinC}°</span>

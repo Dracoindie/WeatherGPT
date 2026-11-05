@@ -306,7 +306,7 @@ export default function DisasterPage() {
       )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <GlassPanel wet={false} label={t('risk.map')} className="flex min-h-[360px] flex-col lg:order-2 lg:min-h-[600px]">
+        <GlassPanel wet={false} label={t('risk.map')} className="flex min-h-[360px] flex-col lg:sticky lg:top-24 lg:order-2 lg:h-[min(720px,calc(100vh-8rem))] lg:min-h-[480px] lg:self-start">
           <div className="min-h-0 flex-1">
             <RiskMap districts={mapRows} />
           </div>

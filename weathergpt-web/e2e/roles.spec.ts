@@ -86,6 +86,8 @@ test('disaster map: the /map basemap (no CARTO tiles), circles coloured by each 
   const box = (await map.boundingBox())!
   const canvas = (await map.locator('canvas.maplibregl-canvas').boundingBox())!
   expect(box.height).toBeGreaterThanOrEqual(300)
+  // not stretched to the list's height (~1600 px with 15 districts): the fit would zoom out to half of India
+  expect(box.height).toBeLessThanOrEqual(760)
   expect(Math.abs(canvas.height - box.height)).toBeLessThanOrEqual(2)
   expect(Math.abs(canvas.width - box.width)).toBeLessThanOrEqual(2)
   expect(carto).toEqual([])
