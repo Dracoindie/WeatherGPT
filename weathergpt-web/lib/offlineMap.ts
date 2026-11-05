@@ -19,7 +19,7 @@ import { API_BASE } from '@/lib/api/base'
 /** Same name as MAP_CACHE in public/sw.js. */
 export const OFFLINE_MAP_CACHE = 'wgpt-v2-map'
 export const OFFLINE_MAP_KEY = 'wgpt:offline-map'
-export const WORKER_URL = '/vendor/maplibre-gl-worker.mjs'
+export const WORKER_URL = '/vendor/maplibre-gl-worker.js'
 const GLYPH_RANGES = ['0-255', '256-511', '2304-2559'] // Latin, Latin extended, Devanagari
 
 export interface OfflineMapInfo {

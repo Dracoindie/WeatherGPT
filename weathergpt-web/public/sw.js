@@ -154,7 +154,7 @@ self.addEventListener('notificationclick', (event) => {
 function isMapRequest(url) {
   if (url.hostname === 'tiles.openfreemap.org') return true
   if (url.hostname === 's3.amazonaws.com' && url.pathname.startsWith('/elevation-tiles-prod/')) return true
-  return url.origin === self.location.origin && url.pathname === '/vendor/maplibre-gl-worker.mjs'
+  return url.origin === self.location.origin && url.pathname === '/vendor/maplibre-gl-worker.js'
 }
 
 async function networkThenMapPack(request, url) {

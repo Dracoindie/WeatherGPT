@@ -53,6 +53,7 @@ import {
 } from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
+import { firstOverlayLayer } from './basemap'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
 
@@ -125,6 +126,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [point, setPoint] = useState<PointState | null>(null)
   // ssr: false, so window exists on first render
   const [pitch, setPitch] = useState(0)
+  const [terrainOn, setTerrainOn] = useState(false)
   const [mobile] = useState(() => window.matchMedia('(max-width: 639px)').matches)
 
   const broadcast3d = broadcast && motion
@@ -214,7 +216,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     const el = mapEl
     let map: MapLibreMap
     try {
-      setWorkerUrl(`/vendor/maplibre-gl-worker.mjs?v=${getVersion()}`)
+      setWorkerUrl(`/vendor/maplibre-gl-worker.js?v=${getVersion()}`)
       const p = initialPlace.current
       map = new MapLibreMap({
         container: el,
@@ -249,6 +251,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       setViewCentre({ latitude: c.lat, longitude: c.lng })
     })
     map.on('pitchend', () => setPitch(Math.round(map.getPitch())))
+    map.on('terrain', () => setTerrainOn(map.getTerrain() != null))
     map.on('click', (e) => clickRef.current(e.point.x, e.point.y, e.lngLat.lat, e.lngLat.lng))
     map.on('error', (e) => {
       console.warn('[map]', e.error?.message ?? e)
@@ -267,7 +270,21 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       if (gridTimer.current) window.clearTimeout(gridTimer.current)
       overlayRef.current = null
       mapRef.current = null
-      map.remove()
+      // each step on its own: one failing must not leave the map (and its
+      // render loop and listeners) alive after navigation
+      const steps: Array<() => void> = [
+        () => map.stop(),
+        () => overlay.setProps({ layers: [] }),
+        () => map.removeControl(overlay), // MapboxOverlay.onRemove finalizes deck
+        () => map.remove(), // MapLibre: WebGL context, render loop, every listener
+      ]
+      for (const s of steps) {
+        try {
+          s()
+        } catch (err) {
+          console.warn('[map] cleanup step failed', err)
+        }
+      }
     }
   }, [mapEl, loadGrid, showPoint])
 
@@ -310,13 +327,20 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         map.addSource('terrain-shade', { type: 'raster-dem', ...dem, attribution: undefined })
       }
       if (!map.getLayer('terrain-hillshade')) {
-        map.addLayer({
-          id: 'terrain-hillshade',
-          type: 'hillshade',
-          source: 'terrain-shade',
-          paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
-        })
+        // under the roads and labels, so place names stay on top of the relief
+        map.addLayer(
+          {
+            id: 'terrain-hillshade',
+            type: 'hillshade',
+            source: 'terrain-shade',
+            paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
+          },
+          firstOverlayLayer(map)
+        )
       }
+      // Real 3D terrain. Needs MapLibre 5: deck.gl 9.4's overlay reads
+      // map.transform.elevation when terrain is set, which MapLibre 6 removed
+      // (it threw on every frame). scripts/copy-maplibre-worker.mjs
       map.setTerrain({ source: 'terrain', exaggeration: 1.6 })
       map.easeTo({ pitch: 58, bearing: -18, zoom: Math.max(map.getZoom(), 6.5), duration: 1800 })
     } else {
@@ -569,21 +593,34 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     map.on('touchstart', stop)
     map.on('wheel', stop)
     const animate = motion && (fieldRef.current != null || point != null || broadcast3d)
+    // Set by the cleanup (broadcast exit, layer change, unmount): a frame that
+    // is already queued does nothing, and nothing is queued after it.
+    let stopped = false
     const frame = (now: number) => {
-      const f = fieldRef.current
-      if (f) {
-        const b = map.getBounds()
-        // ~0.4 % of the view width per frame at the fastest wind in view
-        const degPerKmh = ((b.getEast() - b.getWest()) * 0.004) / Math.max(10, f.maxSpeed)
-        step(f, degPerKmh)
+      if (stopped || mapRef.current !== map) return
+      try {
+        const f = fieldRef.current
+        if (f) {
+          const b = map.getBounds()
+          // ~0.4 % of the view width per frame at the fastest wind in view
+          const degPerKmh = ((b.getEast() - b.getWest()) * 0.004) / Math.max(10, f.maxSpeed)
+          step(f, degPerKmh)
+        }
+        // after the tilt has finished: setBearing would cancel the ease
+        if (flying && !map.isMoving()) map.setBearing(map.getBearing() + 0.05)
+        overlay.setProps({ layers: [...staticLayers, ...dynamicLayers(now)] })
+      } catch (err) {
+        // never spin on an error: report it once and stop this loop
+        stopped = true
+        console.error('[map] frame loop stopped:', err)
+        return
       }
-      // after the tilt has finished: setBearing would cancel the ease
-      if (flying && !map.isMoving()) map.setBearing(map.getBearing() + 0.05)
-      overlay.setProps({ layers: [...staticLayers, ...dynamicLayers(now)] })
-      if (animate) raf = requestAnimationFrame(frame)
+      if (animate && !stopped) raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
     return () => {
+      stopped = true
+      flying = false
       cancelAnimationFrame(raf)
       map.off('mousedown', stop)
       map.off('touchstart', stop)
@@ -823,6 +860,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
       data-layer={layer}
       data-pitch={pitch}
+      data-terrain={terrainOn ? 'on' : 'off'}
       data-basemap={basemap}
       data-hazard-type={hazardOn ? hazardType : undefined}
       data-hazard-cells={hazard ? hazard.cells.length : 0}

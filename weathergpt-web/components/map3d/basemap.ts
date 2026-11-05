@@ -64,4 +64,16 @@ export function addMissingImageFallback(map: MapLibreMap): void {
 }
 
 /** The worker URL every MapLibre map shares (copied by scripts/copy-maplibre-worker.mjs). */
-export const MAPLIBRE_WORKER = '/vendor/maplibre-gl-worker.mjs'
+/**
+ * The first road or label layer of the basemap. Our own MapLibre layers (the
+ * relief, the weather surface) go under it, so roads and place names stay
+ * readable on top.
+ */
+export function firstOverlayLayer(map: MapLibreMap): string | undefined {
+  const road = /road|transport|highway|street|motorway|trunk|primary|secondary|bridge|tunnel|rail/i
+  return (map.getStyle()?.layers ?? []).find(
+    (l) => l.type === 'symbol' || (l.type === 'line' && road.test(`${l.id} ${'source-layer' in l ? (l['source-layer'] ?? '') : ''}`))
+  )?.id
+}
+
+export const MAPLIBRE_WORKER = '/vendor/maplibre-gl-worker.js'

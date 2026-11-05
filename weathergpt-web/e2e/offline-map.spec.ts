@@ -60,14 +60,14 @@ test.describe('offline demo map', () => {
     expect(urls.some((u) => u.endsWith('ofm@2x.png'))).toBe(true)
     expect(urls.some((u) => u.includes('2304-2559.pbf'))).toBe(true)
     expect(urls.some((u) => /elevation-tiles-prod\/terrarium\/8\//.test(u))).toBe(true)
-    expect(urls.some((u) => u.endsWith('/vendor/maplibre-gl-worker.mjs'))).toBe(true)
+    expect(urls.some((u) => u.endsWith('/vendor/maplibre-gl-worker.js'))).toBe(true)
     expect(urls.length).toBeLessThan(250) // small and polite
 
     const tile = urls.find((u) => /elevation-tiles-prod\/terrarium\/9\//.test(u))!
     await context.setOffline(true)
     const ok = await page.evaluate(async (u) => (await fetch(u)).ok, tile)
     expect(ok).toBe(true)
-    const worker = await page.evaluate(async () => (await fetch('/vendor/maplibre-gl-worker.mjs?v=9.9.9')).ok)
+    const worker = await page.evaluate(async () => (await fetch('/vendor/maplibre-gl-worker.js?v=9.9.9')).ok)
     expect(worker).toBe(true)
     await context.setOffline(false)
   })
