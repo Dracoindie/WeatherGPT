@@ -116,3 +116,19 @@ for (const [lang, text] of Object.entries(ANY_STORM)) {
     await expect(cell).toHaveAttribute('title', 'WMO 95')
   })
 }
+
+test('console mini map: the MapLibre canvas fills its panel', async ({ page }) => {
+  await mockBackend(page)
+  await askPune(page)
+  const map = page.getByTestId('sky-map')
+  const canvas = map.locator('canvas.maplibregl-canvas')
+  await expect(canvas).toBeVisible({ timeout: 30_000 })
+  // maplibre-gl.css once collapsed the container to 0 px and clipped the canvas
+  await expect
+    .poll(async () => {
+      const b = (await map.boundingBox())!
+      const c = (await canvas.boundingBox())!
+      return Math.abs(c.height - b.height) <= 2 && Math.abs(c.width - b.width) <= 2 && b.height >= 250
+    }, { timeout: 10_000 })
+    .toBe(true)
+})

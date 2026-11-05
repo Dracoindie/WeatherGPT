@@ -68,3 +68,25 @@ test('disaster board shows each district as soon as it is located', async ({ pag
   await expect(region.locator('li', { hasText: 'Palghar' })).toContainText(/place not found/i)
   await expect(region.locator('li', { hasText: 'Nanded' })).toContainText(/location service unavailable/i)
 })
+
+test('disaster map: the /map basemap (no CARTO tiles), circles coloured by each district level', async ({ page }) => {
+  const carto: string[] = []
+  page.on('request', (r) => {
+    if (/carto(cdn)?\.com/.test(r.url())) carto.push(r.url())
+  })
+  await mockBackend(page, { routes: { '/api/risk': BOARD } })
+  await page.goto('/disaster')
+  const map = page.getByTestId('risk-map')
+  await expect(map.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 30_000 })
+  await expect(map).toHaveAttribute('data-ready', 'true', { timeout: 30_000 })
+  await expect(page.getByRole('region', { name: 'Districts by severity' }).getByRole('listitem')).toHaveCount(DEFAULT_COUNT)
+  // the circles carry the board's levels (warning for Ratnagiri), not all "unknown"
+  await expect(map).toHaveAttribute('data-levels', /warning/)
+  // the canvas fills the panel (maplibre-gl.css once collapsed the container to 0 px and clipped it)
+  const box = (await map.boundingBox())!
+  const canvas = (await map.locator('canvas.maplibregl-canvas').boundingBox())!
+  expect(box.height).toBeGreaterThanOrEqual(300)
+  expect(Math.abs(canvas.height - box.height)).toBeLessThanOrEqual(2)
+  expect(Math.abs(canvas.width - box.width)).toBeLessThanOrEqual(2)
+  expect(carto).toEqual([])
+})

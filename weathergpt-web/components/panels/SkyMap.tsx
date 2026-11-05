@@ -1,15 +1,21 @@
 'use client'
 
 /**
- * Dark map (CartoDB dark_matter) with a glowing pulse marker and a rotating
- * radar sweep. Loaded via next/dynamic with ssr: false.
+ * The console's dark mini map with a glowing pulse marker and a rotating radar
+ * sweep. Loaded via next/dynamic with ssr: false.
+ *
+ * The same basemap as /map (components/map3d/sources.ts): OpenFreeMap's dark
+ * style, keyless, or MapTiler's when NEXT_PUBLIC_MAPTILER_KEY is set, falling
+ * back to keyless if MapTiler refuses. (The old CARTO raster tiles now answer
+ * "API KEY REQUIRED".)
  */
 
-import 'leaflet/dist/leaflet.css'
-import { useEffect, useMemo } from 'react'
-import L from 'leaflet'
-import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { useReducedMotion } from 'framer-motion'
+import { getVersion, Map as MapLibreMap, Marker, setWorkerUrl } from 'maplibre-gl'
+import { useEffect, useRef, useState } from 'react'
+import { addMissingImageFallback, MAPLIBRE_WORKER, tintBasemap } from '@/components/map3d/basemap'
+import { KEYLESS, mapSources, type MapSources } from '@/components/map3d/sources'
 
 interface SkyMapProps {
   latitude: number
@@ -17,47 +23,77 @@ interface SkyMapProps {
   label: string
 }
 
-function FlyTo({ latitude, longitude }: { latitude: number; longitude: number }) {
-  const map = useMap()
-  const reduced = useReducedMotion()
-  useEffect(() => {
-    if (reduced) map.setView([latitude, longitude], 10)
-    else map.flyTo([latitude, longitude], 10, { duration: 1.6 })
-  }, [map, latitude, longitude, reduced])
-  return null
-}
-
 export default function SkyMap({ latitude, longitude, label }: SkyMapProps) {
-  const icon = useMemo(
-    () =>
-      L.divIcon({
-        className: '',
-        html: '<div class="sky-marker"><span></span><span></span></div>',
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      }),
-    []
-  )
+  const el = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<MapLibreMap | null>(null)
+  const markerRef = useRef<Marker | null>(null)
+  const reduced = useReducedMotion()
+  const [failed, setFailed] = useState(false)
+  const start = useRef({ latitude, longitude, label })
+
+  useEffect(() => {
+    const container = el.current
+    if (!container) return
+    let map: MapLibreMap
+    const sources: { current: MapSources } = { current: mapSources() }
+    try {
+      setWorkerUrl(`${MAPLIBRE_WORKER}?v=${getVersion()}`)
+      map = new MapLibreMap({
+        container,
+        style: sources.current.style,
+        center: [start.current.longitude, start.current.latitude],
+        zoom: 10,
+        scrollZoom: false,
+        attributionControl: { compact: true },
+      })
+    } catch {
+      const id = window.setTimeout(() => setFailed(true), 0)
+      return () => window.clearTimeout(id)
+    }
+    mapRef.current = map
+    addMissingImageFallback(map)
+    map.on('style.load', () => tintBasemap(map))
+    map.on('error', (e) => {
+      const status = (e.error as { status?: number } | undefined)?.status
+      if (sources.current.provider === 'maptiler' && (!map.isStyleLoaded() || status === 401 || status === 403 || status === 429)) {
+        sources.current = KEYLESS
+        map.setStyle(KEYLESS.style)
+      }
+    })
+    const dot = document.createElement('div')
+    dot.className = 'sky-marker'
+    dot.innerHTML = '<span></span><span></span>'
+    dot.title = start.current.label
+    markerRef.current = new Marker({ element: dot }).setLngLat([start.current.longitude, start.current.latitude]).addTo(map)
+    const observer = new ResizeObserver(() => map.resize())
+    observer.observe(container)
+    return () => {
+      observer.disconnect()
+      markerRef.current = null
+      mapRef.current = null
+      map.remove()
+    }
+  }, [])
+
+  // follow the place
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    markerRef.current?.setLngLat([longitude, latitude])
+    const title = markerRef.current?.getElement()
+    if (title) title.title = label
+    if (reduced) map.jumpTo({ center: [longitude, latitude], zoom: 10 })
+    else map.flyTo({ center: [longitude, latitude], zoom: 10, duration: 1600 })
+  }, [latitude, longitude, label, reduced])
 
   return (
-    <div className="sky-map relative h-full min-h-[280px] overflow-hidden rounded-xl">
-      <MapContainer
-        center={[latitude, longitude]}
-        zoom={10}
-        zoomControl={false}
-        attributionControl
-        scrollWheelZoom={false}
-        className="absolute inset-0 h-full w-full"
-      >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          subdomains="abcd"
-          maxZoom={19}
-        />
-        <Marker position={[latitude, longitude]} icon={icon} title={label} />
-        <FlyTo latitude={latitude} longitude={longitude} />
-      </MapContainer>
+    <div className="sky-map relative h-full min-h-[280px] overflow-hidden rounded-xl" data-testid="sky-map">
+      {failed ? (
+        <div className="absolute inset-0 bg-white/[0.03]" />
+      ) : (
+        // inline position: maplibre-gl.css's .maplibregl-map { position: relative } beats the class
+        <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label={label} role="img" />
+      )}
 
       {/* radar sweep + range rings, centred on the marker */}
       <div className="pointer-events-none absolute inset-0 z-[500] grid place-items-center" aria-hidden="true">

@@ -19,8 +19,6 @@ async function settle(page: Page) {
 async function scan(page: Page, label: string) {
   const result = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    // Leaflet map tiles and attribution are third-party markup.
-    .exclude('.leaflet-tile-pane')
     .analyze()
   const blocking = result.violations.filter((v) => BLOCKING.has(v.impact ?? ''))
   for (const v of result.violations) {

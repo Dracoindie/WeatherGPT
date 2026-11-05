@@ -1,4 +1,4 @@
-import { test, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { DEMO_PRESETS } from '../lib/weatherScene'
 import { chatResponse, CLIMATE_FACTS, enterDemo, GFS_FACTS, mockBackend, PUNE } from './support/mockApi'
 import { AVIATION, BOARD, COMPARE, FARM } from './support/roleFixtures'
@@ -106,6 +106,8 @@ test('@screens disaster board', async ({ page }, info) => {
   await mockBackend(page, { routes: { '/api/risk': BOARD } })
   await page.goto('/disaster')
   await page.getByText('Ratnagiri').first().waitFor()
+  // the MapLibre risk map loads lazily and draws in WebGL: wait for its style and circles
+  await expect(page.getByTestId('risk-map')).toHaveAttribute('data-ready', 'true', { timeout: 30_000 })
   await page.waitForTimeout(1500)
   await shot(page, info.project.name, 'disaster')
 })
