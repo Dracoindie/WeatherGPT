@@ -82,10 +82,15 @@ export const ROADS = {
 const MAP_STYLE = {
   version: 8,
   name: 'test',
-  sources: { roads: { type: 'geojson', data: ROADS } },
+  sources: {
+    roads: { type: 'geojson', data: ROADS },
+    // a point of interest whose icon the style has no sprite for, like OpenFreeMap dark's "circle-11"
+    poi: { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [73.86, 18.53] } }] } },
+  },
   layers: [
     { id: 'background', type: 'background', paint: { 'background-color': '#111827' } },
     { id: 'roads-base', type: 'line', source: 'roads', paint: { 'line-color': '#334155', 'line-width': 1 } },
+    { id: 'poi', type: 'symbol', source: 'poi', layout: { 'icon-image': 'circle-11' } },
   ],
 }
 

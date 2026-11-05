@@ -93,3 +93,22 @@ test('leaving /map from broadcast stops every loop and disposes the map', async 
   expect(after - before).toBeLessThan(10)
   expect(errors).toEqual([])
 })
+
+test('icons missing from the basemap sprite get a fallback, without warnings', async ({ page }) => {
+  // the test style has a point of interest asking for "circle-11", like OpenFreeMap dark
+  const warnings: string[] = []
+  page.on('console', (m) => {
+    if ((m.type() === 'warning' || m.type() === 'error') && /could not be loaded|circle-11/.test(m.text())) warnings.push(m.text())
+  })
+  await page.context().grantPermissions(['geolocation'])
+  await page.context().setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/map"]').first().dispatchEvent('click')
+  await page.waitForURL('**/map')
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect(page.getByTestId('weather-map').locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId('map-legend')).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(2000)
+  expect(warnings).toEqual([])
+})

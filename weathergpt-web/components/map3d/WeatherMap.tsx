@@ -29,7 +29,7 @@ import { ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useReducedMotion } from 'framer-motion'
 import { Crosshair, Pause, Play, Tv, X } from 'lucide-react'
-import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type CanvasSource, type FlyToOptions, type StyleSpecification } from 'maplibre-gl'
+import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type CanvasSource, type FlyToOptions } from 'maplibre-gl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { SkyButton } from '@/components/ui/SkyButton'
@@ -55,7 +55,7 @@ import {
 } from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
-import { firstOverlayLayer } from './basemap'
+import { addMissingImageFallback, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
 
@@ -222,7 +222,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     const el = mapEl
     let map: MapLibreMap
     try {
-      setWorkerUrl(`/vendor/maplibre-gl-worker.js?v=${getVersion()}`)
+      setWorkerUrl(`${MAPLIBRE_WORKER}?v=${getVersion()}`)
       const p = initialPlace.current
       map = new MapLibreMap({
         container: el,
@@ -245,6 +245,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     overlayRef.current = overlay
     map.addControl(overlay)
 
+    // icons the basemap's sprite lacks (OpenFreeMap dark asks for "circle-11"): a small neutral dot
+    addMissingImageFallback(map)
     map.on('style.load', () => tintBasemap(map))
     map.on('load', () => {
       setMapReady(true)
@@ -1048,21 +1050,3 @@ function flyToSteady(map: MapLibreMap, opts: FlyToOptions): () => void {
   }
 }
 
-/** Living Sky tint on the OpenFreeMap dark style: navy land, deep-blue water. */
-function tintBasemap(map: MapLibreMap) {
-  const base = cssVar('--map-base', 'black')
-  const water = cssVar('--map-water', 'black')
-  const style = map.getStyle() as StyleSpecification | undefined
-  for (const l of style?.layers ?? []) {
-    try {
-      if (l.type === 'background') map.setPaintProperty(l.id, 'background-color', base)
-      else if (l.id === 'water' && l.type === 'fill') map.setPaintProperty(l.id, 'fill-color', water)
-    } catch {
-      // a layer the style does not have: nothing to tint
-    }
-  }
-}
-
-function cssVar(name: string, fallback: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
-}
