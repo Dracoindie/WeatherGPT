@@ -10,7 +10,8 @@ export async function fetchForecast(params: {
   const url = new URL(`${API_BASE}/api/forecast`);
   url.searchParams.set('latitude', String(params.latitude));
   url.searchParams.set('longitude', String(params.longitude));
-  url.searchParams.set('days', String(params.days ?? 5));
+  // the 7-day panel; demo fixtures are recorded with the same days=7 (record_demo_fixtures.py)
+  url.searchParams.set('days', String(params.days ?? 7));
   const resp = await apiFetch(url.toString());
   if (!resp.ok) {
     throw new Error(`Forecast API error: ${resp.status}`);

@@ -48,7 +48,7 @@ async def _fetch_daily(latitude: float, longitude: float, days: int) -> dict:
 async def get_forecast(
     latitude: float = Query(..., ge=-90.0, le=90.0, description="Latitude in decimal degrees (-90 to 90)"),
     longitude: float = Query(..., ge=-180.0, le=180.0, description="Longitude in decimal degrees (-180 to 180)"),
-    days: int = Query(5, ge=1, le=7, description="Number of forecast days (1‑7)"),
+    days: int = Query(7, ge=1, le=7, description="Number of forecast days (1-7); the UI shows all 7"),
 ) -> ForecastResponse:
     """Return a daily forecast for the requested location.
 

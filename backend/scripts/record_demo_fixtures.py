@@ -20,6 +20,9 @@ Options:
                 and 11 (one Open-Meteo request per 4 tiles) and a 0.25° lattice
                 of tap points. About 2,550 Open-Meteo location-calls: run once.
     --map-only  record only the map
+    --forecast-only
+                record only the 7-day forecasts for the alert places (the
+                same days=7 request the UI sends)
     --routes    also record the demo routes (maps/demo.py DEMO_ROUTES: Pune ->
                 Mumbai, Mumbai -> Nashik, Pune -> Nashik): one OSRM request
                 each (public demo server: at most 1 request/s) plus the weather
@@ -56,6 +59,9 @@ DEMO_CHAT: list[tuple[str, str, bool]] = [
 # Alert pages (/alerts and /dashboard) for these places.
 ALERT_PLACES = ["Pune", "Mumbai", "Chennai"]
 
+# Must match the days the UI asks for (weathergpt-web/lib/api/forecast.ts).
+FORECAST_DAYS = 7
+
 # Must match DEFAULT_DISTRICTS in weathergpt-web/app/disaster/page.tsx.
 RISK_DISTRICTS = [
     "Mumbai", "Thane", "Palghar", "Raigad (Alibag)", "Ratnagiri", "Pune", "Satara", "Kolhapur",
@@ -87,6 +93,7 @@ def main() -> int:
     ap.add_argument("--map", action="store_true")
     ap.add_argument("--map-only", action="store_true")
     ap.add_argument("--routes", action="store_true")
+    ap.add_argument("--forecast-only", action="store_true")
     args = ap.parse_args()
     if args.map_only:
         args.map = True
@@ -145,6 +152,17 @@ def main() -> int:
     if args.map_only:
         return report(failures)
 
+    def forecasts() -> None:
+        for place in ALERT_PLACES:
+            geo = get("/api/geocode", q=place)
+            if geo:
+                get("/api/forecast", latitude=geo["latitude"], longitude=geo["longitude"], days=FORECAST_DAYS)
+                print(f"forecast {place}")
+
+    if args.forecast_only:
+        forecasts()
+        return report(failures)
+
     get("/api/alerts/thresholds")
 
     previous: dict | None = None
@@ -167,8 +185,8 @@ def main() -> int:
         geo = get("/api/geocode", q=place)
         if geo:
             get("/api/alerts", latitude=geo["latitude"], longitude=geo["longitude"])
-            get("/api/forecast", latitude=geo["latitude"], longitude=geo["longitude"], days=5)
             print(f"alerts {place}")
+    forecasts()
 
     districts = []
     for name in RISK_DISTRICTS:

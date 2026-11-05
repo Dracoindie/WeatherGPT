@@ -27,7 +27,7 @@ Type them exactly like this. Case, spaces and trailing `?`/`।` don't matter; t
 | 10 | `Is it safe to fly from Nagpur today?` | Aviation | Aviation briefing |
 
 Also recorded:
-- **Alerts and 5-day forecast** for Pune, Mumbai and Chennai.
+- **Alerts and 7-day forecast** for Pune, Mumbai and Chennai (recorded with `days=7`, the request the 7-day panel sends; `tests/test_demo_replay.py` checks they match).
 - **The `/disaster` risk board** for its 15 default Maharashtra districts.
 - **The threshold table.**
 
@@ -111,6 +111,7 @@ $env:PYTHONIOENCODING = "utf-8"
 backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map          # with the chat questions
 backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map-only     # only the map
 backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --map --routes  # plus the 3 demo routes
+backend\.venv\Scripts\python backend\scripts\record_demo_fixtures.py --forecast-only # only the 7-day forecasts
 ```
 
 - **Weather tiles.** It saves the weather tiles (`backend/data/demo_fixtures/map_tiles/`) for every grid step used between about zoom 8 and 11 over the region: 99 tiles of 25 points, 72 hours each.

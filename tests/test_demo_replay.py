@@ -199,3 +199,24 @@ def test_committed_fixtures_are_valid():
         assert request_key(req["method"], req["path"], req["query"], req["body"]) == key
         assert fx["status"] == 200 and fx["recorded_at"].endswith("Z")
         assert not req["path"].startswith("/api/push")
+
+
+def test_forecast_fixtures_match_the_days_the_ui_asks_for():
+    """The 7-day panel asks for days=7; recorded forecasts must be that same request or replay misses them."""
+    from pathlib import Path
+
+    ts = (Path(__file__).resolve().parents[1] / "weathergpt-web" / "lib" / "api" / "forecast.ts").read_text(encoding="utf-8")
+    m = re.search(r"params\.days \?\? (\d+)", ts)
+    assert m, "lib/api/forecast.ts must default days"
+    ui_days = m.group(1)
+    assert ui_days == "7"
+
+    store = FixtureStore()
+    forecasts = [f for f in store.fixtures.values() if f["request"]["path"] == "/api/forecast"]
+    assert len(forecasts) >= 3  # Pune, Mumbai, Chennai (ALERT_PLACES)
+    for f in forecasts:
+        q = f["request"]["query"]
+        assert q["days"] == ui_days, f"fixture for {q} recorded with days={q['days']}"
+        assert len(f["response"]["daily"]) == 7
+        # the UI's request (same coordinates, days=7) finds this fixture
+        assert store.get(request_key("GET", "/api/forecast", {"latitude": q["latitude"], "longitude": q["longitude"], "days": ui_days})) is f
