@@ -242,3 +242,39 @@ test('grid: a pan or small zoom inside the loaded grid sends no new request; lea
   await page.getByRole('button', { name: /zoom out/i }).click()
   await expect.poll(async () => Number(await map.getAttribute('data-grid-requests')), { timeout: 10_000 }).toBe(before + 1)
 })
+
+test('zoomed out beyond the tile plan: "zoom in", and no grid or hazard request (no 422)', async ({ page }) => {
+  const asked: string[] = []
+  page.on('request', (r) => {
+    // the box endpoints (not /api/map/hazard/summary, a radius around the centre)
+    if (/\/api\/map\/(grid|hazard)\?/.test(r.url())) asked.push(r.url())
+  })
+  const errors: string[] = []
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text())
+  })
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/map"]').first().dispatchEvent('click')
+  await page.waitForURL('**/map')
+  const map = page.getByTestId('weather-map')
+  await expect(map.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 30_000 })
+  // zoom out until the view is far larger than 4 tiles at the coarsest step
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: /zoom out/i }).click()
+    await page.waitForTimeout(400)
+  }
+  await expect(map.getByRole('status')).toHaveText('Zoom in to see the weather layers.', { timeout: 15_000 })
+  const before = asked.length
+  await page.getByTestId('map-layer-hazard').click()
+  await page.waitForTimeout(1500)
+  await expect(map.getByRole('status')).toHaveText('Zoom in to see the weather layers.')
+  expect(asked.slice(before)).toEqual([])
+
+  // pick a place: the view fits again and the grid is asked for
+  await page.getByTestId('map-layer-temperature').click()
+  await page.getByRole('button', { name: /use my current location/i }).first().click()
+  await expect.poll(() => asked.slice(before).some((u) => u.includes('/api/map/grid?')), { timeout: 15_000 }).toBe(true)
+  await expect(map.getByText('Zoom in to see the weather layers.')).toHaveCount(0, { timeout: 15_000 })
+  expect(errors.filter((e) => /422/.test(e))).toEqual([])
+})

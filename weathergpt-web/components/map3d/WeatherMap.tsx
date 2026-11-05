@@ -56,6 +56,7 @@ import {
 import { createField, particleCount, step, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
+import { gridFits } from './gridPlan'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
 
@@ -182,6 +183,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         east: Math.min(179.9, b.getEast()),
       }
       if (box.north <= box.south || box.east <= box.west) return
+      // 4 shared tiles of 25 points (backend/maps/tiles.py)
+      const max = 100
+      // Too large for the tile plan: the backend would answer 422. Say "zoom in" without asking.
+      if (!gridFits(box, max)) {
+        gridAbort.current?.abort()
+        gridCover.current = null
+        setGridStatus('too-large')
+        return
+      }
       const zoom = map.getZoom()
       const cover = gridCover.current
       if (
@@ -197,8 +207,6 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       const ctrl = new AbortController()
       gridAbort.current = ctrl
       setGridStatus('loading')
-      // 4 shared tiles of 25 points (backend/maps/tiles.py)
-      const max = 100
       setGridRequests((n) => n + 1)
       fetchMapGrid(box, max, ctrl.signal)
         .then((g) => {

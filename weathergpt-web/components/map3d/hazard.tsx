@@ -35,6 +35,7 @@ import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useDescribeWeather } from '@/lib/i18n/weather'
 import { cn } from '@/lib/utils'
 import { tokenRgb, type RGB } from './field'
+import { gridFits } from './gridPlan'
 import { roadPieces, type RoadPiece } from './roads'
 
 export type HazardType = 'overall' | HazardKind
@@ -126,6 +127,11 @@ export function useHazard({
       north: Math.min(84, b.getNorth()),
       west: Math.max(-179.9, b.getWest()),
       east: Math.min(179.9, b.getEast()),
+    }
+    // too large for the tile plan (the backend would answer 422): "zoom in", no request
+    if (!gridFits(box)) {
+      const id = window.setTimeout(() => setStatus('too-large'), 0)
+      return () => window.clearTimeout(id)
     }
     const key = `${box.south.toFixed(2)},${box.west.toFixed(2)},${box.north.toFixed(2)},${box.east.toFixed(2)}|${hour}`
     const hit = cache.current.get(key)
