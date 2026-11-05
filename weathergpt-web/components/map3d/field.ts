@@ -55,12 +55,16 @@ export function tokenRgb(name: string, fallback: RGB = [255, 255, 255]): RGB {
   return v ? hexToRgb(v) : fallback
 }
 
+/** Stops per ramp (--map-<layer>-0 … -n-1 in globals.css). */
+const RAMP_STOPS: Record<LayerId, number> = { temperature: 3, humidity: 4, wind: 4, rain: 4, heat: 4 }
+const stops = (layer: LayerId) => Array.from({ length: RAMP_STOPS[layer] }, (_, i) => i)
+
 export function rampFor(layer: LayerId): RGB[] {
-  return [0, 1, 2, 3].map((i) => tokenRgb(`${RAMP_TOKEN[layer]}-${i}`))
+  return stops(layer).map((i) => tokenRgb(`${RAMP_TOKEN[layer]}-${i}`))
 }
 
 export function rampCss(layer: LayerId): string {
-  return `linear-gradient(90deg, ${[0, 1, 2, 3].map((i) => `var(${RAMP_TOKEN[layer]}-${i})`).join(', ')})`
+  return `linear-gradient(90deg, ${stops(layer).map((i) => `var(${RAMP_TOKEN[layer]}-${i})`).join(', ')})`
 }
 
 /** One series' values at an hour, row-major like grid.points. */

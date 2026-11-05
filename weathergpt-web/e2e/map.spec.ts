@@ -191,8 +191,7 @@ test('weather surface: under the roads and labels, semi-transparent, coloured by
   // a MapLibre raster inserted below the basemap's first road/label layer ('roads-base' in the test style)
   await expect(map).toHaveAttribute('data-field-before', 'roads-base', { timeout: 15_000 })
   const opacity = Number(await map.getAttribute('data-field-opacity'))
-  expect(opacity).toBeGreaterThanOrEqual(0.35)
-  expect(opacity).toBeLessThanOrEqual(0.45)
+  expect(opacity).toBe(0.5)
   // the fixture varies across the view, so the surface must use many colours, not one
   await expect.poll(async () => Number(await map.getAttribute('data-field-colors')), { timeout: 10_000 }).toBeGreaterThan(8)
 

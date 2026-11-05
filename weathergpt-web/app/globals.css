@@ -46,7 +46,11 @@
   --map-base: #0b1220;
   --map-water: #071a2e;
   --map-gold: #fcd34d;
-  --map-temp-0: #9a3412; --map-temp-1: #c2410c; --map-temp-2: #f97316; --map-temp-3: #fdba74;
+  /* Temperature: a sequential, colour-blind-safe ramp for the dark map (cividis-style:
+     blue -> green -> pale yellow, lightness rising at every step). Validated as drawn,
+     blended at the surface's 0.5 opacity over --map-base: lightness monotone, every
+     step gap >= 0.06 L, the cool end >= 2:1 against the navy, so no step vanishes. */
+  --map-temp-0: #3b78e6; --map-temp-1: #62c98e; --map-temp-2: #ffe680;
   --map-humidity-0: #164e63; --map-humidity-1: #0e7490; --map-humidity-2: #22d3ee; --map-humidity-3: #a5f3fc;
   --map-wind-0: #4338ca; --map-wind-1: #6366f1; --map-wind-2: #818cf8; --map-wind-3: #c7d2fe;
   --map-rain-0: #1d4ed8; --map-rain-1: #3b82f6; --map-rain-2: #60a5fa; --map-rain-3: #bfdbfe;

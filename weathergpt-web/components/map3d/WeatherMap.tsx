@@ -87,7 +87,7 @@ const MODES: MapMode[] = [...LAYERS, 'hazard', 'route']
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
 
 /** The weather surface's opacity: the basemap (and its labels, drawn above) stays readable. */
-const FIELD_OPACITY = 0.4
+const FIELD_OPACITY = 0.5
 const FIELD_ID = 'wx-field'
 
 export function WeatherMap({ place: placeProp, conditionLabel, statusText, statusTone = 'none', timezone }: Props) {
