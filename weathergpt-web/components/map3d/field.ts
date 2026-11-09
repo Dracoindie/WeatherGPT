@@ -227,6 +227,28 @@ export function fieldPixels(
   return out
 }
 
+/**
+ * Fade the surface's alpha to 0 toward its four edges (smoothstep over
+ * `frac` of the width and of the height), in place. In the tilted broadcast
+ * view the far edge of the surface is on screen; a hard edge there reads as a
+ * rectangle floating over the terrain. Colours are untouched.
+ */
+export function featherEdges(px: Uint8ClampedArray, width: number, height: number, frac: number): Uint8ClampedArray {
+  if (frac <= 0) return px
+  const smooth = (t: number) => (t >= 1 ? 1 : t * t * (3 - 2 * t))
+  const fx = Math.max(1, frac * (width - 1))
+  const fy = Math.max(1, frac * (height - 1))
+  for (let y = 0; y < height; y++) {
+    const ay = smooth(Math.min(y, height - 1 - y) / fy)
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4 + 3
+      if (px[o] === 0) continue
+      px[o] = Math.round(px[o] * ay * smooth(Math.min(x, width - 1 - x) / fx))
+    }
+  }
+  return px
+}
+
 /** How many distinct colours (to 1/16 per channel) the opaque pixels use: a
  * surface where every cell got the same colour has 1. */
 export function distinctColors(px: Uint8ClampedArray): number {

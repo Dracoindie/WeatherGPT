@@ -38,7 +38,7 @@ import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
 import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useLiteMode } from '@/lib/liteMode'
 import { cn } from '@/lib/utils'
-import { distinctColors, fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
+import { distinctColors, featherEdges, fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
 import { MapLegend } from './MapLegend'
 import { MapPointCard, type PointState } from './MapPointCard'
 import {
@@ -89,6 +89,10 @@ const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1
 /** The weather surface's opacity: the basemap (and its labels, drawn above) stays readable. */
 const FIELD_OPACITY = 0.5
 const FIELD_ID = 'wx-field'
+/** Broadcast 3D: the surface fades out over this share of each edge (no hard rectangle in the tilted view). */
+const FIELD_FEATHER = 0.18
+/** Broadcast 3D: ask for this much more than the view on each side, when the tile plan allows, so the fade sits off screen. */
+const BROADCAST_PAD = 0.25
 
 export function WeatherMap({ place: placeProp, conditionLabel, statusText, statusTone = 'none', timezone }: Props) {
   // The page passes a new object each render; only a real move counts.
@@ -170,6 +174,11 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   // zoom that stays inside it needs no new request (Open-Meteo free tier).
   const gridCover = useRef<{ south: number; west: number; north: number; east: number; zoom: number } | null>(null)
   const [gridRequests, setGridRequests] = useState(0)
+  // broadcast 3D asks for a margin around the view (BROADCAST_PAD)
+  const padRef = useRef(false)
+  useEffect(() => {
+    padRef.current = broadcast3d
+  }, [broadcast3d])
   const loadGrid = useCallback(() => {
     const map = mapRef.current
     if (!map) return
@@ -203,6 +212,18 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         box.east <= cover.east
       )
         return
+      // the view check above uses the view itself; the request adds the margin
+      if (padRef.current) {
+        const dy = (box.north - box.south) * BROADCAST_PAD
+        const dx = (box.east - box.west) * BROADCAST_PAD
+        const padded = {
+          south: Math.max(-84, box.south - dy),
+          north: Math.min(84, box.north + dy),
+          west: Math.max(-179.9, box.west - dx),
+          east: Math.min(179.9, box.east + dx),
+        }
+        if (gridFits(padded, max)) Object.assign(box, padded)
+      }
       gridAbort.current?.abort()
       const ctrl = new AbortController()
       gridAbort.current = ctrl
@@ -578,7 +599,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       }
       const w = Math.min(256, grid.cols * 24)
       const h = Math.min(256, grid.rows * 24)
-      const px = fieldPixels(grid, surface, hour, rampFor(surface), w, h, 255, playing)
+      const feather = broadcast3d ? FIELD_FEATHER : 0
+      const px = featherEdges(fieldPixels(grid, surface, hour, rampFor(surface), w, h, 255, playing), w, h, feather)
       const canvas = (fieldCanvasRef.current ??= document.createElement('canvas'))
       if (canvas.width !== w) canvas.width = w
       if (canvas.height !== h) canvas.height = h
@@ -617,6 +639,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       root?.setAttribute('data-field-before', before ?? '')
       root?.setAttribute('data-field-colors', String(distinctColors(px)))
       root?.setAttribute('data-field-opacity', String(FIELD_OPACITY))
+      root?.setAttribute('data-field-feather', String(feather))
     }
     let pauseField = () => {}
     const retry = () => apply()
@@ -630,7 +653,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       map.off('idle', retry)
       map.off('render', pauseField)
     }
-  }, [grid, gridStatus, surface, hour, playing, mapReady, basemap])
+  }, [grid, gridStatus, surface, hour, playing, mapReady, basemap, broadcast3d])
 
   // Particles live outside React state: the frame loop advances them and
   // pushes layers to deck directly.

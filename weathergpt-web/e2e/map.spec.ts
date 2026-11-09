@@ -128,6 +128,8 @@ test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ pa
   await expect(page.getByTestId('map-resolution')).toContainText('Model grid ≈ 8 km')
   const particles = Number(await map.getAttribute('data-particles'))
   expect(particles).toBeGreaterThan(0)
+  // the surface fades out at its edges: no hard rectangle in the tilted view
+  await expect(map).toHaveAttribute('data-field-feather', '0.18', { timeout: 10_000 })
   // the broadcast view fills the screen, above the app header
   const vp = page.viewportSize()!
   const box = (await page.getByTestId('map-broadcast-root').boundingBox())!
@@ -137,6 +139,8 @@ test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ pa
 
   await page.keyboard.press('Escape')
   await expect(map).toHaveAttribute('data-broadcast', 'off')
+  // the flat map keeps its edges: the surface covers the whole view
+  await expect(map).toHaveAttribute('data-field-feather', '0', { timeout: 10_000 })
 })
 
 test('reduced motion: broadcast falls back to a still 2D view', async ({ page }) => {
