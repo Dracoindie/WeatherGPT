@@ -63,8 +63,11 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* large screens: the map on the left over two rows; Current conditions
+              and the 7-day forecast stacked on the right, so the column has no
+              empty space under the conditions. Phones: map, conditions, forecast. */}
           <div className="grid gap-5 lg:grid-cols-3">
-            <GlassPanel wet={false} className={loc ? 'min-w-0 p-2 sm:p-3 lg:col-span-2' : 'min-w-0 p-2 sm:p-3 lg:col-span-3'}>
+            <GlassPanel wet={false} className={loc ? 'min-w-0 p-2 sm:p-3 lg:col-span-2 lg:row-span-2' : 'min-w-0 p-2 sm:p-3 lg:col-span-3'}>
               <WeatherMap
                 place={loc ? { latitude: loc.latitude, longitude: loc.longitude, name: loc.name } : null}
                 conditionLabel={conditionLabel}
@@ -92,13 +95,14 @@ export default function MapPage() {
                 />
               </div>
             )}
+            {loc && (
+              <div className="min-w-0 lg:col-start-3" data-testid="map-forecast">
+                <ForecastPanel state={w.forecast} side />
+              </div>
+            )}
           </div>
 
-          {loc ? (
-            <ForecastPanel state={w.forecast} />
-          ) : (
-            <div className="sky-glass p-6 text-center text-sm text-hud-dim">{t('map.pick')}</div>
-          )}
+          {!loc && <div className="sky-glass p-6 text-center text-sm text-hud-dim">{t('map.pick')}</div>}
           <TrustStrip />
         </div>
       </AuthGuard>
