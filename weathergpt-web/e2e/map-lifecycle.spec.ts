@@ -139,3 +139,55 @@ test('broadcast keeps the place in view and exit restores the view', async ({ pa
   await page.waitForTimeout(1000)
   await expect(map).toHaveAttribute('data-center', at)
 })
+
+async function openMapNoPick(page: Page) {
+  await page.context().grantPermissions(['geolocation'])
+  await page.context().setGeolocation({ latitude: PUNE.latitude, longitude: PUNE.longitude })
+  await mockBackend(page)
+  await enterDemo(page)
+  await page.locator('a[href="/map"]').first().dispatchEvent('click')
+  await page.waitForURL('**/map')
+  const map = page.getByTestId('weather-map')
+  await expect(map.locator('canvas.maplibregl-canvas')).toBeVisible({ timeout: 30_000 })
+  return map
+}
+
+// OSMF Attribution Guidelines: the credit is visible at first; it may fold on
+// map interaction or after five seconds, and an (i) button must bring it back.
+test('small screens: the map credit starts expanded and folds to (i) on the first user pan', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'compact credits are for maps <= 640 px wide')
+  const map = await openMapNoPick(page)
+  const attrib = map.locator('.maplibregl-ctrl-attrib')
+  await expect(attrib).toHaveClass(/maplibregl-compact-show/)
+  await expect(attrib.getByRole('link', { name: /OpenStreetMap/ })).toBeVisible()
+  const box = (await map.locator('canvas.maplibregl-canvas').boundingBox())!
+  const t0 = Date.now()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 10, { steps: 5 })
+  await page.mouse.up()
+  await expect(attrib).not.toHaveClass(/maplibregl-compact-show/, { timeout: 2000 })
+  expect(Date.now() - t0).toBeLessThan(4000) // the pan folded it, not the 5 s timer
+  // the (i) button brings the credit and its licence link back
+  await attrib.locator('.maplibregl-ctrl-attrib-button').click()
+  await expect(attrib).toHaveClass(/maplibregl-compact-show/)
+  await expect(attrib.getByRole('link', { name: /OpenStreetMap/ })).toHaveAttribute('href', /openstreetmap\.org\/copyright/)
+})
+
+test('small screens: without interaction the map credit folds to (i) after 5 s', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'compact credits are for maps <= 640 px wide')
+  const map = await openMapNoPick(page)
+  const attrib = map.locator('.maplibregl-ctrl-attrib')
+  await expect(attrib).toHaveClass(/maplibregl-compact-show/)
+  await expect(attrib).not.toHaveClass(/maplibregl-compact-show/, { timeout: 9000 })
+  await expect(attrib.locator('.maplibregl-ctrl-attrib-button')).toBeVisible()
+})
+
+test('wide screens: the map credit is never folded', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'wide maps only')
+  const map = await openMapNoPick(page)
+  const attrib = map.locator('.maplibregl-ctrl-attrib')
+  await page.waitForTimeout(6000)
+  await expect(attrib).not.toHaveClass(/maplibregl-compact/)
+  await expect(attrib.getByRole('link', { name: /OpenStreetMap/ })).toBeVisible()
+})

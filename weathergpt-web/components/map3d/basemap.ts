@@ -77,3 +77,50 @@ export function firstOverlayLayer(map: MapLibreMap): string | undefined {
 }
 
 export const MAPLIBRE_WORKER = '/vendor/maplibre-gl-worker.js'
+
+/**
+ * Small maps (MapLibre turns the attribution compact at <= 640 px, once the
+ * style's credits have arrived): the credit starts expanded and folds to the
+ * (i) button after 5 s or on the first user pan, zoom, rotate or tap, the
+ * conditions the OSMF Attribution Guidelines allow for collapsing it. The (i)
+ * button opens it again. Programmatic camera moves (the fly-to on load) do
+ * not count, and the 5 s start when the compact credit appears. Cleans up on
+ * map.remove().
+ */
+export const ATTRIBUTION_COLLAPSE_MS = 5000
+
+export function collapseAttributionOnUse(map: MapLibreMap): void {
+  const compact = () => map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-attrib.maplibregl-compact')
+  let done = false
+  let timer: number | undefined
+  let observer: MutationObserver | undefined
+  const events = ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart', 'click'] as const
+  const off = () => {
+    done = true
+    window.clearTimeout(timer)
+    observer?.disconnect()
+    for (const ev of events) map.off(ev, onUser)
+  }
+  const collapse = () => {
+    const el = compact()
+    if (done || !el) return
+    off()
+    // the same change MapLibre makes on drag (_updateCompactMinimize)
+    el.classList.remove('maplibregl-compact-show')
+  }
+  function onUser(e: { originalEvent?: unknown }) {
+    if (e.originalEvent) collapse()
+  }
+  const startClock = () => {
+    if (done || timer !== undefined || !compact()) return
+    timer = window.setTimeout(collapse, ATTRIBUTION_COLLAPSE_MS)
+  }
+  for (const ev of events) map.on(ev, onUser)
+  const control = map.getContainer().querySelector('.maplibregl-ctrl-attrib')
+  if (control) {
+    observer = new MutationObserver(startClock)
+    observer.observe(control, { attributes: true, attributeFilter: ['class'] })
+  }
+  startClock()
+  map.once('remove', off)
+}

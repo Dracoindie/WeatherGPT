@@ -14,7 +14,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useReducedMotion } from 'framer-motion'
 import { getVersion, Map as MapLibreMap, Marker, setWorkerUrl } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import { addMissingImageFallback, MAPLIBRE_WORKER, tintBasemap } from '@/components/map3d/basemap'
+import { addMissingImageFallback, collapseAttributionOnUse, MAPLIBRE_WORKER, tintBasemap } from '@/components/map3d/basemap'
 import { KEYLESS, mapSources, type MapSources } from '@/components/map3d/sources'
 
 interface SkyMapProps {
@@ -44,7 +44,8 @@ export default function SkyMap({ latitude, longitude, label }: SkyMapProps) {
         center: [start.current.longitude, start.current.latitude],
         zoom: 10,
         scrollZoom: false,
-        attributionControl: { compact: true },
+        // compact (the (i) button) only on small maps, where MapLibre switches at <= 640 px
+        attributionControl: {},
       })
     } catch {
       const id = window.setTimeout(() => setFailed(true), 0)
@@ -52,6 +53,7 @@ export default function SkyMap({ latitude, longitude, label }: SkyMapProps) {
     }
     mapRef.current = map
     addMissingImageFallback(map)
+    collapseAttributionOnUse(map)
     map.on('style.load', () => tintBasemap(map))
     map.on('error', (e) => {
       const status = (e.error as { status?: number } | undefined)?.status
@@ -92,7 +94,7 @@ export default function SkyMap({ latitude, longitude, label }: SkyMapProps) {
         <div className="absolute inset-0 bg-white/[0.03]" />
       ) : (
         // inline position: maplibre-gl.css's .maplibregl-map { position: relative } beats the class
-        <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label={label} role="img" />
+        <div ref={el} style={{ position: 'absolute', inset: 0 }} aria-label={label} role="region" />
       )}
 
       {/* radar sweep + range rings, centred on the marker */}

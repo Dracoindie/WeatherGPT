@@ -83,7 +83,8 @@ const MAP_STYLE = {
   version: 8,
   name: 'test',
   sources: {
-    roads: { type: 'geojson', data: ROADS },
+    // the credit real basemap styles carry (OpenFreeMap: OpenMapTiles, OpenStreetMap)
+    roads: { type: 'geojson', data: ROADS, attribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>' },
     // a point of interest whose icon the style has no sprite for, like OpenFreeMap dark's "circle-11"
     poi: { type: 'geojson', data: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [73.86, 18.53] } }] } },
   },

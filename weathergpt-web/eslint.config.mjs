@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // MapLibre worker copied from node_modules (scripts/copy-maplibre-worker.mjs)
     "public/vendor/**",
+    // Playwright output: an interrupted run leaves minified trace resources here
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 

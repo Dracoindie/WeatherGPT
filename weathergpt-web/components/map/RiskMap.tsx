@@ -14,7 +14,7 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { getVersion, LngLatBounds, Map as MapLibreMap, NavigationControl, Popup, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import { addMissingImageFallback, cssVar, MAPLIBRE_WORKER, tintBasemap } from '@/components/map3d/basemap'
+import { addMissingImageFallback, collapseAttributionOnUse, cssVar, MAPLIBRE_WORKER, tintBasemap } from '@/components/map3d/basemap'
 import { KEYLESS, mapSources, type MapSources } from '@/components/map3d/sources'
 import { useI18n, type TranslationKey } from '@/context/I18nContext'
 import type { DistrictRisk } from '@/lib/api/roles'
@@ -57,7 +57,8 @@ export default function RiskMap({ districts }: { districts: DistrictRisk[] }) {
         center: [76, 19.5],
         zoom: 5,
         scrollZoom: false,
-        attributionControl: { compact: true },
+        // compact (the (i) button) only on small maps, where MapLibre switches at <= 640 px
+        attributionControl: {},
       })
     } catch {
       const id = window.setTimeout(() => setFailed(true), 0)
@@ -66,6 +67,7 @@ export default function RiskMap({ districts }: { districts: DistrictRisk[] }) {
     mapRef.current = map
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right')
     addMissingImageFallback(map)
+    collapseAttributionOnUse(map)
 
     const severityColor: unknown[] = ['match', ['get', 'severity']]
     for (const l of LEVELS) severityColor.push(l, cssVar(`--sev-${l}`, 'gray'))

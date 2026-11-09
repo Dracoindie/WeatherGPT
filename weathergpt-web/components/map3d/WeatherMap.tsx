@@ -55,7 +55,7 @@ import {
 } from './hazard'
 import { createField, particleCount, step, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
-import { addMissingImageFallback, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
+import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
 import { gridFits } from './gridPlan'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
@@ -256,7 +256,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         center: p ? [p.longitude, p.latitude] : INDIA_VIEW.center,
         zoom: p ? 8 : INDIA_VIEW.zoom,
         maxPitch: 72,
-        attributionControl: { compact: true },
+        // compact (the (i) button) only on small maps, where MapLibre switches at <= 640 px
+        attributionControl: {},
         // Keyboard users pan with the arrow keys; the map canvas is focusable.
         keyboard: true,
       })
@@ -273,6 +274,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
     // icons the basemap's sprite lacks (OpenFreeMap dark asks for "circle-11"): a small neutral dot
     addMissingImageFallback(map)
+    collapseAttributionOnUse(map)
     map.on('style.load', () => tintBasemap(map))
     map.on('load', () => {
       setMapReady(true)
