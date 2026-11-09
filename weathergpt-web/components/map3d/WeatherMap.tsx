@@ -306,7 +306,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     }
     mapRef.current = map
     map.addControl(new NavigationControl({ visualizePitch: true }), 'bottom-right')
-    const overlay = new MapboxOverlay({ interleaved: false, layers: [] })
+    // Picking only on a tap (handleTap turns it on for that one pickObject).
+    // With a pickable layer deck.gl otherwise picks on every mouse move: a
+    // GPU readPixels per move ("GPU stall due to ReadPixels").
+    const overlay = new MapboxOverlay({ interleaved: false, layers: [], _pickable: false })
     overlayRef.current = overlay
     map.addControl(overlay)
 
@@ -630,7 +633,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       const canvas = (fieldCanvasRef.current ??= document.createElement('canvas'))
       if (canvas.width !== w) canvas.width = w
       if (canvas.height !== h) canvas.height = h
-      canvas.getContext('2d')?.putImageData(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0)
+      canvas.getContext('2d', { willReadFrequently: true })?.putImageData(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0)
       const north = grid.south + (grid.rows - 1) * grid.step_deg
       const east = grid.west + (grid.cols - 1) * grid.step_deg
       const coordinates: [[number, number], [number, number], [number, number], [number, number]] = [
@@ -884,7 +887,14 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         return
       }
       if (hazardOn && overlayRef.current) {
-        const info = overlayRef.current.pickObject({ x, y, radius: 2, layerIds: ['hazard-hex'] })
+        const overlay = overlayRef.current
+        overlay.setProps({ _pickable: true })
+        let info: ReturnType<MapboxOverlay['pickObject']> = null
+        try {
+          info = overlay.pickObject({ x, y, radius: 2, layerIds: ['hazard-hex'] })
+        } finally {
+          overlay.setProps({ _pickable: false })
+        }
         const d = info?.object as { cell: string; point: number } | undefined
         if (d) {
           setHexPick({ cell: d.cell, point: d.point })

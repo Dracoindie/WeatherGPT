@@ -77,6 +77,38 @@ test('tap a hex: level, value vs threshold, window, honesty note; agrees with th
   await expect(card.getByTestId('map-hazard-none')).toBeVisible()
 })
 
+test('hovering the hexes reads no pixels from the GPU; a tap still picks', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'no hover on phones')
+  // count WebGL readPixels calls (deck.gl hover picking did one per mouse move)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __readPixels: number }
+    w.__readPixels = 0
+    for (const C of [WebGLRenderingContext, WebGL2RenderingContext]) {
+      const orig = C.prototype.readPixels as (...a: unknown[]) => void
+      C.prototype.readPixels = function (this: unknown, ...a: unknown[]) {
+        w.__readPixels += 1
+        return orig.apply(this, a)
+      } as typeof C.prototype.readPixels
+    }
+  })
+  await openHazard(page)
+  const canvas = page.locator('[data-testid="weather-map"] canvas.maplibregl-canvas')
+  await canvas.scrollIntoViewIfNeeded()
+  const box = (await canvas.boundingBox())!
+  await page.waitForTimeout(1000)
+  const reads = () => page.evaluate(() => (window as unknown as { __readPixels: number }).__readPixels)
+  const before = await reads()
+  for (let i = 0; i < 30; i++) {
+    await page.mouse.move(box.x + 80 + i * 12, box.y + 120 + (i % 5) * 25)
+    await page.waitForTimeout(40)
+  }
+  await page.waitForTimeout(500)
+  expect(await reads()).toBe(before)
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+  await expect(page.getByTestId('map-hazard-card')).toContainText('45 mm ≥ 15 mm', { timeout: 15_000 })
+  expect(await reads()).toBeGreaterThan(before)
+})
+
 test('a mouse tap on the place picks its hex', async ({ page, isMobile }) => {
   test.skip(isMobile, 'touch taps are covered by the centre button on phones')
   await openHazard(page)
