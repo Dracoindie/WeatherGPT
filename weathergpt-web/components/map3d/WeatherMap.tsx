@@ -1087,11 +1087,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       {hazardOn && <HazardTypeChips type={hazardType} onChange={setHazardType} />}
       {routeOn && !broadcast && <RoutePlanner r={rt} />}
 
-      <div className="relative min-h-[380px] flex-1 overflow-hidden rounded-xl sm:min-h-[460px] lg:min-h-[580px]">
+      {/* phones: about 60 % of the screen height (svh: the toolbar does not resize it) */}
+      <div className="relative h-[60svh] min-h-[320px] flex-none overflow-hidden rounded-xl sm:h-auto sm:min-h-[460px] sm:flex-1 lg:min-h-[580px]" data-testid="map-frame">
         {!broadcast && <div ref={setSlot} className="absolute inset-0 z-0" />}
 
         {place && (
-          <div className="sky-glass map-overlay pointer-events-none absolute left-2 top-2 max-w-[60%] px-3 py-2 text-xs" data-testid="map-location-card">
+          <div
+            className="sky-glass map-overlay pointer-events-none absolute left-2 top-2 max-w-[50%] px-2 py-1 text-[11px] leading-tight sm:max-w-[60%] sm:px-3 sm:py-2 sm:text-xs sm:leading-normal"
+            data-testid="map-location-card"
+          >
             <p className="truncate font-semibold text-hud" title={place.name}>
               {placeShort}
             </p>

@@ -24,7 +24,7 @@ import { useLocationWeather } from '@/lib/useLocationWeather'
 // maplibre-gl and deck.gl load only here, only in the browser.
 const WeatherMap = dynamic(() => import('@/components/map3d/WeatherMap').then((m) => m.WeatherMap), {
   ssr: false,
-  loading: () => <div className="h-full min-h-[460px] animate-pulse rounded-xl bg-white/[0.03]" />,
+  loading: () => <div className="h-[60svh] min-h-[320px] animate-pulse rounded-xl bg-white/[0.03] sm:h-full sm:min-h-[460px]" />,
 })
 
 export default function MapPage() {

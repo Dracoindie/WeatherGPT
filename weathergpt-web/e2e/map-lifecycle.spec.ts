@@ -161,6 +161,8 @@ test('small screens: the map credit starts expanded and folds to (i) on the firs
   const attrib = map.locator('.maplibregl-ctrl-attrib')
   await expect(attrib).toHaveClass(/maplibregl-compact-show/)
   await expect(attrib.getByRole('link', { name: /OpenStreetMap/ })).toBeVisible()
+  // the phone map is 60 % of the screen tall: bring its middle into view, clear of the bottom nav
+  await map.locator('canvas.maplibregl-canvas').evaluate((el) => el.scrollIntoView({ block: 'center' }))
   const box = (await map.locator('canvas.maplibregl-canvas').boundingBox())!
   const t0 = Date.now()
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
