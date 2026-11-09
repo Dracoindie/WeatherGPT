@@ -5,6 +5,11 @@
 it is never an alert level, never pushed, and always labelled "experimental ·
 estimated · not official IMD".
 
+On the map: choose **Waterlogging (experimental)**. Zoomed out further than a
+city the map says so and offers **Zoom in here** (no request is sent). Tap a
+hexagon for its parts: rain (9 h total and wettest hour), how many metres it
+lies below or above its surroundings, and nearby waterlogging reports.
+
 ## What it combines, per H3 hexagon
 
 Resolution 8: hexagons about 1 km across, over a city-sized view (at most 0.3° a

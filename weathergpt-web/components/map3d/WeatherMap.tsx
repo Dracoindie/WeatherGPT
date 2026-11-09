@@ -39,6 +39,7 @@ import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
 import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useLiteMode } from '@/lib/liteMode'
+import { WATERLOG_ZOOM } from '@/lib/api/waterlogging'
 import { useRetryCooldown } from '@/lib/retryCooldown'
 import { cn } from '@/lib/utils'
 import { distinctColors, featherEdges, fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
@@ -57,6 +58,7 @@ import {
   type HexPick,
 } from './hazard'
 import { createField, PARTICLE_STYLE, particleCount, retarget, segmentAlpha, step, TRAIL, type ParticleField } from './particles'
+import { useWaterlogging, useWaterlogHexes, WaterlogCard, waterlogColors, waterlogLayers, WaterlogLegend } from './waterlogging'
 import { reportColors, ReportCard, reportLayers, ReportsLegend, ReportsPanel, useReports, type ComposerState } from './reports'
 import { endLabel, routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
@@ -86,8 +88,8 @@ interface Props {
 
 type GridStatus = 'idle' | 'loading' | 'ready' | 'error' | 'too-large'
 /** A weather surface, the hazard hexes and roads, or weather along a route. */
-type MapMode = LayerId | 'hazard' | 'route' | 'reports'
-const MODES: MapMode[] = [...LAYERS, 'hazard', 'route', 'reports']
+type MapMode = LayerId | 'hazard' | 'route' | 'reports' | 'waterlogging'
+const MODES: MapMode[] = [...LAYERS, 'hazard', 'route', 'reports', 'waterlogging']
 
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
 
@@ -128,7 +130,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [grid, setGrid] = useState<MapGrid | null>(null)
   const [gridStatus, setGridStatus] = useState<GridStatus>('idle')
   const [layer, setLayer] = useState<MapMode>('temperature')
-  const surface: LayerId | null = layer === 'hazard' || layer === 'route' || layer === 'reports' ? null : layer
+  const surface: LayerId | null = layer === 'hazard' || layer === 'route' || layer === 'reports' || layer === 'waterlogging' ? null : layer
   const [hazardType, setHazardType] = useState<HazardType>('overall')
   const [hexPick, setHexPick] = useState<HexPick | null>(null)
   const [mapObj, setMapObj] = useState<MapLibreMap | null>(null)
@@ -149,7 +151,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   const broadcast3d = broadcast && motion
   // no particles over the hazard hexes, roads or a route: they would hide the levels
-  const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && layer !== 'reports' && (broadcast || layer === 'wind')
+  const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && layer !== 'reports' && layer !== 'waterlogging' && (broadcast || layer === 'wind')
   // broadcast over a weather surface: the wind is a hint on top of the colours (thinner, fainter, sparser)
   const softParticles = broadcast && layer !== 'wind'
   const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
@@ -173,6 +175,13 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   // --------------------------------------------------------------- route ---
   const routeOn = layer === 'route'
+
+  // -------------------------------------------------------- waterlogging ---
+  const wlOn = layer === 'waterlogging'
+  const wl = useWaterlogging({ map: mapObj, active: wlOn, mapReady })
+  const wlHexes = useWaterlogHexes(wl.data)
+  const [wlPick, setWlPick] = useState<string | null>(null)
+  const pickedWl = wlOn && wlPick && wl.data ? (wl.data.cells.find((c) => c.cell === wlPick) ?? null) : null
 
   // ------------------------------------------------------------- reports ---
   const reportsOn = layer === 'reports'
@@ -608,10 +617,11 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         })
       )
     }
+    if (wlOn) out.push(...waterlogLayers({ hexes: wlHexes, picked: wlPick, colors: waterlogColors() }))
     // report dots above the place marker: a report AT the place must stay tappable
     if (reportsOn) out.push(...reportLayers({ reports: rp.reports, draft, selected: reportPickId, colors: reportColors(), big: broadcast }))
     return out
-  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to, reportsOn, rp.reports, draft, reportPickId])
+  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to, reportsOn, rp.reports, draft, reportPickId, wlOn, wlHexes, wlPick])
 
   // Show the whole route when a new report arrives.
   useEffect(() => {
@@ -928,6 +938,15 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         }
         setReportPickId(null)
       }
+      if (wlOn) {
+        const c = pick(['waterlog-hex'])?.object as { cell: { cell: string } } | undefined
+        if (c) {
+          setWlPick(c.cell.cell)
+          setPoint(null)
+          return
+        }
+        setWlPick(null)
+      }
       if (hazardOn) {
         const info = pick(['hazard-hex'])
         const d = info?.object as { cell: string; point: number } | undefined
@@ -940,7 +959,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       setHexPick(null)
       showPoint(lat, lon)
     },
-    [hazardOn, showPoint, routeOn, routePicking, setRouteFrom, setRouteTo, setRoutePicking, clearRoute, t, reportsOn, composer]
+    [hazardOn, showPoint, routeOn, routePicking, setRouteFrom, setRouteTo, setRoutePicking, clearRoute, t, reportsOn, composer, wlOn]
   )
   useEffect(() => {
     clickRef.current = handleTap
@@ -980,6 +999,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
               setComposer(null)
               setReportPickId(null)
             }
+            if (id !== 'waterlogging') setWlPick(null)
           }}
           className={cn(
             'rounded-full border px-3 py-1.5 text-xs transition-colors',
@@ -1028,7 +1048,22 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     </div>
   )
 
-  const status = hazardOn
+  const wlStatus = !wlOn
+    ? null
+    : wl.status === 'too-large'
+      ? t('wl.zoomIn')
+      : wl.status === 'loading'
+        ? t('wl.loading')
+        : wl.status === 'error'
+          ? t('wl.error')
+          : wl.status === 'ready' && wl.data
+            ? wl.data.cells.length > 0
+              ? fill(t('wl.count'), { n: wl.data.cells.length })
+              : t('wl.none')
+            : null
+  const status = wlOn
+    ? wlStatus
+    : hazardOn
     ? hz.status === 'loading' && !hz.hazard
       ? t('map.hazard.loading')
       : hz.status === 'error'
@@ -1047,7 +1082,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const placeShort = place?.name.split(',')[0]
 
   const legend = (big: boolean) =>
-    routeOn ? null : reportsOn ? (
+    routeOn ? null : wlOn ? (
+      <WaterlogLegend data={wl.data} tz={tz} big={big} />
+    ) : reportsOn ? (
       <ReportsLegend big={big} />
     ) : hazardOn ? (
       hazard ? <HazardLegend hazard={hazard} roadsShown={hz.roads.length > 0} tz={tz} big={big} /> : null
@@ -1064,6 +1101,16 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     pickedReport ? (
       <ReportCard report={pickedReport} token={token} tz={tz} onClose={() => setReportPickId(null)} onUpdated={rp.upsert} className={className} />
     ) : null
+
+  const wlCard = (className?: string) => (pickedWl ? <WaterlogCard cell={pickedWl} onClose={() => setWlPick(null)} className={className} /> : null)
+
+  // the estimate needs a city-sized view: fly in on the place (or the view's centre)
+  const zoomForWaterlogging = () => {
+    const map = mapRef.current
+    if (!map) return
+    const c = place ? ([place.longitude, place.latitude] as [number, number]) : map.getCenter().toArray()
+    flyToSteady(map, { center: c, zoom: WATERLOG_ZOOM, animate: motion })
+  }
 
   const reportHere = () => {
     const c = mapRef.current?.getCenter()
@@ -1170,6 +1217,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-route-worst={routeReport ? routeReport.worst : undefined}
       data-route-picking={routeOn && rt.picking ? rt.picking : undefined}
       data-reports={reportsOn ? rp.reports.length : undefined}
+      data-waterlog-cells={wlOn && wl.data ? wl.data.cells.length : undefined}
+      data-waterlog-status={wlOn ? wl.status : undefined}
       data-report-stage={reportsOn && composer ? composer.stage : undefined}
       data-route-labels={
         routeOn ? [rt.from && endLabel('from', rt.from.name), rt.to && endLabel('to', rt.to.name)].filter(Boolean).join(' | ') || undefined : undefined
@@ -1217,7 +1266,13 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         {status && (
           <div className="sky-glass map-overlay absolute bottom-2 left-2 flex max-w-[80%] flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5 text-xs text-hud" role="status">
             <span>{status}</span>
-            {!hazardOn && gridStatus === 'error' && (
+            {wlOn && wl.status === 'too-large' && (
+              <SkyButton variant="ghost" className="px-3 py-1 text-xs" onClick={zoomForWaterlogging} data-testid="wl-zoom-here">
+                {t('wl.zoomHere')}
+              </SkyButton>
+            )}
+            {wlOn && wl.status === 'error' && <RetryButton wait={0} onRetry={wl.retry} testId="wl-retry" className="px-3 py-1 text-xs" />}
+            {!hazardOn && !wlOn && gridStatus === 'error' && (
               <RetryButton wait={gridRetryWait} onRetry={retryGrid} testId="map-grid-retry" className="px-3 py-1 text-xs" />
             )}
           </div>
@@ -1229,11 +1284,13 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         )}
         {!mobile && !broadcast && hazardCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto')}
         {!mobile && !broadcast && reportCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-80 overflow-y-auto')}
+        {!mobile && !broadcast && wlCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto')}
       </div>
 
       {point && mobile && !broadcast && <MapPointCard point={point} onClose={() => setPoint(null)} />}
       {mobile && !broadcast && hazardCard()}
       {mobile && !broadcast && reportCard()}
+      {mobile && !broadcast && wlCard()}
 
       {routeOn ? (
         routeReport && !broadcast && <RouteReportPanel report={routeReport} tz={tz} onDepart={rt.departAt} />
@@ -1265,7 +1322,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       ) : (
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
           <div className="min-w-0 space-y-2">
-            {!broadcast && slider}
+            {/* the waterlogging estimate is one 9 h window, not an hour on the slider */}
+            {!broadcast && !wlOn && slider}
             <p className="text-xs text-hud-dim">{t('map.tapHint')}</p>
           </div>
           {!broadcast && legend(false) && <div className="min-w-0">{legend(false)}</div>}

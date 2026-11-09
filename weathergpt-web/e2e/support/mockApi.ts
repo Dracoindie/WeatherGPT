@@ -7,7 +7,7 @@
 
 import type { BrowserContext, Page, Route } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
-import { cellToLatLng, latLngToCell, polygonToCells } from 'h3-js'
+import { cellToLatLng, gridDisk, latLngToCell, polygonToCells } from 'h3-js'
 import THRESHOLDS from './thresholds.json'
 
 export const PUNE = { name: 'Pune, Maharashtra, India', latitude: 18.5204, longitude: 73.8567 }
@@ -626,6 +626,37 @@ function multipartField(body: string, name: string): string | null {
   return body.slice(start, end < 0 ? undefined : end)
 }
 
+
+/**
+ * GET /api/map/waterlogging (backend/maps/waterlogging.py): a bowl around the
+ * picked place, H3 res 8. The centre is high, the first ring moderate, the
+ * second low. Boxes larger than a city answer 422 like the backend.
+ */
+export function mapWaterlogging(q: URLSearchParams) {
+  const south = Number(q.get('south')), north = Number(q.get('north'))
+  const west = Number(q.get('west')), east = Number(q.get('east'))
+  if (north - south > 0.3 || east - west > 0.3) return null
+  const centre = latLngToCell(PUNE.latitude, PUNE.longitude, 8)
+  const ring1 = gridDisk(centre, 1).filter((c) => c !== centre)
+  const ring2 = gridDisk(centre, 2).filter((c) => c !== centre && !ring1.includes(c))
+  const cell = (c: string, level: string, score: number, low: number, reports: number) => ({
+    cell: c, score, level, parts: { rain_mm: 22.4, peak_mm_h: 9.1, low_m: low, reports },
+  })
+  const start = new Date(Date.now() - 3 * 3_600_000)
+  start.setUTCMinutes(0, 0, 0)
+  return {
+    experimental: true,
+    note: 'Experimental estimate from Open-Meteo rain (past 3 h + next 6 h, model grid ≈ 8 km), terrain tiles and community reports. Not a measurement, not an alert, not official IMD.',
+    h3_resolution: 8, model_grid_km: 8,
+    window_start: start.toISOString().replace('.000Z', 'Z'),
+    window_end: new Date(start.getTime() + 9 * 3_600_000).toISOString().replace('.000Z', 'Z'),
+    terrain: 'AWS Terrain Tiles (Mapzen terrarium)', reports_used: true,
+    cells: [cell(centre, 'high', 0.82, 7.5, 1), ...ring1.map((c) => cell(c, 'moderate', 0.45, 2.1, 0)), ...ring2.map((c) => cell(c, 'low', 0.2, -1.4, 0))],
+    cells_checked: 1200,
+    levels: [{ level: 'low', from_score: 0.15 }, { level: 'moderate', from_score: 0.35 }, { level: 'high', from_score: 0.6 }],
+  }
+}
+
 export interface MockOptions {
   chat?: ChatHandler
   weatherCode?: number
@@ -786,6 +817,10 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
         return json(route, mapGrid(new URL(req.url()).searchParams))
       case '/api/map/hazard':
         return json(route, mapHazard(new URL(req.url()).searchParams))
+      case '/api/map/waterlogging': {
+        const wl = mapWaterlogging(new URL(req.url()).searchParams)
+        return wl ? json(route, wl) : json(route, { detail: 'Zoom in to a city to see the waterlogging estimate.' }, 422)
+      }
       case '/api/map/hazard/summary':
         return json(route, mapHazardSummary(new URL(req.url()).searchParams))
       case '/api/route':

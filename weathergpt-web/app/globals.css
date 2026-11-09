@@ -58,6 +58,8 @@
   /* Community report dots by group (categorical, colour-blind-safe: blue, near-white,
      orange differ in hue AND lightness), with a dark --map-base outline. Fills only. */
   --map-report-rain: #38bdf8; --map-report-wind: #f1f5f9; --map-report-ground: #f59e0b;
+  /* Waterlogging estimate (experimental): one-hue blue ramp, dark -> bright = low -> high. */
+  --map-wl-low: #1d4ed8; --map-wl-moderate: #3b82f6; --map-wl-high: #93c5fd;
 
   --background: var(--sky-floor);
   --foreground: var(--sky-text);
