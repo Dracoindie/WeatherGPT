@@ -7,6 +7,7 @@ Map data for /map (docs/VISION.md, step 1):
   the visible box, in one batched Open-Meteo request (at most 100 points)
 - GET /api/map/hazard: hazard level per H3 cell for a 24 h window
 - GET /api/map/hazard/summary: hazard within a radius of a place
+- GET /api/map/waterlogging: experimental waterlogging risk per H3 cell (docs/WATERLOGGING.md)
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 from maps.grid import DEFAULT_POINTS, MAX_POINTS, MIN_POINTS, GridResponse, GridSpecError, fetch_grid
 from maps.hazard import DEFAULT_RADIUS_KM, HazardResponse, HazardSummary, fetch_hazard, hazard_summary
 from maps.point import PointWeather, point_weather
+from maps.waterlogging import BoxTooLarge, WaterlogResponse, fetch_waterlogging
 
 # Same header as demo_replay.REPLAY_HEADER (not imported: demo_replay pulls in the chat stack).
 REPLAY_HEADER = "X-WeatherGPT-Replay"
@@ -113,3 +115,25 @@ async def map_demo_region() -> dict:
     from maps.demo import DEMO_REGION, MAX_ZOOM, MIN_ZOOM
 
     return {**DEMO_REGION, "min_zoom": MIN_ZOOM, "max_zoom": MAX_ZOOM}
+
+
+@router.get(
+    "/api/map/waterlogging",
+    response_model=WaterlogResponse,
+    responses={422: {"description": "Bad or too large box"}, 503: {"description": "Weather unavailable"}},
+)
+async def map_waterlogging(
+    south: float = Query(..., ge=-85.0, le=85.0),
+    west: float = Query(..., ge=-180.0, le=180.0),
+    north: float = Query(..., ge=-85.0, le=85.0),
+    east: float = Query(..., ge=-180.0, le=180.0),
+) -> WaterlogResponse:
+    """Experimental: rain (past 3 h + next 6 h) x how low each ~1 km hexagon lies, plus community reports."""
+    if north <= south or east <= west:
+        raise HTTPException(status_code=422, detail="The box must have north > south and east > west.")
+    try:
+        return await fetch_waterlogging(south, west, north, east)
+    except BoxTooLarge as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="The waterlogging estimate is temporarily unavailable.") from exc
