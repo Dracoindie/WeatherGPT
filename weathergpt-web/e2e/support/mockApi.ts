@@ -584,6 +584,48 @@ export function mapRoute(q: URLSearchParams) {
   }
 }
 
+
+/**
+ * Community reports near Pune (backend/api/reports.py shapes). Times are
+ * relative to now, rounded down to 10 minutes like the API.
+ */
+export function reportsFixture() {
+  const ago = (min: number) => {
+    const d = new Date(Date.now() - min * 60_000)
+    d.setUTCMinutes(d.getUTCMinutes() - (d.getUTCMinutes() % 10), 0, 0)
+    return d.toISOString().replace('.000Z', 'Z')
+  }
+  const until = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString().replace(/\.\d+Z$/, 'Z')
+  const base = { note: null, has_photo: false, flags: 0, my_vote: null, mine: false, reporter: 'a resident' }
+  return [
+    {
+      ...base, id: 'rep-water', kind: 'waterlogging', latitude: 18.5204, longitude: 73.8567, has_photo: true,
+      note: 'Knee-deep water under the bridge', reported_at: ago(40), expires_at: until(5), confirms: 2,
+      trust: { level: 'high', score: 0.79, parts: { model: 1, nearby: 0.667, age: 0.889, reporter: 0.5, flags: 0 } },
+    },
+    {
+      ...base, id: 'rep-tree', kind: 'fallen_tree', latitude: 18.6000, longitude: 73.9500, reported_at: ago(90),
+      expires_at: until(4), confirms: 0,
+      trust: { level: 'medium', score: 0.46, parts: { model: 0.35, nearby: 0, age: 0.75, reporter: 0.6, flags: 0 } },
+    },
+    {
+      ...base, id: 'rep-hail', kind: 'hail', latitude: 18.4400, longitude: 73.7600, reported_at: ago(150),
+      expires_at: until(3), confirms: 0, flags: 1,
+      trust: { level: 'low', score: 0.21, parts: { model: 0.2, nearby: 0, age: 0.583, reporter: 0.5, flags: 1 } },
+    },
+  ]
+}
+type MockReport = ReturnType<typeof reportsFixture>[number] & Record<string, unknown>
+
+/** The fields of a multipart body the report form sends (no real parser needed for the mock). */
+function multipartField(body: string, name: string): string | null {
+  const m = body.match(new RegExp(`name="${name}"(?:; filename="[^"]*")?\\r\\nContent-Type: [^\\r]*\\r\\n\\r\\n|name="${name}"\\r\\n\\r\\n`))
+  if (!m) return null
+  const start = (m.index ?? 0) + m[0].length
+  const end = body.indexOf('\r\n--', start)
+  return body.slice(start, end < 0 ? undefined : end)
+}
+
 export interface MockOptions {
   chat?: ChatHandler
   weatherCode?: number
@@ -596,6 +638,8 @@ export interface MockOptions {
   /** /api/geocode: delay (ms) or HTTP status per district name (first part of q). */
   geocodeDelay?: Record<string, number>
   geocodeStatus?: Record<string, number>
+  /** Community reports the backend lists (default reportsFixture()); [] for none. */
+  reports?: MockReport[]
 }
 
 interface BoardRow { name: string; latitude: number; longitude: number; [k: string]: unknown }
@@ -611,12 +655,17 @@ function fakeCoords(name: string) {
 export interface MockLog {
   chat: Array<Record<string, unknown>>
   paths: string[]
+  /** POST /api/reports: what the form sent */
+  reportPosts: Array<{ kind: string | null; latitude: string | null; longitude: string | null; note: string | null; photoType: string | null; auth: string | null }>
+  /** POST /api/reports/{id}/vote */
+  votes: Array<{ id: string; vote: string; auth: string | null }>
 }
 
 /** Pass the BrowserContext instead of a Page when a service worker is active:
  * context routes also see requests the worker makes. */
 export async function mockBackend(page: Page | BrowserContext, opts: MockOptions = {}): Promise<MockLog> {
-  const log: MockLog = { chat: [], paths: [] }
+  const log: MockLog = { chat: [], paths: [], reportPosts: [], votes: [] }
+  const reports: MockReport[] = (opts.reports ?? reportsFixture()).map((r) => ({ ...r }))
   replayHeaders = opts.replayAt
     ? { 'x-weathergpt-replay': opts.replayAt, 'access-control-expose-headers': 'X-WeatherGPT-Replay' }
     : {}
@@ -653,6 +702,56 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
           }
       )
       return json(route, { ...board, districts })
+    }
+    if (pathname === '/api/reports' && req.method() === 'GET') {
+      const signedIn = !!req.headers()['authorization']
+      return json(route, {
+        reports: reports.map((r) => (signedIn ? r : { ...r, my_vote: null, mine: false })),
+        label: 'Community report, unverified. Not an official warning; it never changes forecasts or alert levels.',
+        hide_after_flags: 3,
+      })
+    }
+    if (pathname === '/api/reports' && req.method() === 'POST') {
+      const auth = req.headers()['authorization'] ?? null
+      const body = req.postDataBuffer()?.toString('latin1') ?? ''
+      const photo = body.match(/name="photo"; filename="[^"]*"\r\nContent-Type: ([^\r]*)/)
+      const entry = {
+        kind: multipartField(body, 'kind'),
+        latitude: multipartField(body, 'latitude'),
+        longitude: multipartField(body, 'longitude'),
+        note: multipartField(body, 'note'),
+        photoType: photo ? photo[1] : null,
+        auth,
+      }
+      log.reportPosts.push(entry)
+      if (!auth) return json(route, { code: 'sign_in', detail: 'Sign in to report.' }, 401)
+      const now = new Date()
+      now.setUTCMinutes(now.getUTCMinutes() - (now.getUTCMinutes() % 10), 0, 0)
+      const created = {
+        id: `rep-new-${log.reportPosts.length}`, kind: entry.kind ?? 'heavy_rain',
+        latitude: Number(entry.latitude), longitude: Number(entry.longitude), note: entry.note, has_photo: !!photo,
+        reported_at: now.toISOString().replace('.000Z', 'Z'), expires_at: new Date(Date.now() + 6 * 3_600_000).toISOString(),
+        confirms: 0, flags: 0, my_vote: null, mine: true, reporter: 'a resident',
+        trust: { level: 'medium', score: 0.6, parts: { model: 0.7, nearby: 0, age: 1, reporter: 0.5, flags: 0 } },
+      } as MockReport
+      reports.unshift(created)
+      return json(route, created, 201)
+    }
+    const voteMatch = pathname.match(/^\/api\/reports\/([^/]+)\/vote$/)
+    if (voteMatch) {
+      const auth = req.headers()['authorization'] ?? null
+      const vote = ((req.postDataJSON() ?? {}) as { vote?: string }).vote ?? ''
+      log.votes.push({ id: voteMatch[1], vote, auth })
+      const r = reports.find((x) => x.id === voteMatch[1])
+      if (!auth) return json(route, { code: 'sign_in', detail: 'Sign in.' }, 401)
+      if (!r) return json(route, { code: 'gone', detail: 'Gone.' }, 404)
+      if (r.mine) return json(route, { code: 'own_report', detail: 'Own report.' }, 403)
+      if (r.my_vote) return json(route, { code: 'already_voted', detail: 'Already voted.' }, 409)
+      Object.assign(r, vote === 'confirm' ? { confirms: r.confirms + 1 } : { flags: r.flags + 1 }, { my_vote: vote })
+      return json(route, r)
+    }
+    if (/^\/api\/reports\/[^/]+\/photo$/.test(pathname)) {
+      return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'image/png' }, body: TILE })
     }
     if (opts.routes && pathname in opts.routes) return json(route, opts.routes[pathname])
     switch (pathname) {
@@ -730,4 +829,33 @@ export async function enterDemo(page: Page) {
   await page.goto('/login')
   await page.getByRole('button', { name: /enter demo/i }).click()
   await page.waitForURL('**/dashboard')
+}
+
+/**
+ * A signed-in Supabase session without a real project: the password grant and
+ * the user lookup answer with a fake session, and the profile tables are
+ * empty. Call after mockBackend (later routes win). Lands on /dashboard.
+ *
+ * The Next.js proxy (server side, not interceptable here) checks the session
+ * cookie with Supabase; with this fake token that check simply finds no user.
+ */
+export const TEST_USER = { id: '0b3e8f2a-1c4d-4e5f-8a9b-0c1d2e3f4a5b', email: 'tester@example.com' }
+export async function signIn(page: Page) {
+  const user = {
+    id: TEST_USER.id, aud: 'authenticated', role: 'authenticated', email: TEST_USER.email,
+    app_metadata: { provider: 'email' }, user_metadata: {}, created_at: '2026-11-01T00:00:00Z',
+  }
+  await page.route(/supabase\.co\/rest\/v1\//, (route) => json(route, []))
+  await page.route(/supabase\.co\/auth\/v1\/user/, (route) => json(route, user))
+  await page.route(/supabase\.co\/auth\/v1\/token/, (route) =>
+    json(route, {
+      access_token: 'e2e-access-token', token_type: 'bearer', expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'e2e-refresh-token', user,
+    })
+  )
+  await page.goto('/login')
+  await page.locator('#signin-email').fill(TEST_USER.email)
+  await page.locator('#signin-password').fill('correct-horse-battery')
+  await page.locator('form button[type="submit"]').first().click()
+  await page.waitForURL('**/dashboard', { timeout: 30_000 })
 }

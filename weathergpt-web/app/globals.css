@@ -55,6 +55,9 @@
   --map-wind-0: #4338ca; --map-wind-1: #6366f1; --map-wind-2: #818cf8; --map-wind-3: #c7d2fe;
   --map-rain-0: #1d4ed8; --map-rain-1: #3b82f6; --map-rain-2: #60a5fa; --map-rain-3: #bfdbfe;
   --map-heat-0: #be123c; --map-heat-1: #e11d48; --map-heat-2: #fb7185; --map-heat-3: #fecdd3;
+  /* Community report dots by group (categorical, colour-blind-safe: blue, near-white,
+     orange differ in hue AND lightness), with a dark --map-base outline. Fills only. */
+  --map-report-rain: #38bdf8; --map-report-wind: #f1f5f9; --map-report-ground: #f59e0b;
 
   --background: var(--sky-floor);
   --foreground: var(--sky-text);

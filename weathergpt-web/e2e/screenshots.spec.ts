@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { DEMO_PRESETS } from '../lib/weatherScene'
-import { chatResponse, CLIMATE_FACTS, enterDemo, GFS_FACTS, mockBackend, PUNE } from './support/mockApi'
+import { chatResponse, CLIMATE_FACTS, enterDemo, GFS_FACTS, mockBackend, PUNE, signIn } from './support/mockApi'
 import { AVIATION, BOARD, COMPARE, FARM } from './support/roleFixtures'
 
 /**
@@ -204,4 +204,27 @@ test('@screens map: weather along a route, report and departure suggestion', asy
   // let fitBounds finish
   await page.waitForTimeout(2500)
   await shot(page, info.project.name, 'map-route')
+})
+
+test('@screens map: community reports, card and the report form', async ({ page }, info) => {
+  await mockBackend(page)
+  await signIn(page)
+  await navigate(page, '/map')
+  await pickLocation(page)
+  const map = page.getByTestId('weather-map')
+  await map.locator('canvas.maplibregl-canvas').waitFor({ timeout: 30_000 })
+  await expect(map).toHaveAttribute('data-center', '18.520,73.857', { timeout: 15_000 })
+  await page.getByTestId('map-layer-reports').click()
+  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await page.getByTestId('map-centre').click()
+  await page.getByTestId('report-card').waitFor({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  await shot(page, info.project.name, 'map-reports')
+
+  await page.getByTestId('report-new').click()
+  await page.getByTestId('report-use-centre').click()
+  await page.getByTestId('report-kind-waterlogging').click()
+  await page.getByTestId('report-note-input').fill('Water up to the wheel hubs near the bus stop')
+  await page.waitForTimeout(800)
+  await shot(page, info.project.name, 'map-report-form')
 })

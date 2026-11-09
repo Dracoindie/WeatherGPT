@@ -34,6 +34,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom'
 import { RetryButton } from '@/components/common/RetryButton'
 import { SkyButton } from '@/components/ui/SkyButton'
+import { useAuthContext } from '@/context/AuthContext'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
 import { formatLocalTime, zonedClock } from '@/lib/format'
@@ -56,6 +57,7 @@ import {
   type HexPick,
 } from './hazard'
 import { createField, PARTICLE_STYLE, particleCount, retarget, segmentAlpha, step, TRAIL, type ParticleField } from './particles'
+import { reportColors, ReportCard, reportLayers, ReportsLegend, ReportsPanel, useReports, type ComposerState } from './reports'
 import { endLabel, routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
 import { broadcastCamera } from './camera'
@@ -84,8 +86,8 @@ interface Props {
 
 type GridStatus = 'idle' | 'loading' | 'ready' | 'error' | 'too-large'
 /** A weather surface, the hazard hexes and roads, or weather along a route. */
-type MapMode = LayerId | 'hazard' | 'route'
-const MODES: MapMode[] = [...LAYERS, 'hazard', 'route']
+type MapMode = LayerId | 'hazard' | 'route' | 'reports'
+const MODES: MapMode[] = [...LAYERS, 'hazard', 'route', 'reports']
 
 const rgba = (c: RGB, a: number): [number, number, number, number] => [c[0], c[1], c[2], a]
 
@@ -126,7 +128,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [grid, setGrid] = useState<MapGrid | null>(null)
   const [gridStatus, setGridStatus] = useState<GridStatus>('idle')
   const [layer, setLayer] = useState<MapMode>('temperature')
-  const surface: LayerId | null = layer === 'hazard' || layer === 'route' ? null : layer
+  const surface: LayerId | null = layer === 'hazard' || layer === 'route' || layer === 'reports' ? null : layer
   const [hazardType, setHazardType] = useState<HazardType>('overall')
   const [hexPick, setHexPick] = useState<HexPick | null>(null)
   const [mapObj, setMapObj] = useState<MapLibreMap | null>(null)
@@ -147,7 +149,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   const broadcast3d = broadcast && motion
   // no particles over the hazard hexes, roads or a route: they would hide the levels
-  const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && (broadcast || layer === 'wind')
+  const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && layer !== 'reports' && (broadcast || layer === 'wind')
   // broadcast over a weather surface: the wind is a hint on top of the colours (thinner, fainter, sparser)
   const softParticles = broadcast && layer !== 'wind'
   const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
@@ -171,6 +173,19 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
 
   // --------------------------------------------------------------- route ---
   const routeOn = layer === 'route'
+
+  // ------------------------------------------------------------- reports ---
+  const reportsOn = layer === 'reports'
+  const { session } = useAuthContext()
+  const token = session?.access_token ?? null
+  const rp = useReports({ map: mapObj, active: reportsOn, mapReady, token })
+  const [reportPickId, setReportPickId] = useState<string | null>(null)
+  const [composer, setComposer] = useState<ComposerState>(null)
+  const pickedReport = reportsOn && reportPickId ? (rp.reports.find((r) => r.id === reportPickId) ?? null) : null
+  const draft = useMemo(
+    () => (reportsOn && composer?.stage === 'form' ? { latitude: composer.latitude, longitude: composer.longitude } : null),
+    [reportsOn, composer]
+  )
   const rt = useRoute()
   const routeReport = routeOn ? rt.report : null
 
@@ -593,8 +608,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         })
       )
     }
+    // report dots above the place marker: a report AT the place must stay tappable
+    if (reportsOn) out.push(...reportLayers({ reports: rp.reports, draft, selected: reportPickId, colors: reportColors(), big: broadcast }))
     return out
-  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to])
+  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to, reportsOn, rp.reports, draft, reportPickId])
 
   // Show the whole route when a new report arrives.
   useEffect(() => {
@@ -886,15 +903,33 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         clearRoute()
         return
       }
-      if (hazardOn && overlayRef.current) {
+      // picking is on only for this one pick (never on hover: no GPU read per mouse move)
+      const pick = (layerIds: string[], radius = 2): ReturnType<MapboxOverlay['pickObject']> => {
         const overlay = overlayRef.current
+        if (!overlay) return null
         overlay.setProps({ _pickable: true })
-        let info: ReturnType<MapboxOverlay['pickObject']> = null
         try {
-          info = overlay.pickObject({ x, y, radius: 2, layerIds: ['hazard-hex'] })
+          return overlay.pickObject({ x, y, radius, layerIds })
         } finally {
           overlay.setProps({ _pickable: false })
         }
+      }
+      if (reportsOn) {
+        if (composer?.stage === 'pick') {
+          // "Report what you see": this tap is where it is
+          setComposer({ stage: 'form', latitude: lat, longitude: lon })
+          return
+        }
+        const r = pick(['reports'], 6)?.object as { id: string } | undefined
+        if (r) {
+          setReportPickId(r.id)
+          setPoint(null)
+          return
+        }
+        setReportPickId(null)
+      }
+      if (hazardOn) {
+        const info = pick(['hazard-hex'])
         const d = info?.object as { cell: string; point: number } | undefined
         if (d) {
           setHexPick({ cell: d.cell, point: d.point })
@@ -905,7 +940,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       setHexPick(null)
       showPoint(lat, lon)
     },
-    [hazardOn, showPoint, routeOn, routePicking, setRouteFrom, setRouteTo, setRoutePicking, clearRoute, t]
+    [hazardOn, showPoint, routeOn, routePicking, setRouteFrom, setRouteTo, setRoutePicking, clearRoute, t, reportsOn, composer]
   )
   useEffect(() => {
     clickRef.current = handleTap
@@ -941,6 +976,10 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
             // the picked place is a natural start
             if (id === 'route' && !rt.from && place) rt.setFrom(place)
             if (id !== 'route') rt.setPicking(null)
+            if (id !== 'reports') {
+              setComposer(null)
+              setReportPickId(null)
+            }
           }}
           className={cn(
             'rounded-full border px-3 py-1.5 text-xs transition-colors',
@@ -1008,7 +1047,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const placeShort = place?.name.split(',')[0]
 
   const legend = (big: boolean) =>
-    routeOn ? null : hazardOn ? (
+    routeOn ? null : reportsOn ? (
+      <ReportsLegend big={big} />
+    ) : hazardOn ? (
       hazard ? <HazardLegend hazard={hazard} roadsShown={hz.roads.length > 0} tz={tz} big={big} /> : null
     ) : grid && surface ? (
       <MapLegend grid={grid} layer={surface} hour={hourShown} fixed={playing} timeLabel={timeLabel} big={big} />
@@ -1018,6 +1059,16 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     hazard && pickedHex ? (
       <HazardCard hazard={hazard} pick={pickedHex} type={hazardType} tz={tz} onClose={() => setHexPick(null)} className={className} />
     ) : null
+
+  const reportCard = (className?: string) =>
+    pickedReport ? (
+      <ReportCard report={pickedReport} token={token} tz={tz} onClose={() => setReportPickId(null)} onUpdated={rp.upsert} className={className} />
+    ) : null
+
+  const reportHere = () => {
+    const c = mapRef.current?.getCenter()
+    if (c) setComposer({ stage: 'form', latitude: c.lat, longitude: c.lng })
+  }
 
   if (mapError) {
     return (
@@ -1118,6 +1169,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-route-segments={routeReport ? routeReport.segments.length : 0}
       data-route-worst={routeReport ? routeReport.worst : undefined}
       data-route-picking={routeOn && rt.picking ? rt.picking : undefined}
+      data-reports={reportsOn ? rp.reports.length : undefined}
+      data-report-stage={reportsOn && composer ? composer.stage : undefined}
       data-route-labels={
         routeOn ? [rt.from && endLabel('from', rt.from.name), rt.to && endLabel('to', rt.to.name)].filter(Boolean).join(' | ') || undefined : undefined
       }
@@ -1175,13 +1228,40 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto" />
         )}
         {!mobile && !broadcast && hazardCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-72 overflow-y-auto')}
+        {!mobile && !broadcast && reportCard('absolute right-2 top-2 max-h-[calc(100%-7.5rem)] w-80 overflow-y-auto')}
       </div>
 
       {point && mobile && !broadcast && <MapPointCard point={point} onClose={() => setPoint(null)} />}
       {mobile && !broadcast && hazardCard()}
+      {mobile && !broadcast && reportCard()}
 
       {routeOn ? (
         routeReport && !broadcast && <RouteReportPanel report={routeReport} tz={tz} onDepart={rt.departAt} />
+      ) : reportsOn ? (
+        !broadcast && (
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
+            <div className="min-w-0">
+              <ReportsPanel
+                status={rp.status}
+                error={rp.error}
+                count={rp.reports.length}
+                token={token}
+                composer={composer}
+                setComposer={(c) => {
+                  setComposer(c)
+                  // the form takes the card's place (below the map on phones)
+                  if (c) setReportPickId(null)
+                }}
+                useCentre={reportHere}
+                onSent={(r) => {
+                  rp.upsert(r)
+                  setReportPickId(r.id)
+                }}
+              />
+            </div>
+            <div className="min-w-0">{legend(false)}</div>
+          </div>
+        )
       ) : (
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)]">
           <div className="min-w-0 space-y-2">
