@@ -15,6 +15,7 @@ import type { Layer } from '@deck.gl/core'
 import { PathLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { ArrowUpDown, Crosshair, LoaderCircle, MapPin, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { RetryButton } from '@/components/common/RetryButton'
 import { SeverityBadge } from '@/components/ui/SeverityBadge'
 import { SkyButton } from '@/components/ui/SkyButton'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
@@ -23,6 +24,7 @@ import { geocodePlace } from '@/lib/api/roles'
 import { fetchRoute, RouteError, type RouteFinding, type RouteHazard, type RouteLevel, type RouteReport } from '@/lib/api/route'
 import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useDescribeWeather } from '@/lib/i18n/weather'
+import { useRetryCooldown } from '@/lib/retryCooldown'
 import { cn } from '@/lib/utils'
 import type { RGB } from './field'
 
@@ -69,6 +71,8 @@ export function useRoute() {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<{ status: number; detail: string } | null>(null)
   const abort = useRef<AbortController | null>(null)
+  // "Retry" after the routing or weather service failed, with backoff
+  const { fail: routeFailed, succeed: routeLoaded, wait: retryWait } = useRetryCooldown()
 
   const run = useCallback(
     (override?: Date) => {
@@ -83,15 +87,18 @@ export function useRoute() {
         .then((r) => {
           setReport(r)
           setStatus('ready')
+          routeLoaded()
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') return
           const e = err instanceof RouteError ? err : new RouteError(0, String(err))
           setError({ status: e.status, detail: e.message })
           setStatus('error')
+          // a bad request (422) does not get better by asking again
+          if (e.status !== 422) routeFailed()
         })
     },
-    [from, to, departMode, departLocal]
+    [from, to, departMode, departLocal, routeFailed, routeLoaded]
   )
 
   /** Take a suggested or listed departure and check the route again. */
@@ -117,7 +124,7 @@ export function useRoute() {
   return {
     from, setFrom, to, setTo, picking, setPicking,
     departMode, setDepartMode, departLocal, setDepartLocal,
-    report, status, error, run, departAt, clear,
+    report, status, error, run, departAt, clear, retryWait,
   }
 }
 
@@ -441,9 +448,14 @@ export function RoutePlanner({ r }: { r: RouteState }) {
         </p>
       )}
       {errorText && (
-        <p className="mt-2 text-xs text-sev-warning-text" role="alert" data-testid="route-error">
-          {errorText}
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="text-xs text-sev-warning-text" role="alert" data-testid="route-error">
+            {errorText}
+          </p>
+          {r.error && r.error.status !== 422 && (
+            <RetryButton wait={r.retryWait} onRetry={() => r.run()} testId="route-retry" className="px-3 py-1 text-xs" />
+          )}
+        </div>
       )}
     </section>
   )

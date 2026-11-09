@@ -32,11 +32,13 @@ import { ChevronDown, Crosshair, Pause, Play, Tv, X } from 'lucide-react'
 import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type CanvasSource, type FlyToOptions } from 'maplibre-gl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { RetryButton } from '@/components/common/RetryButton'
 import { SkyButton } from '@/components/ui/SkyButton'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
 import { fetchMapGrid, fetchMapPoint, type MapGrid } from '@/lib/api/map'
 import { formatLocalTime, zonedClock } from '@/lib/format'
 import { useLiteMode } from '@/lib/liteMode'
+import { useRetryCooldown } from '@/lib/retryCooldown'
 import { cn } from '@/lib/utils'
 import { distinctColors, featherEdges, fieldPixels, LAYERS, rampFor, tokenRgb, valuesAt, windVector, type LayerId, type RGB } from './field'
 import { MapLegend } from './MapLegend'
@@ -179,6 +181,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   // zoom that stays inside it needs no new request (Open-Meteo free tier).
   const gridCover = useRef<{ south: number; west: number; north: number; east: number; zoom: number } | null>(null)
   const [gridRequests, setGridRequests] = useState(0)
+  // "Retry" after a failed grid request, with backoff (lib/retryCooldown.ts)
+  const { fail: gridFailed, succeed: gridLoaded, wait: gridRetryWait } = useRetryCooldown()
   // broadcast 3D asks for a margin around the view (BROADCAST_PAD)
   const padRef = useRef(false)
   useEffect(() => {
@@ -239,15 +243,23 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           gridCover.current = { south: g.south, west: g.west, north: g.north, east: g.east, zoom }
           setGrid(g)
           setGridStatus('ready')
+          gridLoaded()
           setHour((h) => Math.min(h, Math.max(0, g.times.length - 1)))
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') return
           gridCover.current = null
-          setGridStatus(err instanceof Error && /422/.test(err.message) ? 'too-large' : 'error')
+          const tooLarge = err instanceof Error && /422/.test(err.message)
+          setGridStatus(tooLarge ? 'too-large' : 'error')
+          if (!tooLarge) gridFailed()
         })
     }, 450)
-  }, [])
+  }, [gridFailed, gridLoaded])
+
+  const retryGrid = useCallback(() => {
+    gridCover.current = null
+    loadGrid()
+  }, [loadGrid])
 
   // --------------------------------------------------------------- point ---
   const pointAbort = useRef<AbortController | null>(null)
@@ -1135,9 +1147,12 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         )}
 
         {status && (
-          <p className="sky-glass map-overlay absolute bottom-2 left-2 max-w-[80%] px-3 py-1.5 text-xs text-hud" role="status">
-            {status}
-          </p>
+          <div className="sky-glass map-overlay absolute bottom-2 left-2 flex max-w-[80%] flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-1.5 text-xs text-hud" role="status">
+            <span>{status}</span>
+            {!hazardOn && gridStatus === 'error' && (
+              <RetryButton wait={gridRetryWait} onRetry={retryGrid} testId="map-grid-retry" className="px-3 py-1 text-xs" />
+            )}
+          </div>
         )}
 
         {/* tapped point: overlay on wider screens */}
