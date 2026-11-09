@@ -187,3 +187,65 @@ def rules_table(rules: tuple[Rule, ...]) -> list[dict]:
 def as_table() -> list[dict]:
     """JSON-ready rows for GET /api/alerts/thresholds."""
     return rules_table(RULES)
+
+
+# ---------------------------------------------------------------------------
+# Community reports and the experimental waterlogging estimate
+# (docs/REPORTS.md, docs/WATERLOGGING.md). These never set an alert level:
+# they only weigh a report's agreement with the model and draw the
+# experimental waterlogging layer.
+# ---------------------------------------------------------------------------
+# Hourly rain intensity, American Meteorological Society Glossary of
+# Meteorology ("rain"): light up to 2.5 mm/h, moderate 2.6-7.6 mm/h, heavy
+# above 7.6 mm/h. Used for one model HOUR of rain (the 24 h rules above are
+# totals and cannot be compared with an hour).
+RAIN_RATE_LIGHT_MM_H = 2.5
+RAIN_RATE_HEAVY_MM_H = 7.6
+# Below this an hour counts as dry (Open-Meteo reports 0.1 mm steps).
+RAIN_TRACE_MM_H = 0.2
+
+# How well the model supports a report, 0..1, by the model's peak around the
+# report time. Rain kinds (heavy rain, waterlogging): peak hourly rain over the
+# past 3 h and the next hour. Wind kinds (strong wind, fallen tree): peak gust,
+# with the Beaufort-based wind rules above (STRONG_WIND, GALE). Landslide and
+# road blocked: the past 24 h rain total against HEAVY_RAIN / EXTREME_RAIN.
+# Hail: the WMO hail codes 96/99, else any rain.
+REPORT_AGREEMENT_RAIN = ((RAIN_TRACE_MM_H, 0.1), (RAIN_RATE_LIGHT_MM_H, 0.4), (RAIN_RATE_HEAVY_MM_H, 0.7))  # (below mm/h, score); above the last: 1.0
+REPORT_AGREEMENT_GUST = ((20.0, 0.2), (STRONG_WIND.value, 0.5), (GALE.value, 0.8))  # (below km/h, score); above: 1.0
+REPORT_AGREEMENT_RAIN_24H = ((5.0, 0.3), (HEAVY_RAIN.value, 0.5), (EXTREME_RAIN.value, 0.8))  # (below mm, score); above: 1.0
+REPORT_AGREEMENT_HAIL_CODES = THUNDERSTORM_HAIL.codes + THUNDERSTORM_HEAVY_HAIL.codes
+# A fallen tree with calm model wind is still plausible (old trees, rain-soaked soil).
+REPORT_AGREEMENT_FALLEN_TREE_FLOOR = 0.35
+# When the model could not be asked: neither support nor contradiction.
+REPORT_AGREEMENT_UNKNOWN = 0.5
+
+# Trust bands of a report's 0..1 score (docs/REPORTS.md has the formula).
+REPORT_TRUST_MEDIUM = 0.4
+REPORT_TRUST_HIGH = 0.65
+
+# Waterlogging estimate (experimental), 0..1 per H3 cell; levels by score.
+# Rain factor: the 9 h window (past 3 h + next 6 h) total against EXTREME_RAIN
+# (50 mm in 24 h, so 50 mm in 9 h is far beyond it), or its peak hour against
+# twice the AMS heavy-rain rate, whichever is larger.
+WATERLOG_RAIN_TOTAL_MM = EXTREME_RAIN.value
+WATERLOG_RAIN_PEAK_MM_H = 2 * RAIN_RATE_HEAVY_MM_H
+# Lowness: metres below the mean of the surrounding cells for a full score.
+WATERLOG_LOW_METRES = 15.0
+WATERLOG_LEVELS = (("low", 0.15), ("moderate", 0.35), ("high", 0.6))  # (level, score from which it applies)
+
+
+def band(value: float, bands: tuple[tuple[float, float], ...], top: float = 1.0) -> float:
+    """Score for ``value`` from (below, score) bands, ``top`` above the last one."""
+    for below, score in bands:
+        if value < below:
+            return score
+    return top
+
+
+def waterlog_level(score: float) -> str:
+    """"none", "low", "moderate" or "high" for a 0..1 waterlogging score."""
+    level = "none"
+    for name, start in WATERLOG_LEVELS:
+        if score >= start:
+            level = name
+    return level

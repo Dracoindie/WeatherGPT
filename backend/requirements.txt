@@ -5,6 +5,10 @@ pydantic==2.13.5
 python-dotenv==1.2.3
 # H3 hexagonal cells for the hazard map (maps/hazard.py); same version as h3-js in the web app.
 h3==4.5.0
+# Community report photos: decoded and re-encoded as JPEG with no metadata (reports/photo.py)
+Pillow==12.3.0
+# multipart form uploads (POST /api/reports)
+python-multipart==0.0.32
 # Web Push sender for early-warning alerts (dissemination/push.py)
 pywebpush==2.5.0
 # NWP (GRIB via cfgrib/eccodes). Optional at runtime: /api/nwp is skipped if missing.

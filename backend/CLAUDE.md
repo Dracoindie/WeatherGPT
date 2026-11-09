@@ -27,6 +27,7 @@ Loaded when working under `backend/`. The ground rules in the root `CLAUDE.md` a
 | `air/` | Open-Meteo CAMS PM2.5/PM10 to Indian AQI (CPCB breakpoints), plus UV |
 | `roles/` | `farm.py`, `aviation.py`, `risk.py` (district board), `compare.py` (GFS vs Open-Meteo), `notes.py` (one role sentence per reply) |
 | `dissemination/` | `push.py` (pywebpush + VAPID), `job.py` (push only when severity becomes `warning`), `store.py` (Supabase service role), `cap.py` (CAP 1.2 XML), `demo_push.py` (signed-in test push; never writes `last_severity`) |
+| `reports/` | Community reports (`docs/REPORTS.md`): `photo.py` (Pillow re-encode, no metadata, 8 MB / 40 MP guards), `trust.py` (model agreement from one Open-Meteo call, trust score and levels; bands in `thresholds.py`), `store.py` (private Supabase tables via the service role; `MemoryStore` for tests), API in `api/reports.py` (sign-in, 1/min and 5/h, expiry, flags, never the reporter's id). Reports never feed forecasts or alerts. |
 | `auth/trusted_location.py` | Verifies the Supabase JWT, then reads `profiles` (`id=eq.<sub>`, RLS) |
 | `open_meteo_access.py` | Free or commercial Open-Meteo host per service (`OPEN_METEO_API_KEY`); `/health` shows the plan, never the key. Without a key: free endpoints, non-commercial only, 10,000 calls/day (`docs/OPEN_METEO.md`). |
 | `http_tls.py` | Shared TLS context for all HTTP clients |
@@ -38,6 +39,7 @@ Loaded when working under `backend/`. The ground rules in the root `CLAUDE.md` a
 
 - `schema.sql` is the full schema: sections 1–5, then migration 6 (`profiles.role`) and migration 7 (`alert_subscriptions` + RLS). It is idempotent.
 - `migrations_6_7.sql` contains only 6 and 7, for a database that already has 1–5. Keep it in sync with `schema.sql`.
+- `migration_8_reports.sql`: community reports (private tables, vote trigger, private `report-photos` bucket). Also appended to `schema.sql`; `tests/test_reports.py` checks they match.
 
 ## Notes
 

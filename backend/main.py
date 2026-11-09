@@ -33,6 +33,7 @@ from api.air import router as air_router  # noqa: E402
 from api.geocode import router as geocode_router  # noqa: E402
 from api.map import router as map_router  # noqa: E402
 from api.route import router as route_router  # noqa: E402
+from api.reports import router as reports_router  # noqa: E402
 import open_meteo_access  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
@@ -108,6 +109,7 @@ app.include_router(air_router)
 app.include_router(geocode_router)
 app.include_router(map_router)
 app.include_router(route_router)
+app.include_router(reports_router)
 
 
 # ---------------------------------------------------------------------------
