@@ -12,7 +12,7 @@
  */
 
 import type { Layer } from '@deck.gl/core'
-import { PathLayer, ScatterplotLayer } from '@deck.gl/layers'
+import { PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
 import { ArrowUpDown, Crosshair, LoaderCircle, MapPin, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { RetryButton } from '@/components/common/RetryButton'
@@ -35,6 +35,14 @@ export interface RouteEndpoint {
 }
 
 export type RouteSlot = 'from' | 'to'
+
+/** The letter for each end, on the map and in the planner. */
+export const END_LETTER: Record<RouteSlot, string> = { from: 'A', to: 'B' }
+
+/** "A Pune", "B Mumbai": the map label of a route end. */
+export function endLabel(slot: RouteSlot, name: string): string {
+  return `${END_LETTER[slot]}  ${name.split(',')[0]}`
+}
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 type DepartMode = 'now' | 'later'
 
@@ -141,7 +149,7 @@ export function routeLayers({
   report: RouteReport | null
   from: RouteEndpoint | null
   to: RouteEndpoint | null
-  colors: Record<HazardLevel, RGB> & { outline: RGB; ink: RGB; unknown: RGB; marker: RGB }
+  colors: Record<HazardLevel, RGB> & { outline: RGB; ink: RGB; unknown: RGB; marker: RGB; floor: RGB }
 }): Layer[] {
   const out: Layer[] = []
   const col = (lv: RouteLevel): [number, number, number, number] => (lv === 'unknown' ? [...colors.unknown, 255] : [...colors[lv], 255])
@@ -170,6 +178,10 @@ export function routeLayers({
     )
   }
   const ends = [from && { ...from, slot: 'from' as const }, to && { ...to, slot: 'to' as const }].filter(Boolean) as Array<RouteEndpoint & { slot: RouteSlot }>
+  // each label sits on the side facing the other end (toward the middle of the
+  // fitted view), so neither runs off the map's edge
+  const otherLon = (d: RouteEndpoint & { slot: RouteSlot }) => ends.find((e) => e.slot !== d.slot)?.longitude ?? d.longitude - 1
+  const labelLeft = (d: RouteEndpoint & { slot: RouteSlot }) => d.longitude > otherLon(d)
   if (ends.length) {
     out.push(
       new ScatterplotLayer({
@@ -183,6 +195,26 @@ export function routeLayers({
         getLineWidth: 3,
         getLineColor: [...colors.ink, 255],
         getFillColor: (d: { slot: RouteSlot }) => (d.slot === 'from' ? [...colors.marker, 255] : [255, 255, 255, 255]),
+      }),
+      // "A Pune" / "B Mumbai" beside each end, on a dark tag so it reads over any basemap
+      new TextLayer({
+        id: 'route-end-labels',
+        data: ends,
+        getPosition: (d: RouteEndpoint) => [d.longitude, d.latitude],
+        getText: (d: RouteEndpoint & { slot: RouteSlot }) => endLabel(d.slot, d.name),
+        // place names can be in Devanagari
+        characterSet: 'auto',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontWeight: 600,
+        getSize: 13,
+        sizeUnits: 'pixels',
+        getTextAnchor: (d: RouteEndpoint & { slot: RouteSlot }) => (labelLeft(d) ? 'end' : 'start'),
+        getAlignmentBaseline: 'center',
+        getPixelOffset: (d: RouteEndpoint & { slot: RouteSlot }) => (labelLeft(d) ? [-14, 0] : [14, 0]),
+        getColor: [...colors.ink, 255],
+        background: true,
+        getBackgroundColor: [...colors.floor, 225],
+        backgroundPadding: [6, 3],
       })
     )
   }
@@ -265,6 +297,16 @@ function EndpointField({
   return (
     <div className="min-w-0 space-y-1.5" data-testid={`route-field-${slot}`}>
       <label htmlFor={id} className="sky-label flex items-center gap-1.5">
+        <span
+          className={cn(
+            'inline-flex size-4 items-center justify-center rounded-full font-readout text-[10px] font-semibold text-[var(--sky-floor)]',
+            slot === 'from' ? 'bg-[var(--map-gold)]' : 'bg-white'
+          )}
+          aria-hidden
+          data-testid={`route-${slot}-letter`}
+        >
+          {END_LETTER[slot]}
+        </span>
         <MapPin className={cn('size-3', slot === 'from' ? 'text-accent-text' : 'text-hud')} aria-hidden /> {t(slot === 'from' ? 'route.from' : 'route.to')}
       </label>
       {value ? (

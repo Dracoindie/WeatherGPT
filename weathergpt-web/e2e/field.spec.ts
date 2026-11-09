@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { featherEdges } from '../components/map3d/field'
+import { featherEdges, hexToRgb } from '../components/map3d/field'
 
 /**
  * The broadcast surface fades out toward its edges (no hard rectangle in the
@@ -53,4 +53,10 @@ test('featherEdges: frac 0 changes nothing; transparent pixels stay transparent'
   const holes = solid(w, h, 0)
   featherEdges(holes, w, h, 0.3)
   expect(Math.max(...Array.from({ length: w * h }, (_, i) => holes[i * 4 + 3]))).toBe(0)
+})
+
+test('tokenRgb colours: hex and rgb() both parse (StaticSky sets --sky-floor as rgb())', () => {
+  expect(hexToRgb('#02040a')).toEqual([2, 4, 10])
+  expect(hexToRgb(' rgb(12, 20, 33)')).toEqual([12, 20, 33])
+  expect(hexToRgb('rgba(1.6, 2, 3, 0.5)')).toEqual([2, 2, 3])
 })

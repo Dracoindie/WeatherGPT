@@ -33,6 +33,18 @@ async function toMumbai(page: Page) {
   await expect(page.getByTestId('route-to-name')).toHaveText('Mumbai')
 }
 
+test('route ends are labelled A (start) and B (destination), on the map and in the planner', async ({ page }) => {
+  const map = await openRoute(page)
+  await toMumbai(page)
+  // the picked place is the start
+  await expect(map).toHaveAttribute('data-route-labels', 'A  Pune | B  Mumbai')
+  await expect(page.getByTestId('route-from-letter')).toHaveText('A')
+  await expect(page.getByTestId('route-to-letter')).toHaveText('B')
+  // swapping the ends swaps the letters' places
+  await page.getByTestId('route-swap').click()
+  await expect(map).toHaveAttribute('data-route-labels', 'A  Mumbai | B  Pune')
+})
+
 test('pick a route: coloured line, report, findings and honesty', async ({ page }) => {
   const map = await openRoute(page)
   // the picked place is the start

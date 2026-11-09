@@ -223,7 +223,9 @@ export function hazardColors(): Record<HazardLevel, RGB> & { outline: RGB; ink: 
     warning: tokenRgb('--sev-warning'),
     severe: tokenRgb('--sev-severe'),
     outline: tokenRgb('--sev-severe-text'),
-    ink: tokenRgb('--sky-floor', [2, 4, 10]),
+    // light casing and outlines, as they have always been drawn: --sky-floor
+    // read as white while tokenRgb could not parse StaticSky's rgb() value
+    ink: tokenRgb('--sky-text', [231, 240, 255]),
   }
 }
 

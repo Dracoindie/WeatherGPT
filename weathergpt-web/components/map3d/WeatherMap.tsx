@@ -56,7 +56,7 @@ import {
   type HexPick,
 } from './hazard'
 import { createField, PARTICLE_STYLE, particleCount, retarget, segmentAlpha, step, TRAIL, type ParticleField } from './particles'
-import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
+import { endLabel, routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
 import { broadcastCamera } from './camera'
 import { gridFits } from './gridPlan'
@@ -569,7 +569,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           report: routeReport,
           from: rt.from,
           to: rt.to,
-          colors: { ...hazardColors(), unknown: tokenRgb('--sev-unknown', [148, 163, 184]), marker: colors.gold },
+          colors: { ...hazardColors(), unknown: tokenRgb('--sev-unknown', [148, 163, 184]), marker: colors.gold, floor: tokenRgb('--sky-floor', [7, 11, 22]) },
         })
       )
     }
@@ -597,7 +597,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   useEffect(() => {
     const map = mapRef.current
     if (!map || !routeReport || routeReport.segments.length === 0) return
-    map.fitBounds(routeBounds(routeReport), { padding: mobile ? 32 : 60, maxZoom: 11, animate: motion, duration: motion ? 900 : 0 })
+    // extra room at the top: the place chip sits there, and the end labels must not hide under it
+    const pad = mobile ? 32 : 60
+    map.fitBounds(routeBounds(routeReport), { padding: { top: pad + 56, bottom: pad, left: pad, right: pad }, maxZoom: 11, animate: motion, duration: motion ? 900 : 0 })
   }, [routeReport, motion, mobile])
 
   // The weather surface: a MapLibre canvas source and raster layer inserted
@@ -1106,6 +1108,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-route-segments={routeReport ? routeReport.segments.length : 0}
       data-route-worst={routeReport ? routeReport.worst : undefined}
       data-route-picking={routeOn && rt.picking ? rt.picking : undefined}
+      data-route-labels={
+        routeOn ? [rt.from && endLabel('from', rt.from.name), rt.to && endLabel('to', rt.to.name)].filter(Boolean).join(' | ') || undefined : undefined
+      }
       data-center={viewCentre ? `${viewCentre.latitude.toFixed(3)},${viewCentre.longitude.toFixed(3)}` : undefined}
       className="flex h-full flex-col gap-3"
     >

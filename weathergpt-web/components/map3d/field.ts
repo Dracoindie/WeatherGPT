@@ -41,6 +41,9 @@ const RAMP_TOKEN: Record<LayerId, string> = {
 export type RGB = [number, number, number]
 
 export function hexToRgb(hex: string): RGB {
+  // tokens set at runtime can be rgb()/rgba() (StaticSky sets --sky-floor that way)
+  const m = hex.trim().match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i)
+  if (m) return [Math.round(Number(m[1])), Math.round(Number(m[2])), Math.round(Number(m[3]))]
   const h = hex.trim().replace('#', '')
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6)
   const n = parseInt(full, 16)
