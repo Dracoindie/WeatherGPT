@@ -135,6 +135,8 @@ test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ pa
   await expect(page.getByTestId('map-resolution')).toContainText('Model grid ≈ 8 km')
   const particles = Number(await map.getAttribute('data-particles'))
   expect(particles).toBeGreaterThan(0)
+  // over the temperature surface the wind is a soft hint: thinner, fainter, sparser streaks
+  await expect(map).toHaveAttribute('data-particle-style', 'soft')
   // the surface fades out at its edges: no hard rectangle in the tilted view
   await expect(map).toHaveAttribute('data-field-feather', '0.18', { timeout: 10_000 })
   // the broadcast view fills the screen, above the app header

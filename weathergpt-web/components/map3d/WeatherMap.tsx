@@ -53,7 +53,7 @@ import {
   type HazardType,
   type HexPick,
 } from './hazard'
-import { createField, particleCount, step, type ParticleField } from './particles'
+import { createField, PARTICLE_STYLE, particleCount, retarget, segmentAlpha, step, TRAIL, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
 import { broadcastCamera } from './camera'
@@ -144,6 +144,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const broadcast3d = broadcast && motion
   // no particles over the hazard hexes, roads or a route: they would hide the levels
   const particlesOn = motion && layer !== 'hazard' && layer !== 'route' && (broadcast || layer === 'wind')
+  // broadcast over a weather surface: the wind is a hint on top of the colours (thinner, fainter, sparser)
+  const softParticles = broadcast && layer !== 'wind'
   const tz = timezone ?? (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC')
 
   // -------------------------------------------------------------- hazard ---
@@ -667,22 +669,54 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   // pushes layers to deck directly.
   const fieldRef = useRef<ParticleField | null>(null)
   useEffect(() => {
-    fieldRef.current = particlesOn && grid ? createField(grid, hour, particleCount(window.innerWidth, mobile)) : null
-  }, [particlesOn, grid, hour, mobile])
+    if (!particlesOn || !grid) {
+      fieldRef.current = null
+      return
+    }
+    const count = particleCount(window.innerWidth, mobile, softParticles)
+    const f = fieldRef.current
+    // same density: keep the particles and their trails, take the new hour's wind
+    if (f && f.particles.length === count) {
+      retarget(f, grid, hour)
+      return
+    }
+    const b = mapRef.current?.getBounds()
+    fieldRef.current = createField(grid, hour, count, b ? { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() } : undefined)
+  }, [particlesOn, grid, hour, mobile, softParticles])
 
   const dynamicLayers = useCallback(
     (now: number): Layer[] => {
       const out: Layer[] = []
       const f = fieldRef.current
       if (f) {
+        const style = PARTICLE_STYLE[softParticles ? 'soft' : 'normal']
         out.push(
+          // TRAIL - 1 segments per particle, fading toward the tail; accessors
+          // fill deck's target arrays, so no objects are made per frame
           new LineLayer({
             id: 'wind-particles',
-            data: f.particles,
-            getSourcePosition: (p) => [p.plon - (p.lon - p.plon) * 4, p.plat - (p.lat - p.plat) * 4],
-            getTargetPosition: (p) => [p.lon, p.lat],
-            getColor: (p) => rgba(colors.ink, Math.round(60 + 150 * Math.min(1, p.speed / Math.max(1, f.maxSpeed)))),
-            getWidth: 1.5,
+            data: { length: f.particles.length * (TRAIL - 1) },
+            getSourcePosition: (_: unknown, { index, target }: { index: number; target: number[] }) => {
+              const tr = f.particles[Math.floor(index / (TRAIL - 1))].trail
+              const k = index % (TRAIL - 1)
+              target[0] = tr[2 * k + 2]
+              target[1] = tr[2 * k + 3]
+              target[2] = 0 // deck's reused array has 3 slots: a stale z would drop the segment
+              return target as [number, number, number]
+            },
+            getTargetPosition: (_: unknown, { index, target }: { index: number; target: number[] }) => {
+              const tr = f.particles[Math.floor(index / (TRAIL - 1))].trail
+              const k = index % (TRAIL - 1)
+              target[0] = tr[2 * k]
+              target[1] = tr[2 * k + 1]
+              target[2] = 0
+              return target as [number, number, number]
+            },
+            getColor: (_: unknown, { index }: { index: number }) => {
+              const p = f.particles[Math.floor(index / (TRAIL - 1))]
+              return rgba(colors.ink, segmentAlpha(style, index % (TRAIL - 1), p.speed, f.maxSpeed))
+            },
+            getWidth: style.width,
             widthUnits: 'pixels',
             updateTriggers: { getSourcePosition: now, getTargetPosition: now, getColor: now },
           })
@@ -738,7 +772,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       }
       return out
     },
-    [point, motion, colors, broadcast3d]
+    [point, motion, colors, broadcast3d, softParticles]
   )
 
   // Frame loop: particles, the pin animation and the broadcast flyover.
@@ -764,6 +798,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         const f = fieldRef.current
         if (f) {
           const b = map.getBounds()
+          f.spawnBox = { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }
           // ~0.4 % of the view width per frame at the fastest wind in view
           const degPerKmh = ((b.getEast() - b.getWest()) * 0.004) / Math.max(10, f.maxSpeed)
           step(f, degPerKmh)
@@ -1020,7 +1055,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       ref={rootRef}
       data-testid="weather-map"
       data-broadcast={broadcast ? (broadcast3d ? '3d' : '2d') : 'off'}
-      data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile) : 0}
+      data-particles={particlesOn && grid ? particleCount(window.innerWidth, mobile, softParticles) : 0}
+      data-particle-style={particlesOn && grid ? (softParticles ? 'soft' : 'normal') : undefined}
       data-layer={layer}
       data-grid-requests={gridRequests}
       data-pitch={pitch}
