@@ -56,6 +56,7 @@ import {
 import { createField, particleCount, step, type ParticleField } from './particles'
 import { routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
+import { broadcastCamera } from './camera'
 import { gridFits } from './gridPlan'
 import { KEYLESS, mapSources, type MapSources } from './sources'
 
@@ -302,8 +303,13 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       setMapObj(map)
       loadGrid()
     })
-    map.on('moveend', loadGrid)
-    map.on('moveend', () => {
+    // the broadcast flyover turns the camera a little every frame; each turn
+    // ends a "move", which kept restarting the grid debounce so it never fired
+    map.on('moveend', (e: { flyover?: boolean }) => {
+      if (!e.flyover) loadGrid()
+    })
+    map.on('moveend', (e: { flyover?: boolean }) => {
+      if (e.flyover) return
       const c = map.getCenter()
       setViewCentre({ latitude: c.lat, longitude: c.lng })
     })
@@ -406,7 +412,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
               id: 'terrain-hillshade',
               type: 'hillshade',
               source: 'terrain-shade',
-              paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.45 },
+              paint: { 'hillshade-shadow-color': cssVar('--sky-floor', 'black'), 'hillshade-highlight-color': cssVar('--sky-accent-2', 'white'), 'hillshade-exaggeration': 0.6 },
             },
             firstOverlayLayer(map)
           )
@@ -417,7 +423,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
         map.setTerrain({ source: 'terrain', exaggeration: 1.6 })
         // the centre is explicit: the tilt must not walk the place off screen
         const center = view?.center ?? map.getCenter()
-        map.easeTo({ center, pitch: 58, bearing: -18, zoom: Math.max(map.getZoom(), 6.5), duration: 1800 })
+        // close and steep enough for the relief to show on wide screens too (camera.ts)
+        const cam = broadcastCamera(el.clientWidth, view?.zoom ?? map.getZoom())
+        map.easeTo({ center, ...cam, duration: 1800 })
       } else {
         if (map.getTerrain()) map.setTerrain(null)
         if (map.getLayer('terrain-hillshade')) map.removeLayer('terrain-hillshade')
@@ -761,7 +769,7 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           step(f, degPerKmh)
         }
         // after the tilt has finished: setBearing would cancel the ease
-        if (flying && !map.isMoving()) map.setBearing(map.getBearing() + 0.05)
+        if (flying && !map.isMoving()) map.setBearing(map.getBearing() + 0.05, { flyover: true })
         overlay.setProps({ layers: [...staticLayers, ...dynamicLayers(now)] })
       } catch (err) {
         // never spin on an error: report it once and stop this loop

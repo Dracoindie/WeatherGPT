@@ -112,16 +112,23 @@ test('layer toggles switch the surface and legend; the time slider moves the hou
   await expect(label).not.toHaveText(before)
 })
 
-test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ page }) => {
+test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ page, isMobile }) => {
   // Headless Chromium draws WebGL in software, where lite mode turns on by
   // itself; force it off to exercise the full 3D path.
   await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
   const map = await openMap(page)
+  await expect.poll(async () => Number(await map.getAttribute('data-grid-requests')), { timeout: 15_000 }).toBeGreaterThan(0)
+  await page.waitForTimeout(1000)
+  const requestsBefore = Number(await map.getAttribute('data-grid-requests'))
   await page.getByTestId('map-broadcast').click()
 
   await expect(map).toHaveAttribute('data-broadcast', '3d')
   // the camera tilts for the 3D terrain
   await expect.poll(async () => Number(await map.getAttribute('data-pitch')), { timeout: 10_000 }).toBeGreaterThan(30)
+  // wide screens tilt further so the relief shows (camera.ts)
+  if (!isMobile) await expect.poll(async () => Number(await map.getAttribute('data-pitch')), { timeout: 10_000 }).toBeGreaterThanOrEqual(63)
+  // the closer broadcast camera loads the grid for its view, even while the flyover turns the camera every frame
+  if (!isMobile) await expect.poll(async () => Number(await map.getAttribute('data-grid-requests')), { timeout: 10_000 }).toBeGreaterThan(requestsBefore)
   await expect(page.getByTestId('map-broadcast-title')).toContainText('Pune')
   await expect(page.getByTestId('map-broadcast-title')).toContainText('Temperature')
   await expect(page.getByTestId('map-broadcast-root').getByTestId('map-legend').filter({ visible: true })).toBeVisible()

@@ -113,7 +113,7 @@ test('icons missing from the basemap sprite get a fallback, without warnings', a
   expect(warnings).toEqual([])
 })
 
-test('broadcast keeps the place in view and exit restores the view', async ({ page }) => {
+test('broadcast keeps the place in view and exit restores the view', async ({ page, isMobile }) => {
   // Regression: the portal move made the container 0x0 for a moment, and the
   // resize + tilt computed at that size moved the centre ~330 km from Pune.
   await page.addInitScript(() => localStorage.setItem('wgpt:lite-mode', 'off'))
@@ -130,7 +130,8 @@ test('broadcast keeps the place in view and exit restores the view', async ({ pa
   await expect(map).toHaveAttribute('data-center', at, { timeout: 15_000 })
 
   await page.getByTestId('map-broadcast').click()
-  await expect(map).toHaveAttribute('data-pitch', '58', { timeout: 15_000 })
+  // the broadcast tilt: 58 on phones, 64 on wide maps (camera.ts)
+  await expect(map).toHaveAttribute('data-pitch', isMobile ? '58' : '64', { timeout: 15_000 })
   await page.waitForTimeout(1000)
   await expect(map).toHaveAttribute('data-center', at)
 
