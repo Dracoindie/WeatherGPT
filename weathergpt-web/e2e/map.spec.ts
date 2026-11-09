@@ -131,6 +131,8 @@ test('broadcast mode: 3D terrain, particles, big title; Esc leaves', async ({ pa
   if (!isMobile) await expect.poll(async () => Number(await map.getAttribute('data-grid-requests')), { timeout: 10_000 }).toBeGreaterThan(requestsBefore)
   await expect(page.getByTestId('map-broadcast-title')).toContainText('Pune')
   await expect(page.getByTestId('map-broadcast-title')).toContainText('Temperature')
+  // phones fold the legend behind a toggle (e2e/broadcast-mobile.spec.ts)
+  if (isMobile) await page.getByTestId('map-broadcast-legend-toggle').click()
   await expect(page.getByTestId('map-broadcast-root').getByTestId('map-legend').filter({ visible: true })).toBeVisible()
   await expect(page.getByTestId('map-resolution')).toContainText('Model grid ≈ 8 km')
   const particles = Number(await map.getAttribute('data-particles'))

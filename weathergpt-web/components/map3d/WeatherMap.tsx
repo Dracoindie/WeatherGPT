@@ -28,7 +28,7 @@ import type { Layer } from '@deck.gl/core'
 import { ColumnLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import { useReducedMotion } from 'framer-motion'
-import { Crosshair, Pause, Play, Tv, X } from 'lucide-react'
+import { ChevronDown, Crosshair, Pause, Play, Tv, X } from 'lucide-react'
 import { getVersion, Map as MapLibreMap, NavigationControl, setWorkerUrl, type CanvasSource, type FlyToOptions } from 'maplibre-gl'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -135,6 +135,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const [hour, setHour] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [broadcast, setBroadcast] = useState(false)
+  // phones: the broadcast legend starts folded so the map stays in view
+  const [legendOpen, setLegendOpen] = useState(false)
   const [point, setPoint] = useState<PointState | null>(null)
   // ssr: false, so window exists on first render
   const [pitch, setPitch] = useState(0)
@@ -1025,21 +1027,45 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
           {point && !mobile && (
             <MapPointCard point={point} onClose={() => setPoint(null)} className="absolute left-3 top-20 max-h-[45%] w-72 overflow-y-auto" />
           )}
-          {/* news-style lower third */}
-          <div className="absolute inset-x-3 bottom-9 sm:inset-x-6 sm:bottom-10">
+          {/* news-style lower third; on phones compact (one-line title, legend
+              folded) and high enough that the map credit below it stays clear */}
+          <div className="absolute inset-x-3 bottom-16 sm:inset-x-6 sm:bottom-10" data-testid="map-broadcast-panel">
             <div className="sky-glass map-overlay overflow-hidden p-0">
-              <div className="flex flex-wrap items-stretch">
-                <div className="flex items-center bg-accent px-4 py-2 font-hud text-xs uppercase tracking-[0.2em] text-[var(--sky-floor)] sm:text-sm">
+              <div className="flex items-stretch">
+                <div className="flex shrink-0 items-center bg-accent px-2.5 py-1.5 font-hud text-[10px] uppercase tracking-[0.15em] text-[var(--sky-floor)] sm:px-4 sm:py-2 sm:text-sm sm:tracking-[0.2em]">
                   {t('map.broadcast.kicker')}
                 </div>
-                <p className="min-w-0 flex-1 px-4 py-2 font-hud text-xl text-hud sm:text-3xl" data-testid="map-broadcast-title">
+                <p
+                  className="min-w-0 flex-1 truncate px-3 py-1.5 font-hud text-base text-hud sm:px-4 sm:py-2 sm:text-3xl"
+                  title={`${placeShort ? `${placeShort} · ` : ''}${t(`map.layer.${layer}` as TranslationKey)}`}
+                  data-testid="map-broadcast-title"
+                >
                   {placeShort ? `${placeShort} · ` : ''}
                   {t(`map.layer.${layer}` as TranslationKey)}
                 </p>
               </div>
-              {legend(false) && <div className="border-t border-white/10 px-4 py-2 sm:hidden">{legend(false)}</div>}
-              <div className="border-t border-white/10 px-4 py-2">{slider}</div>
-              <p className="border-t border-white/10 px-4 py-1.5 text-[11px] text-hud-dim" data-testid="map-resolution">
+              {legend(false) && (
+                <div className="border-t border-white/10 sm:hidden">
+                  <button
+                    type="button"
+                    aria-expanded={legendOpen}
+                    aria-controls="map-broadcast-legend"
+                    onClick={() => setLegendOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs text-hud-dim hover:text-hud"
+                    data-testid="map-broadcast-legend-toggle"
+                  >
+                    {t(legendOpen ? 'map.legend.hide' : 'map.legend.show')}
+                    <ChevronDown className={cn('h-4 w-4 transition-transform motion-reduce:transition-none', legendOpen && 'rotate-180')} aria-hidden />
+                  </button>
+                  {legendOpen && (
+                    <div id="map-broadcast-legend" className="px-3 pb-2">
+                      {legend(false)}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="border-t border-white/10 px-3 py-1.5 sm:px-4 sm:py-2">{slider}</div>
+              <p className="border-t border-white/10 px-3 py-1 text-[11px] text-hud-dim sm:px-4 sm:py-1.5" data-testid="map-resolution">
                 {resolution}
                 {!broadcast3d && ` · ${t('map.broadcast.flat')}`}
               </p>
