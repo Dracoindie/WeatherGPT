@@ -89,7 +89,9 @@ test('departure suggestion: leaving later avoids the rain, and can be applied', 
   const asked = page.waitForRequest((r) => r.url().includes('/api/route') && r.url().includes('depart='))
   await page.getByTestId('route-use-suggestion').click()
   await asked
-  await expect(page.getByTestId('route-best-already')).toBeVisible({ timeout: 15_000 })
+  // dry all the way at every departure: positive wording, not "no lower hazard"
+  await expect(page.getByTestId('route-all-clear')).toHaveText('Clear along the whole way: any departure in the next 12 h looks fine.', { timeout: 15_000 })
+  await expect(page.getByTestId('route-best-already')).toHaveCount(0)
   await expect(page.getByTestId('route-report')).toHaveAttribute('data-worst', 'none')
   await expect(page.getByTestId('route-no-findings')).toBeVisible()
   await expect(page.getByTestId('route-depart-later')).toHaveAttribute('aria-pressed', 'true')
@@ -138,6 +140,14 @@ test('route words follow the UI language', async ({ page, isMobile }) => {
   await page.getByRole('button', { name: 'मरा', exact: true }).first().click()
   await expect(page.getByTestId('route-legend')).toContainText('वाहतूक नाही')
   await expect(page.getByTestId('route-suggestion-text')).toContainText('पाऊस टाळता येईल')
+
+  // a calm route in every language (here after taking the suggested departure)
+  await page.getByTestId('route-use-suggestion').click()
+  await expect(page.getByTestId('route-all-clear')).toContainText('संपूर्ण मार्गावर हवामान स्वच्छ', { timeout: 15_000 })
+  await page.getByRole('button', { name: 'हिं', exact: true }).first().click()
+  await expect(page.getByTestId('route-all-clear')).toContainText('पूरे रास्ते मौसम साफ़')
+  await page.getByRole('button', { name: 'Hing', exact: true }).first().click()
+  await expect(page.getByTestId('route-all-clear')).toContainText('Poore raaste mausam saaf')
 })
 
 test('route planner and report pass axe (no serious or critical issues)', async ({ page }) => {

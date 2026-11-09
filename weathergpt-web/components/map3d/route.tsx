@@ -516,6 +516,8 @@ export function RouteReportPanel({ report, tz, onDepart }: { report: RouteReport
 
   const s = report.suggestion
   const depOptions = report.departures
+  // the whole way at level none, and every departure in the 12 h too: say so plainly
+  const calm = report.worst === 'none' && depOptions.length > 0 && depOptions.every((o) => o.worst === 'none')
 
   return (
     <section className="sky-glass space-y-4 p-4" data-testid="route-report" data-worst={report.worst} aria-label={t('route.title')}>
@@ -618,6 +620,10 @@ export function RouteReportPanel({ report, tz, onDepart }: { report: RouteReport
               {t('route.useSuggestion')}
             </SkyButton>
           </>
+        ) : calm ? (
+          <p className="text-sm text-hud" data-testid="route-all-clear">
+            {t('route.allClear')}
+          </p>
         ) : (
           <p className="text-xs text-hud" data-testid="route-best-already">
             {t('route.bestAlready')}
