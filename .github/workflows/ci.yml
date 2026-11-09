@@ -65,3 +65,42 @@ jobs:
           name: playwright-traces
           path: weathergpt-web/test-results/
           retention-days: 7
+
+  docker:
+    # The production backend images (backend/Dockerfile), both variants, built
+    # and started on every push: docs/DEPLOYMENT.md relies on this job instead
+    # of a local Docker build. No secrets: /health needs none.
+    name: Backend image (WITH_NWP=${{ matrix.nwp }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        nwp: ["1", "0"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker build
+        run: docker build --build-arg WITH_NWP=${{ matrix.nwp }} -t weathergpt-api:nwp${{ matrix.nwp }} backend
+      - name: Image size
+        run: docker image ls weathergpt-api:nwp${{ matrix.nwp }} --format '{{.Repository}}:{{.Tag}} {{.Size}}'
+      - name: Smoke test (start the image, GET /health)
+        run: |
+          docker run -d --name api -p 8000:8000 -e PORT=8000 -e ALLOWED_ORIGINS=http://localhost:3000 weathergpt-api:nwp${{ matrix.nwp }}
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8000/health -o health.json; then break; fi
+            sleep 2
+          done
+          cat health.json; echo
+          # status ok; nwp true only in the full image (cfgrib + ecCodes load), false in the lite one
+          jq -e --argjson nwp ${{ matrix.nwp == '1' && 'true' || 'false' }} '.status == "ok" and .nwp == $nwp' health.json
+          # the container's own HEALTHCHECK agrees
+          for i in $(seq 1 30); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' api)
+            [ "$s" = "healthy" ] && break
+            sleep 2
+          done
+          echo "container health: $s"
+          test "$s" = "healthy"
+      - name: Container log
+        if: always()
+        run: docker logs api 2>&1 | tail -50 || true
