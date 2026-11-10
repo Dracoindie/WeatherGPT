@@ -40,11 +40,18 @@ These come from the ground rules in `CLAUDE.md` and are not optional:
 - Show the worst stretch, the time it is reached and a "leave earlier / later" comparison. Guidance only, never "safe" in an absolute sense.
 - Routing needs a routing engine (OSRM / Valhalla public instances or self-hosted): a dependency decision for later.
 
-## 4. Community ground truth
+## 4. Community ground truth *(done: `f7e0a00`, `9bd169f`, `a8fd63c`, `6e8bba3`, risk board)*
 
 - Signed-in users report what they see (rain, waterlogging, fallen tree, heat). Reports are stored in Supabase with RLS, time-limited and shown on the map.
 - **Trust score** per report: agreement with nearby reports, agreement with the model, the reporter's history. Low-trust reports are hidden by default.
 - **Experimental waterlogging-risk estimate** from forecast rain and elevation (terrain tiles; low points and flat basins). Labelled experimental; checked against community reports before it is promoted.
+
+**As built (step 4):**
+
+- Seven kinds (waterlogging, fallen tree, landslide, hail, heavy rain, strong wind, road blocked); sign-in, 1 a minute and 5 an hour, 6 h on the map (24 h for landslide and road blocked), hidden after 3 flags, the reporter never shown. Private Supabase tables written only by the backend. Photos re-encoded with all metadata removed. `docs/REPORTS.md`.
+- Trust from the model's support, nearby confirmations and reports, age and the reporter's record. Low-trust reports are **shown, as small dots** (sized by trust), not hidden: hiding them would hide a first report of something new. Flags hide a report.
+- Waterlogging: rain (past 3 h + next 6 h) × lowness against the two rings of ~1 km hexagons around (AWS terrain tiles) + nearby reports. `docs/WATERLOGGING.md`.
+- The risk board shows each district's live reports within 25 km.
 
 ## 5. Android app via Capacitor
 
@@ -63,4 +70,6 @@ These come from the ground rules in `CLAUDE.md` and are not optional:
 |------|---------|----------|
 | 1 | `backend/maps/` (grid and point services, heat index), `api/map.py` | `components/map3d/`, `app/map/page.tsx` |
 | 2 | `thresholds.py` scoring over the grid | hex and road layers in `components/map3d/` |
-| 3 onward | to be decided | to be decided |
+| 3 | `routing/` (OSRM, scoring at arrival time), `api/route.py` | `components/map3d/route.tsx` |
+| 4 | `reports/`, `api/reports.py`, `maps/dem.py`, `maps/waterlogging.py`, `supabase/migration_8_reports.sql` | `components/map3d/reports.tsx`, `components/map3d/waterlogging.tsx`, `lib/useAreaReports.ts` |
+| 5 onward | to be decided | to be decided |

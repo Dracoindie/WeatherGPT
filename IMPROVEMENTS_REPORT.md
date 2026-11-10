@@ -341,41 +341,87 @@ Your answers from step 1 came first, then the hazard map. Nothing was pushed, an
   - Source selection.
 - **Screenshots: 18 passed. Design audit: 6 passed.**
 
+## Map polish, deployment prep and step 4: community reports and waterlogging risk
+
+From your review of the real-tile screenshots, then the deployment prep and Phase 4. One commit per item, each after the full suite with `--workers=1`. Nothing was pushed and no tag was moved.
+
+| Commit | Change |
+|--------|--------|
+| `15b5139` | Map credit: on maps 640 px wide or less, it starts expanded and folds to (i) on the first pan or after 5 s (OSMF guidelines). Wide maps always show it. |
+| `d8f2bf0` | Broadcast: the temperature surface fades out at its edges; broadcast asks for a 25 % margin when the tile plan allows. |
+| `cad0868` | Broadcast camera zooms with the map's width (8 on a phone, up to 9) and tilts to 64° on wide screens; the Western Ghats read as relief. **Bug fixed:** the flyover's per-frame turn restarted the grid debounce, so broadcast never loaded its own grid. |
+| `77a009b` | Wind: 8-point trails fading toward the tail; in broadcast over a surface 1 px, fainter and 40 % as many. Particles are born in view and keep their trails across hour changes (they were rebuilt every 0.9 s while playing). |
+| `c4c0301` | Phone /map: the map is 60svh tall, the place chip is smaller. |
+| `7cd36f2` | Phone broadcast: one-line title, legend behind "Show legend", the panel clears the map credit. |
+| `4cdc2d9` | Retry buttons on "Map weather is unavailable" and route errors, with a 2 s → 30 s backoff and a countdown. |
+| `b56aa39` | Calm routes: "Clear along the whole way: any departure in the next 12 h looks fine." |
+| `9d8b0bd` | Desktop /map: the 7-day forecast fills the column under Current conditions (compact rows). |
+| `1d08558` | Route ends labelled "A Pune" / "B Mumbai" on the map and in the planner. **Bug fixed:** `tokenRgb` parsed hex only, but StaticSky sets `--sky-floor` as `rgb()`, so colours read from it were white; route casing and outlines now read `--sky-text` on purpose and look the same. |
+| `2861f3c` | deck.gl picks only on a tap: 0 GPU reads while hovering hexes (40 before), one per tap. |
+| `413a1cd` | CI builds and starts both backend images; `docs/DEPLOYMENT.md` is a click-by-click checklist. |
+| `f7e0a00` | **Community reports backend** (`docs/REPORTS.md`). |
+| `9bd169f` | **Waterlogging estimate backend** (`docs/WATERLOGGING.md`). |
+| `a8fd63c` | **Reports on /map:** layer, tap card with trust and why, "Report what you see" with a photo, Confirm / Flag. |
+| `6e8bba3` | **"Waterlogging (experimental)" layer**, legend, "Zoom in here", tap card. |
+| (this pass) | **Risk board:** each district's live reports within 25 km; then these docs. |
+
+### Community reports
+
+- **Kinds:** waterlogging, fallen tree, landslide, hail, heavy rain, strong wind, road blocked; optional note (280 characters) and photo.
+- **Safety:** sign-in (verified with Supabase Auth), 1 a minute and 5 an hour, 6 h on the map (24 h for landslide and road blocked), 3 flags hide a report, one vote per person, never on your own report. The reporter's id never leaves the server; the card says "a resident" and a time rounded to 10 minutes.
+- **Storage:** `community_reports` and `report_votes` are private (RLS on, no policies, no grants); only the backend writes them, with the service-role key. Photos sit in a private bucket and are served by the backend.
+- **Photos:** Pillow decodes and re-encodes every photo as a new JPEG (≤ 1600 px): EXIF incl. GPS and all other metadata are gone (tested with a real GPS-tagged JPEG), the camera's rotation is applied first, 8 MB and 40 MP guards. The browser converts HEIC (and other formats it can decode) to JPEG; anything else gets "Please use a JPEG or PNG photo".
+- **Trust:** `0.35 model + 0.25 nearby + 0.15 age + 0.25 reporter − 0.1 per flag`; Low < 0.4 ≤ Medium < 0.65 ≤ High. The model part is one Open-Meteo call when the report is made; its bands (AMS rain rates, the alert wind rules, the 24 h rain rules) are in `thresholds.py`.
+- **Never** a forecast number or an alert level: a test checks that no forecast, alert, route, risk-board scoring or push module imports `reports`.
+
+### Waterlogging risk (experimental)
+
+`score = min(1, R × (0.4 + 0.6 L) + 0.3 C)` per ~1 km hexagon: R from rain over the past 3 h and next 6 h, L from metres below the two rings around (AWS terrain tiles, decoded with Pillow), C from nearby waterlogging reports by trust. No rain and no reports means no risk. Limits are on the map and in `docs/WATERLOGGING.md` (8 km rain, 76 m terrain, no drains, pumps or tides).
+
+### Tests
+
+- **Backend: 982 passed** (26 for reports: rate limit, expiry, flags, votes, trust formula and levels, model agreement bands, EXIF/GPS stripping, orientation, bomb guard, store, migration privacy, no feed into alerts; 10 for waterlogging: formula, terrain decoding, lowness, a synthetic bowl, dry weather, reports, outage, API limits).
+- **Frontend:** e2e for the reports layer and card, the signed-in report flow with a photo, votes, rate-limit and outage messages, languages and the phone layout; the waterlogging layer, legend, "Zoom in here", card, outage and languages; the risk board line. Screenshots: `map-reports`, `map-report-form`, `map-waterlogging`.
+- Backend tests ran in Docker (`python:3.11`, like CI): Windows Smart App Control started blocking h3's unsigned `.pyd` on this PC on 2026-11-09.
+
 ## Needs your input
 
-1. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
-2. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
-3. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
-4. **Signed-in UI paths are untested end to end.** Playwright cannot create a Supabase session.
-5. **Local leftovers (not in git).**
+1. **Run the SQL.** `supabase/migration_8_reports.sql` in the Supabase SQL editor (also in `schema.sql`). Reports also need `SUPABASE_SERVICE_ROLE_KEY` on the backend; without it the map says reports are not set up.
+2. **Smart App Control blocks h3 on this PC.** Since 2026-11-09 Windows refuses h3's unsigned `cells.pyd`, so `pytest` and the backend fail to import on Windows here. I ran the suite and the live backend in Docker. Options: run the backend in Docker or WSL, or (your decision; Windows cannot turn it back on without a reinstall) turn Smart App Control off.
+3. **Signed-in e2e.** Playwright now signs in against a mocked Supabase (`signIn` in `e2e/support/mockApi.ts`). The Next.js proxy checks the session cookie on the server, which Playwright cannot intercept: during those tests it sends one request with a fake token to the Supabase URL in `.env.local` (answered 401). Say if you would rather have a test-only proxy bypass.
+4. **Review the trust weights and the waterlogging formula** (`docs/REPORTS.md`, `docs/WATERLOGGING.md`). They are reasoned defaults, not calibrated: check them against real reports after a few monsoon days.
+5. **Low-trust reports are shown small, not hidden** (VISION said hidden by default). Hiding them would hide a first report of something new; flags already hide bad ones. Say if you want them hidden.
+6. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
+7. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).
+8. **Rate limit is per process.** Documented in `docs/EARLY_WARNING.md`. The Dockerfile runs one worker; keep instances at 1, or move the limit to Supabase.
+9. **Local leftovers (not in git).**
    - The ignored root `node_modules/` (from the removed root `package.json`) and the stray `D:\ci_sim_build.log` can be deleted.
    - The `mcr.microsoft.com/playwright:v1.64.1-noble` Docker image (about 2 GB, pulled for a CI reproduction that was stopped for low memory) can be removed with `docker rmi mcr.microsoft.com/playwright:v1.64.1-noble`.
-6. **Climate demo question not recorded.** The Open-Meteo archive returned 503 and then timed out on 2026-11-03. Re-run `record_demo_fixtures.py` the morning of the demo (`docs/DEMO.md`); it lists anything it could not record.
-7. **Demo fixtures are not in the Docker image** (`.dockerignore` excludes `data/`). Replay is meant for the demo laptop. The deployed backend always serves live data.
-8. **Push and watch CI.** The fix for the 4 desktop Playwright timeouts is explained above. If CI still fails, `gh run view <id> --log-failed` now gives the exact test.
-9. **Still open from before:**
+10. **Climate demo question not recorded.** The Open-Meteo archive returned 503 and then timed out on 2026-11-03. Re-run `record_demo_fixtures.py` the morning of the demo (`docs/DEMO.md`); it lists anything it could not record.
+11. **Demo fixtures are not in the Docker image** (`.dockerignore` excludes `data/`). Replay is meant for the demo laptop. The deployed backend always serves live data.
+12. **Push and watch CI.** The fix for the 4 desktop Playwright timeouts is explained above. If CI still fails, `gh run view <id> --log-failed` now gives the exact test.
+13. **Still open from before:**
    - real-device speech recognition for mr-IN
    - no WRF source
    - AQI is modelled, not CPCB stations
    - smart-city feature only partial
    - with `npm run dev` running, use `npx playwright test --workers=1`
-10. **Look at `/map` with live tiles on a real GPU.**
+14. **Look at `/map` with live tiles on a real GPU.**
     - Tests use a stand-in style, a three-line road network and flat terrain.
     - Please check the hazard hexes over real OpenFreeMap roads and labels: hex opacity, road widths, and whether res 6 hexes look right at zoom 9–11.
-11. **Run the map recorder once, the morning of the demo.**
+15. **Run the map recorder once, the morning of the demo.**
     - Command: `record_demo_fixtures.py --map` (about 1,800 Open-Meteo location-calls). Then click "Prepare offline map" on the demo laptop.
     - I have not run it against the live services, so neither the map tiles nor the tap points are recorded yet.
-12. **MapTiler.**
+16. **MapTiler.**
     - If you want it, create a key, restrict it to your domains, and set `NEXT_PUBLIC_MAPTILER_KEY`. It is a public browser key by design.
     - The switch and fallback were not tested against live MapTiler; only the source selection is tested.
     - The offline pack always uses the keyless sources. MapTiler's terms on offline caching would need checking before caching theirs.
-13. **Open-Meteo terms.**
+17. **Open-Meteo terms.**
     - Free use is non-commercial. Set `OPEN_METEO_API_KEY` before any commercial or high-traffic deployment (`docs/OPEN_METEO.md`).
     - Read their current terms yourself; my doc summarises them.
-14. **Review the severe thresholds.**
+18. **Review the severe thresholds.**
     - The values are 115.6 mm, 47 °C, 89 km/h and WMO 99, with heat-stress watch and warning at heat index 39.4 / 51.7 °C. They are borrowed from IMD, Beaufort and the NWS.
     - Confirm they suit your judges' framing; they change alerts, push and the risk board too.
-15. **Behaviour changes** (above): alert windows now start at the current hour, advisory is yellow, push fires on escalation to severe, and heat-stress alerts are new. Tell me if any should be reverted.
-16. **Hex → chat link** from `docs/VISION.md` step 2 is not built: the card explains the level itself. Say if you still want "Ask about this area".
-17. **Half-hour time zones.** India's local hours fall on UTC :30. Alerts use local hours from the place's forecast; the map uses UTC hours from the tiles. The two 24 h windows can differ by 30 minutes. In practice this hardly changes a 24 h total, but it is not zero.
-18. **Next step.** Step 3 (weather-safe routes) needs a routing engine (OSRM or Valhalla, public or self-hosted). That is a dependency decision for you.
+19. **Behaviour changes** (above): alert windows now start at the current hour, advisory is yellow, push fires on escalation to severe, and heat-stress alerts are new. Tell me if any should be reverted.
+20. **Half-hour time zones.** India's local hours fall on UTC :30. Alerts use local hours from the place's forecast; the map uses UTC hours from the tiles. The two 24 h windows can differ by 30 minutes. In practice this hardly changes a 24 h total, but it is not zero.
+21. **Next step.** Step 5 (Android app via Capacitor) is next in `docs/VISION.md`; it adds native dependencies, so it needs your go-ahead.

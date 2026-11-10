@@ -418,6 +418,18 @@ Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or der
 - **Scoring:** a sample every 5 km; arrival time from OSRM's own durations; the nearest grid point of the shared map tiles and the forecast hour nearest the arrival; `alerts/scoring.py` with `thresholds.ROUTE_RULES` (the instant rules, plus rain from that hour's WMO code).
 - **Response:** `samples`, coloured `segments`, `findings` (hazard, level, value vs threshold, km, clock time, nearby town or road), 49 `departures` over 12 h, the `suggestion` (lowest worst level) and the honesty fields. Never "safe": only "lower estimated weather hazard".
 
+### Community reports and the waterlogging estimate
+
+Community reports are "community report, unverified": they are shown on the map and the risk board and never change a forecast number or an alert level (`docs/REPORTS.md`).
+
+- `GET /api/reports?south=&west=&north=&east=` lists live reports in a box (at most 15° a side), newest first, each with a trust level (Low / Medium / High), its score and parts. The reporter is never returned ("a resident", time rounded to 10 min).
+- `POST /api/reports` (signed in, multipart: `kind`, `latitude`, `longitude`, optional `note` and `photo`). Kinds: waterlogging, fallen tree, landslide, hail, heavy rain, strong wind, road blocked. One a minute and 5 an hour per person; 6 h on the map (24 h for landslide and road blocked). Photos are re-encoded as JPEG with all metadata (EXIF incl. GPS) removed.
+- `POST /api/reports/{id}/vote` with `{"vote": "confirm" | "flag"}` (signed in, once per report, never your own); 3 flags hide a report.
+- `GET /api/reports/{id}/photo` serves the cleaned JPEG while the report is live.
+- Needs `SUPABASE_SERVICE_ROLE_KEY` and `supabase/migration_8_reports.sql`; without them the endpoints answer 503 `not_configured`.
+
+`GET /api/map/waterlogging?south=&west=&north=&east=` is the **experimental** waterlogging risk per ~1 km H3 hexagon (res 8) for a city-sized box (at most 0.3° a side, else 422): rain over the past 3 h and next 6 h at the nearest model point, times how low the hexagon lies against the two rings around it (AWS terrain tiles), plus nearby waterlogging reports weighted by trust. Levels low / moderate / high; never an alert, never official (`docs/WATERLOGGING.md`).
+
 **Heat index.** The NWS method (Rothfusz regression with the low/high humidity adjustments) in `backend/maps/heat_index.py`. The bands are the NWS categories (Caution 26.7 °C, Extreme caution 32.2 °C, Danger 39.4 °C, Extreme danger 51.7 °C) in `thresholds.py`. It is guidance for outdoor workers, assumes shade, and is not an official product.
 
 **LLM provider setup** (optional)

@@ -77,7 +77,7 @@ The role is sent in `ChatRequest.role` and saved in `profiles.role` (migration 6
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root) | all pass (924 on 2026-11-04). Fully mocked, no network. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root) | all pass (982 on 2026-11-09). Fully mocked, no network. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build` | succeeds. **Needed before Playwright.** |
 | E2E | `npx playwright test --grep-invert @screens` (add `--workers=1` when memory is low) | all pass; skips are desktop-only tests in the mobile project and the opt-in `@audit` spec |
