@@ -71,6 +71,7 @@ Every page must look like it belongs to the Living Sky home. Before adding UI, r
 ## Playwright notes
 
 - Playwright mocks the backend, Nominatim and Supabase (`e2e/support/mockApi.ts`).
-- `npm run build` is needed before Playwright, which runs `next start` on port 3100.
+- `npm run build:e2e` is needed before Playwright, which runs `next start` on port 3100 from `.next-e2e`. `NEXT_PUBLIC_*` values are fixed at build time, so the e2e build is made with the test-only addresses in `scripts/e2e-env.mjs` (Supabase = `http://127.0.0.1:3101`), never the ones in `.env.local`. The app has no test switch.
+- Supabase in tests: the browser's calls are answered by `page.route` in `mockApi.ts`; the proxy's server-side session check (not interceptable) goes to `scripts/mock-supabase.mjs`, which Playwright starts. `e2e/supabase-mock.spec.ts` proves both, and a request to a real `supabase.co` host is aborted.
 - Headless Chromium draws WebGL in software (SwiftShader), so lite mode's auto setting picks the CSS sky in e2e (`lib/liteMode.ts`, reason `software-renderer`). That is the CI fix. A test that needs the WebGL sky sets `localStorage['wgpt:lite-mode'] = 'off'`, as the screenshot and audit specs do.
 - Settings -> "Prepare offline map" (`lib/offlineMap.ts`, dynamic import) saves basemap and terrain tiles for the demo region at zoom 6-10; `public/sw.js` serves them only when the network fails.

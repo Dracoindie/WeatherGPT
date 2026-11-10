@@ -38,6 +38,7 @@ English, हिंदी and Hinglish.
    npm install
    npm run dev        # http://localhost:3000
    npm run build      # production build
+   npm run build:e2e  # the build Playwright serves (.next-e2e, test-only Supabase address)
    npm run lint
    ```
 

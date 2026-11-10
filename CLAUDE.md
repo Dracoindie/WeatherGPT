@@ -79,7 +79,7 @@ The role is sent in `ChatRequest.role` and saved in `profiles.role` (migration 6
 |-------|---------|--------|
 | Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root) | all pass (982 on 2026-11-09). Fully mocked, no network. |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
-| Frontend build | `npm run build` | succeeds. **Needed before Playwright.** |
+| Frontend build | `npm run build:e2e` | succeeds. **Needed before Playwright.** The same `next build`, into `.next-e2e`, with the test-only Supabase address (`weathergpt-web/scripts/e2e-env.mjs`), so no test request reaches the real project. `npm run build` is the real build and is not what Playwright serves. |
 | E2E | `npx playwright test --grep-invert @screens` (add `--workers=1` when memory is low) | all pass; skips are desktop-only tests in the mobile project and the opt-in `@audit` spec |
 | Screenshots | `npx playwright test --grep @screens` | all pass; output in `weathergpt-web/screenshots/{desktop,mobile}/` (git-ignored) |
 | Design audit | `AUDIT_DIR=screenshots/wip npx playwright test e2e/audit.spec.ts` | all pass; look at the images at 1440 and 390 px (`docs/DESIGN_AUDIT.md`) |

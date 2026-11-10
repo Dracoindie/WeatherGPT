@@ -8,7 +8,11 @@
 import type { BrowserContext, Page, Route } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
 import { cellToLatLng, gridDisk, latLngToCell, polygonToCells } from 'h3-js'
+import { E2E_SUPABASE_URL } from '../../scripts/e2e-env.mjs'
 import THRESHOLDS from './thresholds.json'
+
+/** A request to the test-only Supabase address (the e2e build's NEXT_PUBLIC_SUPABASE_URL). */
+const supabase = (path = '/') => (url: URL) => url.origin === E2E_SUPABASE_URL && url.pathname.startsWith(path)
 
 export const PUNE = { name: 'Pune, Maharashtra, India', latitude: 18.5204, longitude: 73.8567 }
 
@@ -840,8 +844,10 @@ export async function mockBackend(page: Page | BrowserContext, opts: MockOptions
     return json(route, [{ lat: String(PUNE.latitude), lon: String(PUNE.longitude), display_name: PUNE.name }])
   })
 
-  // No Supabase session in tests; never reach the real project.
-  await page.route(/supabase\.co/, (route) => json(route, {}))
+  // No Supabase session in tests. The e2e build talks to the test-only address;
+  // a request to a real project would mean the wrong build is being served, so it is cut off.
+  await page.route(/supabase\.(co|com|in)\b/, (route) => route.abort())
+  await page.route(supabase(), (route) => json(route, {}))
 
   // Map tiles: a flat slate tile keeps screenshots deterministic and offline.
   await page.route(/basemaps\.cartocdn\.com|tile\.openstreetmap\.org/, (route) =>
@@ -872,7 +878,8 @@ export async function enterDemo(page: Page) {
  * empty. Call after mockBackend (later routes win). Lands on /dashboard.
  *
  * The Next.js proxy (server side, not interceptable here) checks the session
- * cookie with Supabase; with this fake token that check simply finds no user.
+ * cookie with Supabase. In the e2e build that is scripts/mock-supabase.mjs on
+ * 127.0.0.1, which knows no user (e2e/supabase-mock.spec.ts).
  */
 export const TEST_USER = { id: '0b3e8f2a-1c4d-4e5f-8a9b-0c1d2e3f4a5b', email: 'tester@example.com' }
 export async function signIn(page: Page) {
@@ -880,9 +887,9 @@ export async function signIn(page: Page) {
     id: TEST_USER.id, aud: 'authenticated', role: 'authenticated', email: TEST_USER.email,
     app_metadata: { provider: 'email' }, user_metadata: {}, created_at: '2026-11-01T00:00:00Z',
   }
-  await page.route(/supabase\.co\/rest\/v1\//, (route) => json(route, []))
-  await page.route(/supabase\.co\/auth\/v1\/user/, (route) => json(route, user))
-  await page.route(/supabase\.co\/auth\/v1\/token/, (route) =>
+  await page.route(supabase('/rest/v1/'), (route) => json(route, []))
+  await page.route(supabase('/auth/v1/user'), (route) => json(route, user))
+  await page.route(supabase('/auth/v1/token'), (route) =>
     json(route, {
       access_token: 'e2e-access-token', token_type: 'bearer', expires_in: 3600,
       expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'e2e-refresh-token', user,

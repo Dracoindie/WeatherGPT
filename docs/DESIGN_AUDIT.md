@@ -6,7 +6,7 @@
 
 ```powershell
 cd weathergpt-web
-npm run build
+npm run build:e2e
 $env:AUDIT_DIR = "screenshots/audit-before"; npx playwright test e2e/audit.spec.ts
 ```
 

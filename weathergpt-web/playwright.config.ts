@@ -1,9 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
+import { E2E_DIST_DIR, E2E_SUPABASE_URL } from './scripts/e2e-env.mjs'
 
 /**
- * E2E + screenshot runs against a production build (`npm run build` first).
+ * E2E + screenshot runs against a production build made for tests
+ * (`npm run build:e2e` first; it builds into `.next-e2e` with the test-only
+ * Supabase address from scripts/e2e-env.mjs, never the one in `.env.local`).
  * The FastAPI backend, Nominatim and Supabase are mocked per test in
- * e2e/support/mockApi.ts, so no network or backend is needed.
+ * e2e/support/mockApi.ts; the Next.js server's own Supabase check goes to
+ * scripts/mock-supabase.mjs on 127.0.0.1. No network or backend is needed.
  */
 const PORT = 3100
 
@@ -35,10 +39,19 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: `npx next start -p ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'node scripts/mock-supabase.mjs',
+      url: `${E2E_SUPABASE_URL}/__e2e/health`,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    {
+      command: `npx next start -p ${PORT}`,
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: true,
+      timeout: 120_000,
+      env: { NEXT_DIST_DIR: E2E_DIST_DIR },
+    },
+  ],
 })

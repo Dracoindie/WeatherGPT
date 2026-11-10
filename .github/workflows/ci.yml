@@ -40,10 +40,8 @@ jobs:
       run:
         working-directory: weathergpt-web
     env:
-      # Placeholders: the build needs the names; Playwright mocks Supabase and the backend.
-      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      # No Supabase or backend address here: `npm run build:e2e` builds with the
+      # test-only ones (weathergpt-web/scripts/e2e-env.mjs) and Playwright mocks both.
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +52,7 @@ jobs:
           cache-dependency-path: weathergpt-web/package-lock.json
       - run: npm ci
       - run: npx eslint
-      - run: npm run build
+      - run: npm run build:e2e
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
       - name: Playwright e2e (screenshots excluded)
