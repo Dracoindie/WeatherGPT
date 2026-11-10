@@ -77,7 +77,7 @@ The role is sent in `ChatRequest.role` and saved in `profiles.role` (migration 6
 
 | Check | Command | Expect |
 |-------|---------|--------|
-| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root) | all pass (982 on 2026-11-09). Fully mocked, no network. |
+| Backend tests | `backend/.venv/Scripts/python -m pytest tests/ -q` (from the repo root) | all pass (982 on 2026-11-09). Fully mocked, no network. **On the Windows dev PC use `bash scripts/pytest-docker.sh`** (same suite in a Linux container): Smart App Control blocks h3's unsigned library there and stays on (`docs/WINDOWS_DEV.md`). |
 | Frontend lint | `npx eslint` (in `weathergpt-web/`) | clean |
 | Frontend build | `npm run build:e2e` | succeeds. **Needed before Playwright.** The same `next build`, into `.next-e2e`, with the test-only Supabase address (`weathergpt-web/scripts/e2e-env.mjs`), so no test request reaches the real project. `npm run build` is the real build and is not what Playwright serves. |
 | E2E | `npx playwright test --grep-invert @screens` (add `--workers=1` when memory is low) | all pass; skips are desktop-only tests in the mobile project and the opt-in `@audit` spec |
@@ -97,6 +97,7 @@ Environment variables: backend in `backend/.env` (python-dotenv; real environmen
 - `docs/AUTH_LOCATION_ARCHITECTURE.md`: trusted location and RLS
 - `docs/ROUTES.md`: weather along a route, OSRM, fair use, scoring at arrival time, departure suggestion, replay
 - `docs/OPEN_METEO.md`: free-tier limits, non-commercial terms, how calls are counted, the optional key
+- `docs/WINDOWS_DEV.md`: Windows-only dev note: Smart App Control blocks h3, so backend tests and the live backend run in Docker
 - `docs/DEPLOYMENT.md`: Render/Railway (`backend/Dockerfile`, `render.yaml`), Vercel, Supabase auth URLs, GitHub secrets, smoke test
 
 **Not part of the repo:**
