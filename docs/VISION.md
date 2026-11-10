@@ -50,7 +50,7 @@ These come from the ground rules in `CLAUDE.md` and are not optional:
 
 - Seven kinds (waterlogging, fallen tree, landslide, hail, heavy rain, strong wind, road blocked); sign-in, 1 a minute and 5 an hour, 6 h on the map (24 h for landslide and road blocked), hidden after 3 flags, the reporter never shown. Private Supabase tables written only by the backend. Photos re-encoded with all metadata removed. `docs/REPORTS.md`.
 - Trust from the model's support, nearby confirmations and reports, age and the reporter's record. Low-trust reports are **hidden by default**; "Show unverified reports (N hidden)" under the map draws them (small dots). Your own report always shows to you. Flags hide a report for everyone.
-- Waterlogging: rain (past 3 h + next 6 h) × lowness against the two rings of ~1 km hexagons around (AWS terrain tiles) + nearby reports. `docs/WATERLOGGING.md`.
+- Waterlogging: rain (past 3 h + next 6 h) × lowness against the two rings of ~1 km hexagons around (AWS terrain tiles) + nearby reports. `docs/WATERLOGGING.md`. The trust weights and this formula are **default, not calibrated**, and labelled so in the docs and on the map.
 - The risk board shows each district's live reports within 25 km.
 
 ## 5. Android app via Capacitor

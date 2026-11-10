@@ -363,7 +363,12 @@ From your review of the real-tile screenshots, then the deployment prep and Phas
 | `9bd169f` | **Waterlogging estimate backend** (`docs/WATERLOGGING.md`). |
 | `a8fd63c` | **Reports on /map:** layer, tap card with trust and why, "Report what you see" with a photo, Confirm / Flag. |
 | `6e8bba3` | **"Waterlogging (experimental)" layer**, legend, "Zoom in here", tap card. |
-| (this pass) | **Risk board:** each district's live reports within 25 km; then these docs. |
+| `38970f2` | **Risk board:** each district's live reports within 25 km. |
+| `36d63d3` | Docs for step 4 (README API, VISION, this report). |
+| `d51593e` | **E2E never reaches a real Supabase project:** `npm run build:e2e` builds into `.next-e2e` with a test-only address; a local mock answers the Next.js proxy's server-side check. No test switch in the app. |
+| `173fd1f` | Windows-only dev note (`docs/WINDOWS_DEV.md`): Smart App Control stays on; backend tests via `scripts/pytest-docker.sh`. |
+| `96a2cde` | **Low-trust reports hidden by default**, "Show unverified reports (N hidden)" in four languages; your own report always shows. |
+| (this commit) | Trust weights and the waterlogging formula labelled **"default, not calibrated"** in the docs and the UI help text. |
 
 ### Community reports
 
@@ -381,7 +386,7 @@ From your review of the real-tile screenshots, then the deployment prep and Phas
 ### Tests
 
 - **Backend: 982 passed** (26 for reports: rate limit, expiry, flags, votes, trust formula and levels, model agreement bands, EXIF/GPS stripping, orientation, bomb guard, store, migration privacy, no feed into alerts; 10 for waterlogging: formula, terrain decoding, lowness, a synthetic bowl, dry weather, reports, outage, API limits).
-- **Frontend:** e2e for the reports layer and card, the signed-in report flow with a photo, votes, rate-limit and outage messages, languages and the phone layout; the waterlogging layer, legend, "Zoom in here", card, outage and languages; the risk board line. Screenshots: `map-reports`, `map-report-form`, `map-waterlogging`.
+- **Frontend:** e2e for the reports layer and card, the signed-in report flow with a photo, votes, rate-limit and outage messages, languages and the phone layout; the waterlogging layer, legend, "Zoom in here", card, outage and languages; the risk board line; the low-trust toggle (hidden by default, own report shown, four languages); the "default, not calibrated" notes; and a spec proving signed-in tests only call the test-only Supabase address. Screenshots: `map-reports`, `map-report-form`, `map-waterlogging`.
 - Backend tests ran in Docker (`python:3.11`, like CI): Windows Smart App Control started blocking h3's unsigned `.pyd` on this PC on 2026-11-09.
 
 ## Needs your input
@@ -389,7 +394,7 @@ From your review of the real-tile screenshots, then the deployment prep and Phas
 1. **Run the SQL.** `supabase/migration_8_reports.sql` in the Supabase SQL editor (also in `schema.sql`). Reports also need `SUPABASE_SERVICE_ROLE_KEY` on the backend; without it the map says reports are not set up.
 2. **Smart App Control: settled.** It stays on. On this PC backend tests run with `bash scripts/pytest-docker.sh` and a live backend runs from the `backend/Dockerfile` image; both are written up as a Windows-only dev note in `docs/WINDOWS_DEV.md`. CI and deployment are unaffected.
 3. **Signed-in e2e: settled.** Tests never reach your Supabase project. `npm run build:e2e` builds for Playwright into `.next-e2e` with a test-only Supabase address (`http://127.0.0.1:3101`, `weathergpt-web/scripts/e2e-env.mjs`); Playwright starts a small mock there for the Next.js proxy's server-side check, and `e2e/supabase-mock.spec.ts` proves the check lands on it. `.env.local`, the normal build and the app code are unchanged (no bypass). CI uses the same command; I could not run GitHub Actions from here, so watch the first run after you push.
-4. **Review the trust weights and the waterlogging formula** (`docs/REPORTS.md`, `docs/WATERLOGGING.md`). They are reasoned defaults, not calibrated: check them against real reports after a few monsoon days.
+4. **Trust weights and the waterlogging formula: kept, labelled "default, not calibrated"** in `docs/REPORTS.md`, `docs/WATERLOGGING.md`, the README, the report card and the waterlogging legend (all four languages). They still need checking against real reports after a few monsoon days.
 5. **Low-trust reports: settled.** Hidden by default on the map and the risk board, with "Show unverified reports (N hidden)" in all four languages. Your own report always shows to you.
 6. **See a real notification.** Follow "See a real test notification" above. It needs your Supabase account, a browser permission prompt and the OS notification centre.
 7. **Render free plan memory.** GFS decoding on 512 MB may restart the service. Use `WITH_NWP=0` or the Starter plan if it does (`docs/DEPLOYMENT.md`).

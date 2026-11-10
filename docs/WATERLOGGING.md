@@ -10,6 +10,11 @@ city the map says so and offers **Zoom in here** (no request is sent). Tap a
 hexagon for its parts: rain (9 h total and wettest hour), how many metres it
 lies below or above its surroundings, and nearby waterlogging reports.
 
+> **Default, not calibrated.** The formula, its weights (0.4, 0.6, 0.3), the
+> scales (50 mm, 15.2 mm/h, 15 m, 1.5) and the level cut-offs are reasoned
+> starting values. They have not been fitted to observed waterlogging. The map
+> legend says so too ("The formula's weights are defaults, not calibrated").
+
 ## What it combines, per H3 hexagon
 
 Resolution 8: hexagons about 1 km across, over a city-sized view (at most 0.3° a

@@ -43,6 +43,12 @@ Optional: a short note (at most 280 characters) and one photo.
 
 ## Trust score
 
+> **Default, not calibrated.** The weights, bands and level cut-offs below are
+> reasoned starting values. They have not been fitted to real reports. The
+> report card says so too ("The trust weights are defaults, not calibrated").
+> Review them against real reports after a few monsoon days before relying on
+> the levels.
+
 Each report gets a score from 0 to 1, shown as **Low**, **Medium** or **High**:
 
 ```

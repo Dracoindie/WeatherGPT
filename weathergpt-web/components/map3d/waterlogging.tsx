@@ -133,6 +133,7 @@ export function WaterlogLegend({ data, tz, big = false }: { data: Waterlogging |
         {fill(t('wl.how'), { km: data?.model_grid_km ?? 8 })}
       </p>
       <p className={cn('mt-1 font-semibold text-hud', big ? 'text-xs' : 'text-[11px]')}>{t('wl.experimental')}</p>
+      <p className={cn('mt-1 text-hud-dim', big ? 'text-xs' : 'text-[11px]')} data-testid="wl-defaults">{t('wl.defaults')}</p>
     </div>
   )
 }

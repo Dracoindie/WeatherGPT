@@ -51,6 +51,7 @@ test('legend: levels, the rain window, how it is made, experimental and not offi
   await expect(page.getByTestId('wl-window')).toHaveText(/^Rain window \d\d:\d\d – \d\d:\d\d$/)
   await expect(page.getByTestId('wl-how')).toContainText('Not a measurement, not an alert, not official IMD.')
   await expect(page.getByTestId('wl-how')).toContainText('model grid ≈ 8 km')
+  await expect(page.getByTestId('wl-defaults').filter({ visible: true })).toHaveText("The formula's weights are defaults, not calibrated.")
 })
 
 test('tap a hexagon: level and its parts', async ({ page }) => {
@@ -91,4 +92,5 @@ test('waterlogging words follow the UI language', async ({ page, isMobile }) => 
   await expect(page.getByTestId('map-layer-waterlogging')).toHaveText('पाणी साचणे (प्रायोगिक)')
   await page.getByRole('button', { name: 'Hing', exact: true }).first().click()
   await expect(page.getByTestId('wl-how')).toContainText('official IMD nahi')
+  await expect(page.getByTestId('wl-defaults').filter({ visible: true })).toHaveText('Formula ke weights default hain, calibrate nahi hue.')
 })

@@ -322,7 +322,8 @@ export function ReportCard({
           </div>
         ))}
       </dl>
-      <p className="mt-2 text-[11px] text-hud-dim" data-testid="report-counts">
+      <p className="mt-2 text-[11px] text-hud-dim" data-testid="report-why-note">{t('report.whyNote')}</p>
+      <p className="mt-1 text-[11px] text-hud-dim" data-testid="report-counts">
         {fill(t('report.confirms'), { n: report.confirms })}
         {report.flags > 0 && ` · ${fill(t('report.flags'), { n: report.flags })}`}
       </p>

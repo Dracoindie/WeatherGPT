@@ -109,6 +109,7 @@ test('tap a report: kind, trust and why, photo, approximate time, never who', as
   await expect(page.getByTestId('report-photo')).toHaveAttribute('src', /\/api\/reports\/rep-water\/photo$/)
   await expect(page.getByTestId('report-why')).toContainText('Forecast model agrees')
   await expect(page.getByTestId('report-why')).toContainText('100%')
+  await expect(page.getByTestId('report-why-note')).toHaveText('The trust weights are defaults, not calibrated.')
   await expect(page.getByTestId('report-counts')).toHaveText('Confirmed by 2')
   await expect(card).toContainText('Sign in to confirm or flag.')
   await expect(page.getByTestId('report-confirm')).toHaveCount(0)
@@ -213,11 +214,14 @@ test('report words follow the UI language', async ({ page, isMobile }) => {
   await page.getByRole('button', { name: 'मरा', exact: true }).first().click()
   await expect(page.getByTestId('report-kind')).toHaveText('पाणी साचले')
   await expect(page.getByTestId('report-card')).toContainText('नागरिक अहवाल, पडताळलेला नाही')
+  await expect(page.getByTestId('report-why-note')).toHaveText('विश्वासाचे भार डीफॉल्ट आहेत, कॅलिब्रेट केलेले नाहीत.')
   await expect(page.getByTestId('map-layer-reports')).toHaveText('अहवाल')
   await page.getByRole('button', { name: 'हिं', exact: true }).first().click()
   await expect(page.getByTestId('report-trust')).toHaveText('ऊँचा भरोसा')
+  await expect(page.getByTestId('report-why-note')).toHaveText('भरोसे के भार डिफ़ॉल्ट हैं, कैलिब्रेट नहीं किए गए।')
   await page.getByRole('button', { name: 'Hing', exact: true }).first().click()
   await expect(page.getByTestId('report-kind')).toHaveText('Paani bharaav')
+  await expect(page.getByTestId('report-why-note')).toHaveText('Bharose ke weights default hain, calibrate nahi hue.')
 })
 
 test('phones: the card sits under the map, the panel stays reachable, no sideways scroll', async ({ page, isMobile }) => {
