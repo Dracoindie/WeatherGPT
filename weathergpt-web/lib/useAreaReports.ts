@@ -4,11 +4,12 @@
  * Live community reports near a set of places (the risk board's districts):
  * one GET /api/reports for the box around them, then each place's reports
  * within RADIUS_KM. Community reports are unverified and never change a
- * district's level (docs/REPORTS.md).
+ * district's level (docs/REPORTS.md). Low-trust reports are only counted
+ * (hiddenByPlace), as on the map, where they can be shown.
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { fetchReports, MAX_BOX_DEG, ReportError, type Report, type ReportErrorCode } from '@/lib/api/reports'
+import { fetchReports, hiddenByDefault, MAX_BOX_DEG, ReportError, type Report, type ReportErrorCode } from '@/lib/api/reports'
 
 export const RADIUS_KM = 25
 const PAD_DEG = 0.3
@@ -64,13 +65,16 @@ export function useAreaReports(places: Array<{ name: string; latitude: number; l
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, refreshKey])
 
-  const byPlace = useMemo(() => {
-    const out: Record<string, Report[]> = {}
+  const { byPlace, hiddenByPlace } = useMemo(() => {
+    const byPlace: Record<string, Report[]> = {}
+    const hiddenByPlace: Record<string, number> = {}
     for (const p of places) {
-      out[p.name] = reports.filter((r) => km(p.latitude, p.longitude, r.latitude, r.longitude) <= RADIUS_KM)
+      const near = reports.filter((r) => km(p.latitude, p.longitude, r.latitude, r.longitude) <= RADIUS_KM)
+      byPlace[p.name] = near.filter((r) => !hiddenByDefault(r))
+      hiddenByPlace[p.name] = near.length - byPlace[p.name].length
     }
-    return out
+    return { byPlace, hiddenByPlace }
   }, [places, reports])
 
-  return { byPlace, error }
+  return { byPlace, hiddenByPlace, error }
 }

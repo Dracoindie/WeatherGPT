@@ -345,6 +345,11 @@ export default function DisasterPage() {
                         })}
                       </p>
                     )}
+                    {(areaReports.hiddenByPlace[r.name] ?? 0) > 0 && (
+                      <p className="mt-1 text-[11px] text-hud-dim" data-testid={`risk-reports-hidden-${r.name}`}>
+                        {fill(t('risk.reportsHidden'), { n: areaReports.hiddenByPlace[r.name] })}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"

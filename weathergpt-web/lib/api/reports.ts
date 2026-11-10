@@ -56,6 +56,13 @@ export interface Box {
   east: number
 }
 
+/**
+ * Low-trust reports are hidden until the viewer asks for them ("Show
+ * unverified reports"). Your own report always shows, so it never seems lost.
+ * The level is the backend's (thresholds.py), never recomputed here.
+ */
+export const hiddenByDefault = (r: Report): boolean => r.trust.level === 'low' && !r.mine
+
 /** The backend's error codes; the UI words each one (report.err.<code>). */
 export type ReportErrorCode =
   | 'sign_in'

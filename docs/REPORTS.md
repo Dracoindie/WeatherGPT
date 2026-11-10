@@ -61,6 +61,22 @@ score = 0.35 × model + 0.25 × nearby + 0.15 × age + 0.25 × reporter − 0.1 
 `REPORT_TRUST_MEDIUM`, `REPORT_TRUST_HIGH`). Every band above lives in
 `thresholds.py`. The API returns the score and its parts, so the card can say why.
 
+### Low-trust reports are hidden by default
+
+On the map only **Medium** and **High** trust reports are drawn and counted. If
+the view holds Low-trust reports, the panel under the map offers **"Show
+unverified reports (N hidden)"**; pressing it draws them too (small dots), and
+pressing again hides them. The risk board counts Medium and High reports per
+district and adds "Low-trust reports hidden: N (show them on the map)".
+
+- **Your own report always shows to you**, whatever its trust, so it never seems lost.
+- A report that is hidden here is still stored, still expires and can still be
+  confirmed once shown; three flags still remove it for everyone.
+- The choice is made in the browser from the level the API returns
+  (`hiddenByDefault` in `weathergpt-web/lib/api/reports.ts`); the API itself
+  lists every live report with its trust, and the waterlogging estimate still
+  counts low-trust waterlogging reports at their small weight (0.25).
+
 Examples: a fresh heavy-rain report while the model shows heavy rain, from a new
 reporter, scores 0.35 + 0.15 + 0.125 = 0.625 (Medium); one confirmation lifts it
 to 0.71 (High). The same report while the model is dry scores 0.31 (Low).

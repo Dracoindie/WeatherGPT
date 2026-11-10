@@ -422,7 +422,7 @@ Both feed `/map` (`docs/VISION.md`, step 1). Every value is Open-Meteo's, or der
 
 Community reports are "community report, unverified": they are shown on the map and the risk board and never change a forecast number or an alert level (`docs/REPORTS.md`).
 
-- `GET /api/reports?south=&west=&north=&east=` lists live reports in a box (at most 15° a side), newest first, each with a trust level (Low / Medium / High), its score and parts. The reporter is never returned ("a resident", time rounded to 10 min).
+- `GET /api/reports?south=&west=&north=&east=` lists live reports in a box (at most 15° a side), newest first, each with a trust level (Low / Medium / High), its score and parts. The UI hides Low-trust reports until "Show unverified reports (N hidden)" is pressed. The reporter is never returned ("a resident", time rounded to 10 min).
 - `POST /api/reports` (signed in, multipart: `kind`, `latitude`, `longitude`, optional `note` and `photo`). Kinds: waterlogging, fallen tree, landslide, hail, heavy rain, strong wind, road blocked. One a minute and 5 an hour per person; 6 h on the map (24 h for landslide and road blocked). Photos are re-encoded as JPEG with all metadata (EXIF incl. GPS) removed.
 - `POST /api/reports/{id}/vote` with `{"vote": "confirm" | "flag"}` (signed in, once per report, never your own); 3 flags hide a report.
 - `GET /api/reports/{id}/photo` serves the cleaned JPEG while the report is live.

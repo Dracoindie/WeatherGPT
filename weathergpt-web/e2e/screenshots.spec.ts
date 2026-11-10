@@ -215,7 +215,7 @@ test('@screens map: community reports, card and the report form', async ({ page 
   await map.locator('canvas.maplibregl-canvas').waitFor({ timeout: 30_000 })
   await expect(map).toHaveAttribute('data-center', '18.520,73.857', { timeout: 15_000 })
   await page.getByTestId('map-layer-reports').click()
-  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   await page.getByTestId('map-centre').click()
   await page.getByTestId('report-card').waitFor({ timeout: 15_000 })
   await page.waitForTimeout(1500)

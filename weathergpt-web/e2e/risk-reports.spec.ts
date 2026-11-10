@@ -5,7 +5,8 @@ import { enterDemo, mockBackend } from './support/mockApi'
 /**
  * The risk board lists recent community reports within 25 km of each district
  * (unverified; they never change a district's level). The mocked reports sit
- * around Pune (mockApi.ts reportsFixture).
+ * around Pune (mockApi.ts reportsFixture); the low-trust one is only counted
+ * as hidden, as on the map.
  */
 test('district rows show nearby community reports, labelled unverified, levels unchanged', async ({ page }) => {
   const log = await mockBackend(page, { routes: { '/api/risk': BOARD } })
@@ -13,7 +14,8 @@ test('district rows show nearby community reports, labelled unverified, levels u
   await page.locator('a[href="/disaster"]').first().dispatchEvent('click')
   await page.waitForURL('**/disaster')
   const pune = page.getByTestId('risk-reports-Pune')
-  await expect(pune).toHaveText('Community reports (unverified) within 25 km: 3 · Waterlogging, Fallen tree, Hail', { timeout: 30_000 })
+  await expect(pune).toHaveText('Community reports (unverified) within 25 km: 2 · Waterlogging, Fallen tree', { timeout: 30_000 })
+  await expect(page.getByTestId('risk-reports-hidden-Pune')).toHaveText('Low-trust reports hidden: 1 (show them on the map)')
   // far from Pune: no line
   await expect(page.getByTestId('risk-reports-Nagpur')).toHaveCount(0)
   // one request for the whole board, not one per district

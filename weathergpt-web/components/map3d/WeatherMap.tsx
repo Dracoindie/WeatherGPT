@@ -59,6 +59,7 @@ import {
 } from './hazard'
 import { createField, PARTICLE_STYLE, particleCount, retarget, segmentAlpha, step, TRAIL, type ParticleField } from './particles'
 import { useWaterlogging, useWaterlogHexes, WaterlogCard, waterlogColors, waterlogLayers, WaterlogLegend } from './waterlogging'
+import { hiddenByDefault } from '@/lib/api/reports'
 import { reportColors, ReportCard, reportLayers, ReportsLegend, ReportsPanel, useReports, type ComposerState } from './reports'
 import { endLabel, routeBounds, routeLayers, RoutePlanner, RouteReportPanel, useRoute } from './route'
 import { addMissingImageFallback, collapseAttributionOnUse, cssVar, firstOverlayLayer, MAPLIBRE_WORKER, tintBasemap } from './basemap'
@@ -190,6 +191,11 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
   const rp = useReports({ map: mapObj, active: reportsOn, mapReady, token })
   const [reportPickId, setReportPickId] = useState<string | null>(null)
   const [composer, setComposer] = useState<ComposerState>(null)
+  // low-trust reports stay hidden until "Show unverified reports" (your own always show)
+  const [showLowReports, setShowLowReports] = useState(false)
+  const lowReports = useMemo(() => rp.reports.filter(hiddenByDefault).length, [rp.reports])
+  const shownReports = useMemo(() => (showLowReports ? rp.reports : rp.reports.filter((r) => !hiddenByDefault(r))), [rp.reports, showLowReports])
+  // looked up in every report: a card stays open when your own flag drops its report to low trust
   const pickedReport = reportsOn && reportPickId ? (rp.reports.find((r) => r.id === reportPickId) ?? null) : null
   const draft = useMemo(
     () => (reportsOn && composer?.stage === 'form' ? { latitude: composer.latitude, longitude: composer.longitude } : null),
@@ -619,9 +625,9 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
     }
     if (wlOn) out.push(...waterlogLayers({ hexes: wlHexes, picked: wlPick, colors: waterlogColors() }))
     // report dots above the place marker: a report AT the place must stay tappable
-    if (reportsOn) out.push(...reportLayers({ reports: rp.reports, draft, selected: reportPickId, colors: reportColors(), big: broadcast }))
+    if (reportsOn) out.push(...reportLayers({ reports: shownReports, draft, selected: reportPickId, colors: reportColors(), big: broadcast }))
     return out
-  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to, reportsOn, rp.reports, draft, reportPickId, wlOn, wlHexes, wlPick])
+  }, [grid, gridStatus, surface, layer, hour, broadcast, broadcast3d, motion, place, colors, hazard, hexes, hz.roads, hazardType, routeOn, routeReport, rt.from, rt.to, reportsOn, shownReports, draft, reportPickId, wlOn, wlHexes, wlPick])
 
   // Show the whole route when a new report arrives.
   useEffect(() => {
@@ -1216,7 +1222,8 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
       data-route-segments={routeReport ? routeReport.segments.length : 0}
       data-route-worst={routeReport ? routeReport.worst : undefined}
       data-route-picking={routeOn && rt.picking ? rt.picking : undefined}
-      data-reports={reportsOn ? rp.reports.length : undefined}
+      data-reports={reportsOn ? shownReports.length : undefined}
+      data-reports-hidden={reportsOn ? (showLowReports ? 0 : lowReports) : undefined}
       data-waterlog-cells={wlOn && wl.data ? wl.data.cells.length : undefined}
       data-waterlog-status={wlOn ? wl.status : undefined}
       data-report-stage={reportsOn && composer ? composer.stage : undefined}
@@ -1301,7 +1308,13 @@ export function WeatherMap({ place: placeProp, conditionLabel, statusText, statu
               <ReportsPanel
                 status={rp.status}
                 error={rp.error}
-                count={rp.reports.length}
+                count={shownReports.length}
+                lowCount={lowReports}
+                showLow={showLowReports}
+                onShowLow={(show) => {
+                  setShowLowReports(show)
+                  if (!show) setReportPickId(null)
+                }}
                 token={token}
                 composer={composer}
                 setComposer={(c) => {

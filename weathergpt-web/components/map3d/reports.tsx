@@ -367,6 +367,9 @@ export function ReportsPanel({
   status,
   error,
   count,
+  lowCount,
+  showLow,
+  onShowLow,
   token,
   composer,
   setComposer,
@@ -375,7 +378,12 @@ export function ReportsPanel({
 }: {
   status: Status
   error: ReportErrorCode | null
+  /** reports drawn on the map */
   count: number
+  /** low-trust reports in view: hidden unless showLow */
+  lowCount: number
+  showLow: boolean
+  onShowLow: (show: boolean) => void
   token: string | null
   composer: ComposerState
   setComposer: (c: ComposerState) => void
@@ -422,6 +430,25 @@ export function ReportsPanel({
             </Link>
           ))}
       </div>
+      {status === 'ready' && lowCount > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            aria-pressed={showLow}
+            onClick={() => onShowLow(!showLow)}
+            data-testid="reports-show-low"
+            className={cn(
+              'rounded-full border px-3 py-1.5 text-xs transition-colors',
+              showLow ? 'border-accent bg-accent/15 text-hud' : 'border-white/10 bg-white/[0.04] text-hud-dim hover:text-hud'
+            )}
+          >
+            {fill(t(showLow ? 'report.showingLow' : 'report.showLow'), { n: lowCount })}
+          </button>
+          <p className="min-w-0 text-[11px] text-hud-dim" data-testid="reports-low-note">
+            {t('report.lowNote')}
+          </p>
+        </div>
+      )}
       {sent && !composer && (
         <p className="text-xs text-sev-none-text" role="status" data-testid="report-sent">
           {t('report.sent')}

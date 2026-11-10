@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
-import { enterDemo, mockBackend, PUNE, signIn, type MockOptions } from './support/mockApi'
+import { enterDemo, mockBackend, PUNE, reportsFixture, signIn, type MockOptions } from './support/mockApi'
 
 /**
  * Community reports on /map (docs/REPORTS.md): the reports layer, the tap card
  * (trust and why, photo, approximate time, "community report, unverified"),
  * the signed-in "Report what you see" flow with a photo, Confirm / Flag, and
- * the error messages. The backend is mocked (mockApi.ts reportsFixture).
+ * the error messages. The backend is mocked (mockApi.ts reportsFixture: one
+ * high, one medium and one low-trust report; the low one is hidden by default).
  */
 
 test.beforeEach(async ({ context }) => {
@@ -41,8 +42,8 @@ async function signedIn(page: Page, opts: MockOptions = {}) {
 
 test('reports layer: dots, legend, count and the unverified label; signed out you are asked to sign in', async ({ page }) => {
   const { map } = await demo(page)
-  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
-  await expect(page.getByTestId('reports-status')).toHaveText('3 community reports in view')
+  await expect(map).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
+  await expect(page.getByTestId('reports-status')).toHaveText('2 community reports in view')
   const legend = page.getByTestId('map-legend').filter({ visible: true })
   await expect(legend).toHaveAttribute('data-layer', 'reports')
   await expect(legend).toContainText('Community reports (unverified)')
@@ -55,9 +56,47 @@ test('reports layer: dots, legend, count and the unverified label; signed out yo
   await expect(map).toHaveAttribute('data-particles', '0')
 })
 
+test('low-trust reports are hidden until "Show unverified reports"; the toggle follows the UI language', async ({ page, isMobile }) => {
+  const { map } = await demo(page)
+  await expect(map).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-reports-hidden', '1')
+  const toggle = page.getByTestId('reports-show-low')
+  await expect(toggle).toHaveText('Show unverified reports (1 hidden)')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.getByTestId('reports-low-note')).toHaveText('Low-trust reports are hidden until you show them. Your own reports always show.')
+
+  await toggle.click()
+  await expect(map).toHaveAttribute('data-reports', '3')
+  await expect(map).toHaveAttribute('data-reports-hidden', '0')
+  await expect(toggle).toHaveText('Showing unverified reports (1)')
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('reports-status')).toHaveText('3 community reports in view')
+
+  await toggle.click()
+  await expect(map).toHaveAttribute('data-reports', '2')
+  await expect(page.getByTestId('reports-status')).toHaveText('2 community reports in view')
+
+  if (isMobile) return // language buttons sit in the desktop nav
+  await page.getByRole('button', { name: 'मरा', exact: true }).first().click()
+  await expect(toggle).toHaveText('पडताळणी न झालेले अहवाल दाखवा (1 लपवलेले)')
+  await page.getByRole('button', { name: 'हिं', exact: true }).first().click()
+  await expect(toggle).toHaveText('असत्यापित रिपोर्ट दिखाएँ (1 छिपी हैं)')
+  await page.getByRole('button', { name: 'Hing', exact: true }).first().click()
+  await expect(toggle).toHaveText('Unverified reports dikhao (1 chhupi hain)')
+  await toggle.click()
+  await expect(toggle).toHaveText('Unverified reports dikh rahi hain (1)')
+})
+
+test('signed in: your own low-trust report is never hidden; with nothing hidden there is no toggle', async ({ page }) => {
+  const { map } = await signedIn(page, { reports: reportsFixture().map((r) => (r.id === 'rep-hail' ? { ...r, mine: true } : r)) })
+  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-reports-hidden', '0')
+  await expect(page.getByTestId('reports-show-low')).toHaveCount(0)
+})
+
 test('tap a report: kind, trust and why, photo, approximate time, never who', async ({ page }) => {
   await demo(page)
-  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   // the report next to the map centre (Pune)
   await page.getByTestId('map-centre').click()
   const card = page.getByTestId('report-card')
@@ -77,7 +116,7 @@ test('tap a report: kind, trust and why, photo, approximate time, never who', as
 
 test('signed in: report what you see at the map centre, with a photo; it appears as yours', async ({ page }) => {
   const { log, map } = await signedIn(page)
-  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   await page.getByTestId('report-new').click()
   await expect(map).toHaveAttribute('data-report-stage', 'pick')
   await page.getByTestId('report-use-centre').click()
@@ -104,7 +143,7 @@ test('signed in: report what you see at the map centre, with a photo; it appears
   expect(sent.note).toBe('Water up to the wheel hubs')
   expect(sent.photoType).toBe('image/png')
   expect(sent.auth).toBe('Bearer e2e-access-token')
-  await expect(map).toHaveAttribute('data-reports', '4')
+  await expect(map).toHaveAttribute('data-reports', '3')
   await expect(page.getByTestId('report-card')).toHaveAttribute('data-kind', 'waterlogging')
   await expect(page.getByTestId('report-mine')).toBeVisible()
 })
@@ -131,7 +170,7 @@ test('a photo the browser cannot read is refused before upload', async ({ page }
 
 test('signed in: confirm a report once; your vote shows', async ({ page }) => {
   const { log, map } = await signedIn(page)
-  await expect(map).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   await page.getByTestId('map-centre').click()
   await expect(page.getByTestId('report-card')).toHaveAttribute('data-kind', 'waterlogging')
   await page.getByTestId('report-confirm').click()
@@ -169,7 +208,7 @@ test('reports unavailable: a clear line, the map keeps working', async ({ page }
 test('report words follow the UI language', async ({ page, isMobile }) => {
   test.skip(isMobile, 'language buttons sit in the desktop nav')
   await demo(page)
-  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   await page.getByTestId('map-centre').click()
   await page.getByRole('button', { name: 'मरा', exact: true }).first().click()
   await expect(page.getByTestId('report-kind')).toHaveText('पाणी साचले')
@@ -184,7 +223,7 @@ test('report words follow the UI language', async ({ page, isMobile }) => {
 test('phones: the card sits under the map, the panel stays reachable, no sideways scroll', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'phone layout')
   await demo(page)
-  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '3', { timeout: 15_000 })
+  await expect(page.getByTestId('weather-map')).toHaveAttribute('data-reports', '2', { timeout: 15_000 })
   await page.getByTestId('map-centre').click()
   const frame = (await page.getByTestId('map-frame').boundingBox())!
   const card = (await page.getByTestId('report-card').boundingBox())!
