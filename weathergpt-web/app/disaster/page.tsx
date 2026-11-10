@@ -15,6 +15,7 @@ import { SkyButton } from '@/components/ui/SkyButton'
 import { SEVERITY_VAR, SeverityBadge } from '@/components/ui/SeverityBadge'
 import { GlassPanel } from '@/components/panels/GlassPanel'
 import { fill, useI18n, type TranslationKey } from '@/context/I18nContext'
+import { useAreaReports } from '@/lib/useAreaReports'
 import {
   geocodePlace,
   getRiskBoard,
@@ -268,6 +269,8 @@ export default function DisasterPage() {
   )
   const pending = loading ? wanted.filter((w) => !risk[w.name] && !failed[w.name]) : []
   const notLocated = wanted.filter((w) => failed[w.name])
+  // community reports near each district (unverified; never change a level)
+  const areaReports = useAreaReports(useMemo(() => Object.values(located), [located]))
   const counts = rows.reduce<Record<string, number>>((acc, r) => ({ ...acc, [r.severity]: (acc[r.severity] ?? 0) + 1 }), {})
 
   return (
@@ -330,6 +333,16 @@ export default function DisasterPage() {
                     {r.severity !== 'unknown' && (
                       <p className="mt-1 font-readout text-[11px] text-hud-dim">
                         {fill(t('risk.line'), { rain: r.rain_24h_mm ?? '—', wind: r.max_wind_24h_kmh ?? '—', temp: r.max_temperature_24h_c ?? '—' })}
+                      </p>
+                    )}
+                    {(areaReports.byPlace[r.name]?.length ?? 0) > 0 && (
+                      <p className="mt-1 text-[11px] text-hud" data-testid={`risk-reports-${r.name}`}>
+                        {fill(t('risk.reports'), {
+                          n: areaReports.byPlace[r.name].length,
+                          kinds: [...new Set(areaReports.byPlace[r.name].map((x) => x.kind))]
+                            .map((k) => t(`report.kind.${k}` as TranslationKey))
+                            .join(', '),
+                        })}
                       </p>
                     )}
                   </div>
